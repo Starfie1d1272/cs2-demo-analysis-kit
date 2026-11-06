@@ -2,7 +2,7 @@
  * UtilitySpatial 几何地基（SP3 v2）。纯几何 + nav 拓扑，可独立单测，不依赖 demo。
  * 供烟雾视线封锁（segment-sphere）与烟雾隔离（nav 绕路代价）使用。
  */
-import type { CompactNav, MapZone, Vec3 } from "@cs2dak/maps";
+import type { CompactNav, MapZone, Vec3 } from '@cs2dak/maps';
 
 /** CS2 道具有效半径（世界单位，近似）。烟雾球 ~144、火焰面 ~150。 */
 export const SMOKE_RADIUS = 144;
@@ -10,20 +10,30 @@ export const FIRE_RADIUS = 150;
 
 /** 线段 AB 是否穿过以 center 为心、radius 为半径的球（即最近点距离 < radius）。 */
 export function segmentSphereIntersects(a: Vec3, b: Vec3, center: Vec3, radius: number): boolean {
-  const abx = b.x - a.x, aby = b.y - a.y, abz = b.z - a.z;
-  const apx = center.x - a.x, apy = center.y - a.y, apz = center.z - a.z;
+  const abx = b.x - a.x,
+    aby = b.y - a.y,
+    abz = b.z - a.z;
+  const apx = center.x - a.x,
+    apy = center.y - a.y,
+    apz = center.z - a.z;
   const abLen2 = abx * abx + aby * aby + abz * abz;
   let t = abLen2 > 0 ? (apx * abx + apy * aby + apz * abz) / abLen2 : 0;
   t = Math.max(0, Math.min(1, t));
-  const cx = a.x + abx * t, cy = a.y + aby * t, cz = a.z + abz * t;
-  const dx = center.x - cx, dy = center.y - cy, dz = center.z - cz;
+  const cx = a.x + abx * t,
+    cy = a.y + aby * t,
+    cz = a.z + abz * t;
+  const dx = center.x - cx,
+    dy = center.y - cy,
+    dz = center.z - cz;
   return dx * dx + dy * dy + dz * dz <= radius * radius;
 }
 
 /** 多边形质心（XY，世界坐标）。退化时回退到顶点平均。 */
 export function polygonCentroid(zone: MapZone): { x: number; y: number } {
   const p = zone.polygon;
-  let area = 0, cx = 0, cy = 0;
+  let area = 0,
+    cx = 0,
+    cy = 0;
   for (let i = 0, j = p.length - 1; i < p.length; j = i++) {
     const [xi, yi] = p[i]!;
     const [xj, yj] = p[j]!;
@@ -58,9 +68,14 @@ export function nearestAreaId(index: NavIndex, point: Vec3): number | null {
   let best: number | null = null;
   let bestD = Infinity;
   for (const [id, a] of index.byId) {
-    const dx = a.centroid.x - point.x, dy = a.centroid.y - point.y, dz = a.centroid.z - point.z;
+    const dx = a.centroid.x - point.x,
+      dy = a.centroid.y - point.y,
+      dz = a.centroid.z - point.z;
     const d = dx * dx + dy * dy + dz * dz;
-    if (d < bestD) { bestD = d; best = id; }
+    if (d < bestD) {
+      bestD = d;
+      best = id;
+    }
   }
   return best;
 }
@@ -70,7 +85,9 @@ export function areasWithinRadius(index: NavIndex, center: Vec3, radius: number)
   const out = new Set<number>();
   const r2 = radius * radius;
   for (const [id, a] of index.byId) {
-    const dx = a.centroid.x - center.x, dy = a.centroid.y - center.y, dz = a.centroid.z - center.z;
+    const dx = a.centroid.x - center.x,
+      dy = a.centroid.y - center.y,
+      dz = a.centroid.z - center.z;
     if (dx * dx + dy * dy + dz * dz <= r2) out.add(id);
   }
   return out;
@@ -132,7 +149,9 @@ export function smokeDetourCost(
 /** 极简二叉堆（id + cost）。 */
 class MinHeap {
   private heap: Array<{ id: number; cost: number }> = [];
-  get size(): number { return this.heap.length; }
+  get size(): number {
+    return this.heap.length;
+  }
   push(id: number, cost: number): void {
     const h = this.heap;
     h.push({ id, cost });
@@ -153,7 +172,8 @@ class MinHeap {
       h[0] = last;
       let i = 0;
       for (;;) {
-        const l = 2 * i + 1, r = 2 * i + 2;
+        const l = 2 * i + 1,
+          r = 2 * i + 2;
         let s = i;
         if (l < h.length && h[l]!.cost < h[s]!.cost) s = l;
         if (r < h.length && h[r]!.cost < h[s]!.cost) s = r;

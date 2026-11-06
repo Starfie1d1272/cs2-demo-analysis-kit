@@ -1,21 +1,24 @@
-import type { DemoPackage, QaIssue, QaReport } from "@cs2dak/contract";
-import { isNamedWeapon, normalizeWeapon, round } from "./utils.js";
+import type { DemoPackage, QaIssue, QaReport } from '@cs2dak/contract';
+import { isNamedWeapon, normalizeWeapon, round } from './utils.js';
 
 export interface ScoreboardFieldAvailability {
-  playerStats: "available" | "missing";
-  economy: "available" | "missing";
-  rounds: "available" | "missing";
-  richKills: "available" | "partial" | "missing";
-  damages: "available" | "missing";
-  bombs: "available" | "missing";
+  playerStats: 'available' | 'missing';
+  economy: 'available' | 'missing';
+  rounds: 'available' | 'missing';
+  richKills: 'available' | 'partial' | 'missing';
+  damages: 'available' | 'missing';
+  bombs: 'available' | 'missing';
 }
 
 export type DemoSourceAvailability = ScoreboardFieldAvailability & {
-  utility: "available";
-  clutches: "available";
+  utility: 'available';
+  clutches: 'available';
 };
 
-export function buildQaReport(pkg: DemoPackage, additionalIssues: readonly QaIssue[] = []): QaReport {
+export function buildQaReport(
+  pkg: DemoPackage,
+  additionalIssues: readonly QaIssue[] = [],
+): QaReport {
   const issues: QaIssue[] = [...additionalIssues];
   const roundNumbers = pkg.rounds.map((round) => round.roundNumber).sort((a, b) => a - b);
   const roundsByNumber = new Map(pkg.rounds.map((round) => [round.roundNumber, round]));
@@ -25,63 +28,69 @@ export function buildQaReport(pkg: DemoPackage, additionalIssues: readonly QaIss
   for (let i = 0; i < sortedRounds.length; i++) {
     const current = sortedRounds[i];
     const next = sortedRounds[i + 1];
-    eventEndTickByRound.set(
-      current.roundNumber,
-      next ? next.startTick - 1 : current.endTick
-    );
+    eventEndTickByRound.set(current.roundNumber, next ? next.startTick - 1 : current.endTick);
   }
 
   for (let i = 0; i < roundNumbers.length; i += 1) {
     if (roundNumbers[i] !== i + 1) {
       issues.push({
-        severity: "error",
-        code: "rounds.not_contiguous",
+        severity: 'error',
+        code: 'rounds.not_contiguous',
         message: `Round numbers should be contiguous from 1; found ${roundNumbers[i]} at index ${i}.`,
-        path: "rounds"
+        path: 'rounds',
       });
       break;
     }
   }
 
-  const teamAScore = pkg.rounds.filter((round) => round.winnerTeamKey === "teamA").length;
-  const teamBScore = pkg.rounds.filter((round) => round.winnerTeamKey === "teamB").length;
+  const teamAScore = pkg.rounds.filter((round) => round.winnerTeamKey === 'teamA').length;
+  const teamBScore = pkg.rounds.filter((round) => round.winnerTeamKey === 'teamB').length;
   if (teamAScore !== pkg.match.teamA.score || teamBScore !== pkg.match.teamB.score) {
     issues.push({
-      severity: "error",
-      code: "score.round_winners_mismatch",
+      severity: 'error',
+      code: 'score.round_winners_mismatch',
       message: `Match score is ${pkg.match.teamA.score}:${pkg.match.teamB.score}, but rounds imply ${teamAScore}:${teamBScore}.`,
-      path: "match"
+      path: 'match',
     });
   }
 
   for (const roundRow of pkg.rounds) {
-    if (!(roundRow.startTick <= roundRow.freezeEndTick && roundRow.freezeEndTick <= roundRow.endTick)) {
+    if (!(
+      roundRow.startTick <= roundRow.freezeEndTick && roundRow.freezeEndTick <= roundRow.endTick
+    )) {
       issues.push({
-        severity: "error",
-        code: "rounds.invalid_tick_order",
+        severity: 'error',
+        code: 'rounds.invalid_tick_order',
         message: `Round ${roundRow.roundNumber} has invalid tick order.`,
-        path: "rounds"
+        path: 'rounds',
       });
     }
-    const expectedWinnerSide = roundRow.winnerTeamKey === "teamA" ? roundRow.teamASide : roundRow.teamBSide;
+    const expectedWinnerSide =
+      roundRow.winnerTeamKey === 'teamA' ? roundRow.teamASide : roundRow.teamBSide;
     if (roundRow.winnerSide !== expectedWinnerSide) {
       issues.push({
-        severity: "error",
-        code: "rounds.winner_side_mismatch",
+        severity: 'error',
+        code: 'rounds.winner_side_mismatch',
         message: `Round ${roundRow.roundNumber} winnerSide does not match winnerTeamKey side.`,
-        path: "rounds"
+        path: 'rounds',
       });
     }
   }
 
-  const checkEventTick = (kind: string, roundNumber: number, tick: number, index: number, allowFreeze = false) => {
+  const checkEventTick = (
+    kind: string,
+    roundNumber: number,
+    tick: number,
+    index: number,
+    allowFreeze = false,
+  ) => {
     const roundRow = roundsByNumber.get(roundNumber);
     if (!roundRow) {
       issues.push({
-        severity: "error",
+        severity: 'error',
         code: `${kind}.unknown_round`,
         message: `${kind} event ${index} references missing round ${roundNumber}.`,
-        path: kind
+        path: kind,
       });
       return;
     }
@@ -89,10 +98,10 @@ export function buildQaReport(pkg: DemoPackage, additionalIssues: readonly QaIss
     const eventEnd = eventEndTickByRound.get(roundNumber) ?? roundRow.endTick;
     if (tick < minTick || tick > eventEnd) {
       issues.push({
-        severity: "error",
+        severity: 'error',
         code: `${kind}.tick_outside_round`,
         message: `${kind} event ${index} tick ${tick} is outside round ${roundNumber} active window.`,
-        path: kind
+        path: kind,
       });
     }
   };
@@ -100,91 +109,97 @@ export function buildQaReport(pkg: DemoPackage, additionalIssues: readonly QaIss
   const expectedEconomyRows = pkg.players.length * pkg.rounds.length;
   if (pkg.playerEconomies.length < expectedEconomyRows) {
     issues.push({
-      severity: "warning",
-      code: "economy.coverage_incomplete",
+      severity: 'warning',
+      code: 'economy.coverage_incomplete',
       message: `Expected ${expectedEconomyRows} player economy rows, found ${pkg.playerEconomies.length}.`,
-      path: "playerEconomies"
+      path: 'playerEconomies',
     });
   }
 
   pkg.kills.forEach((kill, index) => {
-    checkEventTick("kills", kill.roundNumber, kill.tick, index);
+    checkEventTick('kills', kill.roundNumber, kill.tick, index);
     if (kill.killerIndex !== null && kill.killerIndex >= pkg.players.length) {
       issues.push({
-        severity: "warning",
-        code: "kill.unknown_killer",
+        severity: 'warning',
+        code: 'kill.unknown_killer',
         message: `Killer playerIndex ${kill.killerIndex} is out of range (players.length=${pkg.players.length}).`,
-        path: "kills"
+        path: 'kills',
       });
     }
     if (kill.victimIndex >= pkg.players.length) {
       issues.push({
-        severity: "error",
-        code: "kill.unknown_victim",
+        severity: 'error',
+        code: 'kill.unknown_victim',
         message: `Victim playerIndex ${kill.victimIndex} is out of range (players.length=${pkg.players.length}).`,
-        path: "kills"
+        path: 'kills',
       });
     }
   });
 
-  pkg.damages.forEach((damage, index) => checkEventTick("damages", damage.roundNumber, damage.tick, index, true));
-  pkg.blinds.forEach((blind, index) => checkEventTick("blinds", blind.roundNumber, blind.tick, index));
+  pkg.damages.forEach((damage, index) =>
+    checkEventTick('damages', damage.roundNumber, damage.tick, index, true),
+  );
+  pkg.blinds.forEach((blind, index) =>
+    checkEventTick('blinds', blind.roundNumber, blind.tick, index),
+  );
   pkg.grenades.forEach((grenade, index) => {
-    checkEventTick("grenades", grenade.roundNumber, grenade.throwTick, index);
-    checkEventTick("grenades", grenade.roundNumber, grenade.effectTick, index);
+    checkEventTick('grenades', grenade.roundNumber, grenade.throwTick, index);
+    checkEventTick('grenades', grenade.roundNumber, grenade.effectTick, index);
   });
 
   const bombEventsByRound = new Map<number, typeof pkg.bombs>();
   pkg.bombs.forEach((bomb, index) => {
-    checkEventTick("bombs", bomb.roundNumber, bomb.tick, index);
+    checkEventTick('bombs', bomb.roundNumber, bomb.tick, index);
     const events = bombEventsByRound.get(bomb.roundNumber) ?? [];
     events.push(bomb);
     bombEventsByRound.set(bomb.roundNumber, events);
     if (bomb.actorIndex !== null && bomb.actorIndex >= pkg.players.length) {
       issues.push({
-        severity: "warning",
-        code: "bomb.unknown_actor",
+        severity: 'warning',
+        code: 'bomb.unknown_actor',
         message: `Bomb actor playerIndex ${bomb.actorIndex} is out of range (players.length=${pkg.players.length}).`,
-        path: "bombs"
+        path: 'bombs',
       });
     }
   });
 
   for (const [roundNumber, bombs] of bombEventsByRound) {
     const sorted = [...bombs].sort((a, b) => a.tick - b.tick);
-    const planted = sorted.find((bomb) => bomb.type === "planted");
-    const terminal = sorted.find((bomb) => bomb.type === "exploded" || bomb.type === "defused");
+    const planted = sorted.find((bomb) => bomb.type === 'planted');
+    const terminal = sorted.find((bomb) => bomb.type === 'exploded' || bomb.type === 'defused');
     if (terminal && (!planted || planted.tick > terminal.tick)) {
       issues.push({
-        severity: "error",
-        code: "bomb.lifecycle_without_plant",
+        severity: 'error',
+        code: 'bomb.lifecycle_without_plant',
         message: `Round ${roundNumber} has ${terminal.type} before any planted event.`,
-        path: "bombs"
+        path: 'bombs',
       });
     }
   }
 
-  const spatialRows = pkg.kills.filter((kill) => kill.victimPosition.x !== 0 || kill.victimPosition.y !== 0).length;
+  const spatialRows = pkg.kills.filter(
+    (kill) => kill.victimPosition.x !== 0 || kill.victimPosition.y !== 0,
+  ).length;
   if (pkg.kills.length > 0 && spatialRows === 0) {
     issues.push({
-      severity: "warning",
-      code: "spatial.no_real_kill_positions",
-      message: "Kills exist, but no non-origin victim positions were found.",
-      path: "kills"
+      severity: 'warning',
+      code: 'spatial.no_real_kill_positions',
+      message: 'Kills exist, but no non-origin victim positions were found.',
+      path: 'kills',
     });
   }
 
-  const errorCount = issues.filter((issue) => issue.severity === "error").length;
-  const warningCount = issues.filter((issue) => issue.severity === "warning").length;
+  const errorCount = issues.filter((issue) => issue.severity === 'error').length;
+  const warningCount = issues.filter((issue) => issue.severity === 'warning').length;
 
   return {
     ok: errorCount === 0,
     summary: {
       issueCount: issues.length,
       errorCount,
-      warningCount
+      warningCount,
     },
-    issues
+    issues,
   };
 }
 
@@ -207,14 +222,14 @@ export function fieldAvailability(pkg: DemoPackage): ScoreboardFieldAvailability
  */
 export function demoSourceAvailability(pkg: DemoPackage): DemoSourceAvailability {
   return {
-    playerStats: "available",
-    economy: "available",
-    rounds: "available",
+    playerStats: 'available',
+    economy: 'available',
+    rounds: 'available',
     richKills: richKillAvailability(richKillDiagnostics(pkg)),
-    damages: "available",
-    bombs: "available",
-    utility: "available",
-    clutches: "available",
+    damages: 'available',
+    bombs: 'available',
+    utility: 'available',
+    clutches: 'available',
   };
 }
 
@@ -225,8 +240,8 @@ export function fieldConfidence(availability: ScoreboardFieldAvailability): numb
     availability.rounds,
     availability.richKills,
     availability.damages,
-    availability.bombs
-  ].map<number>((value) => value === "available" ? 1 : value === "partial" ? 0.5 : 0);
+    availability.bombs,
+  ].map<number>((value) => (value === 'available' ? 1 : value === 'partial' ? 0.5 : 0));
   return round(values.reduce((sum, value) => sum + value, 0) / values.length, 3);
 }
 
@@ -234,26 +249,44 @@ export type RichKillDiagnostics = {
   eventCount: number;
   flagsEventCount: number;
   namedActiveWeaponEventCount: number;
-  reason: "no_kill_events" | "flags_and_named_active_weapon" | "no_named_active_weapon" | "no_rich_kill_flags";
+  reason:
+    | 'no_kill_events'
+    | 'flags_and_named_active_weapon'
+    | 'no_named_active_weapon'
+    | 'no_rich_kill_flags';
 };
 
 /** Core owns both capability and its explanation; counts use the same predicates. */
 export function richKillDiagnostics(pkg: DemoPackage): RichKillDiagnostics {
   const eventCount = pkg.kills.length;
-  const flagsEventCount = pkg.kills.filter((kill) => "throughSmoke" in kill && "noScope" in kill && "penetratedObjects" in kill).length;
-  const namedActiveWeaponEventCount = pkg.kills.filter((kill) => kill.killerActiveWeapon && isNamedWeapon(normalizeWeapon(kill.killerActiveWeapon))).length;
-  const reason = eventCount === 0 ? "no_kill_events"
-    : flagsEventCount > 0 ? (namedActiveWeaponEventCount > 0 ? "flags_and_named_active_weapon" : "no_named_active_weapon")
-    : "no_rich_kill_flags";
+  const flagsEventCount = pkg.kills.filter(
+    (kill) => 'throughSmoke' in kill && 'noScope' in kill && 'penetratedObjects' in kill,
+  ).length;
+  const namedActiveWeaponEventCount = pkg.kills.filter(
+    (kill) => kill.killerActiveWeapon && isNamedWeapon(normalizeWeapon(kill.killerActiveWeapon)),
+  ).length;
+  const reason =
+    eventCount === 0
+      ? 'no_kill_events'
+      : flagsEventCount > 0
+        ? namedActiveWeaponEventCount > 0
+          ? 'flags_and_named_active_weapon'
+          : 'no_named_active_weapon'
+        : 'no_rich_kill_flags';
   return { eventCount, flagsEventCount, namedActiveWeaponEventCount, reason };
 }
 
-function richKillAvailability(diagnostics: RichKillDiagnostics): ScoreboardFieldAvailability["richKills"] {
+function richKillAvailability(
+  diagnostics: RichKillDiagnostics,
+): ScoreboardFieldAvailability['richKills'] {
   // A legal empty kills.json is an observed zero, not an unavailable source.
   switch (diagnostics.reason) {
-    case "no_kill_events":
-    case "flags_and_named_active_weapon": return "available";
-    case "no_named_active_weapon": return "partial";
-    case "no_rich_kill_flags": return "missing";
+    case 'no_kill_events':
+    case 'flags_and_named_active_weapon':
+      return 'available';
+    case 'no_named_active_weapon':
+      return 'partial';
+    case 'no_rich_kill_flags':
+      return 'missing';
   }
 }

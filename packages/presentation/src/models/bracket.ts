@@ -9,7 +9,7 @@ export interface BracketCell {
   teamB: string | null;
   scoreA: number | null;
   scoreB: number | null;
-  winner: "A" | "B" | null;
+  winner: 'A' | 'B' | null;
   date: string | null;
   /** 观看侧：点开该场的 demo entry。 */
   entryIds?: string[];
@@ -48,7 +48,7 @@ export interface ElimColumn {
 export interface ElimNode {
   id: string;
   round: number;
-  lane: "winner" | "loser" | "grand" | "single";
+  lane: 'winner' | 'loser' | 'grand' | 'single';
   label: string;
   nextWinNodeId?: string | null;
   nextLossNodeId?: string | null;
@@ -65,4 +65,3 @@ export interface ElimModel {
    */
   nodes?: ElimNode[];
 }
-

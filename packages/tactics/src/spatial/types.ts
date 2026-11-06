@@ -8,21 +8,13 @@
 
 /** 回合阶段。official scoring 排除 freeze / save / exit（见 OFFICIAL_EXCLUDED_PHASES）。 */
 export type RoundPhase =
-  | "freeze"
-  | "default"
-  | "take"
-  | "execute"
-  | "postPlant"
-  | "retake"
-  | "save"
-  | "exit"
-  | "clutch";
+  'freeze' | 'default' | 'take' | 'execute' | 'postPlant' | 'retake' | 'save' | 'exit' | 'clutch';
 
 /** save / exit / freeze 默认不进 official MapControl/UtilitySpatial（仍进 review 层）。 */
 export const OFFICIAL_EXCLUDED_PHASES: ReadonlySet<RoundPhase> = new Set<RoundPhase>([
-  "freeze",
-  "save",
-  "exit",
+  'freeze',
+  'save',
+  'exit',
 ]);
 
 export function isOfficialScoringPhase(phase: RoundPhase): boolean {

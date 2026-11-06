@@ -9,11 +9,22 @@ import type {
   TournamentTeamMapCount,
   TournamentTeamSlot,
   WinLossCount,
-} from "./types.js";
+} from './types.js';
 
-const TEAM_SLOTS = ["teamA", "teamB"] as const satisfies readonly TournamentTeamSlot[];
-const MAN_ADVANTAGE_KEYS = ["5v4", "4v5", "5v3", "3v5"] as const satisfies readonly TournamentManAdvantage[];
-const ECONOMY_ORDER = ["pistol", "eco", "semi", "force", "full"] as const satisfies readonly TournamentEconomyType[];
+const TEAM_SLOTS = ['teamA', 'teamB'] as const satisfies readonly TournamentTeamSlot[];
+const MAN_ADVANTAGE_KEYS = [
+  '5v4',
+  '4v5',
+  '5v3',
+  '3v5',
+] as const satisfies readonly TournamentManAdvantage[];
+const ECONOMY_ORDER = [
+  'pistol',
+  'eco',
+  'semi',
+  'force',
+  'full',
+] as const satisfies readonly TournamentEconomyType[];
 
 type MutableCount = { opportunities: number; wins: number };
 
@@ -22,18 +33,20 @@ function invalid(mapKey: string, path: string, message: string): never {
 }
 
 function assertNonEmptyString(value: string, mapKey: string, path: string): void {
-  if (typeof value !== "string" || value.length === 0) invalid(mapKey, path, "must be a non-empty string");
+  if (typeof value !== 'string' || value.length === 0)
+    invalid(mapKey, path, 'must be a non-empty string');
 }
 
 function assertCount(value: number, mapKey: string, path: string): void {
-  if (!Number.isInteger(value) || value < 0) invalid(mapKey, path, "must be a non-negative integer");
+  if (!Number.isInteger(value) || value < 0)
+    invalid(mapKey, path, 'must be a non-negative integer');
 }
 
 function assertWinLoss(value: WinLossCount, mapKey: string, path: string): void {
-  if (value == null || typeof value !== "object") invalid(mapKey, path, "must be a win/loss count");
+  if (value == null || typeof value !== 'object') invalid(mapKey, path, 'must be a win/loss count');
   assertCount(value.opportunities, mapKey, `${path}.opportunities`);
   assertCount(value.wins, mapKey, `${path}.wins`);
-  if (value.wins > value.opportunities) invalid(mapKey, path, "wins must not exceed opportunities");
+  if (value.wins > value.opportunities) invalid(mapKey, path, 'wins must not exceed opportunities');
 }
 
 function assertTeamMapCount(value: TournamentTeamMapCount, mapKey: string, path: string): void {
@@ -43,29 +56,38 @@ function assertTeamMapCount(value: TournamentTeamMapCount, mapKey: string, path:
   assertCount(value.tWins, mapKey, `${path}.tWins`);
   assertCount(value.ctRounds, mapKey, `${path}.ctRounds`);
   assertCount(value.ctWins, mapKey, `${path}.ctWins`);
-  if (value.tRounds + value.ctRounds !== value.rounds) invalid(mapKey, path, "tRounds + ctRounds must equal rounds");
-  if (value.tWins > value.tRounds) invalid(mapKey, `${path}.tWins`, "must not exceed tRounds");
-  if (value.ctWins > value.ctRounds) invalid(mapKey, `${path}.ctWins`, "must not exceed ctRounds");
-  if (value.roundWins !== value.tWins + value.ctWins) invalid(mapKey, path, "roundWins must equal tWins + ctWins");
+  if (value.tRounds + value.ctRounds !== value.rounds)
+    invalid(mapKey, path, 'tRounds + ctRounds must equal rounds');
+  if (value.tWins > value.tRounds) invalid(mapKey, `${path}.tWins`, 'must not exceed tRounds');
+  if (value.ctWins > value.ctRounds) invalid(mapKey, `${path}.ctWins`, 'must not exceed ctRounds');
+  if (value.roundWins !== value.tWins + value.ctWins)
+    invalid(mapKey, path, 'roundWins must equal tWins + ctWins');
 }
 
-function assertTeamConversions(value: TournamentTeamConversionCount, mapKey: string, path: string): void {
+function assertTeamConversions(
+  value: TournamentTeamConversionCount,
+  mapKey: string,
+  path: string,
+): void {
   assertWinLoss(value.pistol, mapKey, `${path}.pistol`);
   assertWinLoss(value.round2.conversion, mapKey, `${path}.round2.conversion`);
   assertWinLoss(value.round2.break, mapKey, `${path}.round2.break`);
   assertWinLoss(value.ecoSemiUpset, mapKey, `${path}.ecoSemiUpset`);
-  for (const key of MAN_ADVANTAGE_KEYS) assertWinLoss(value.manAdvantage[key], mapKey, `${path}.manAdvantage.${key}`);
+  for (const key of MAN_ADVANTAGE_KEYS)
+    assertWinLoss(value.manAdvantage[key], mapKey, `${path}.manAdvantage.${key}`);
 }
 
 function assertMapFacts(facts: TournamentMapFacts): void {
   const mapKey = facts.mapKey;
-  assertNonEmptyString(facts.semanticProfile, mapKey, "semanticProfile");
-  assertNonEmptyString(facts.analysisVersion, mapKey, "analysisVersion");
-  assertNonEmptyString(facts.mapKey, mapKey, "mapKey");
-  assertNonEmptyString(facts.matchKey, mapKey, "matchKey");
-  assertNonEmptyString(facts.mapName, mapKey, "mapName");
-  for (const slot of TEAM_SLOTS) assertNonEmptyString(facts.teamEntityKeys[slot], mapKey, `teamEntityKeys.${slot}`);
-  if (facts.teamEntityKeys.teamA === facts.teamEntityKeys.teamB) invalid(mapKey, "teamEntityKeys", "teamA and teamB must differ");
+  assertNonEmptyString(facts.semanticProfile, mapKey, 'semanticProfile');
+  assertNonEmptyString(facts.analysisVersion, mapKey, 'analysisVersion');
+  assertNonEmptyString(facts.mapKey, mapKey, 'mapKey');
+  assertNonEmptyString(facts.matchKey, mapKey, 'matchKey');
+  assertNonEmptyString(facts.mapName, mapKey, 'mapName');
+  for (const slot of TEAM_SLOTS)
+    assertNonEmptyString(facts.teamEntityKeys[slot], mapKey, `teamEntityKeys.${slot}`);
+  if (facts.teamEntityKeys.teamA === facts.teamEntityKeys.teamB)
+    invalid(mapKey, 'teamEntityKeys', 'teamA and teamB must differ');
 
   for (const slot of TEAM_SLOTS) {
     assertTeamMapCount(facts.teamMaps[slot], mapKey, `teamMaps.${slot}`);
@@ -74,46 +96,90 @@ function assertMapFacts(facts: TournamentMapFacts): void {
 
   const teamA = facts.teamMaps.teamA;
   const teamB = facts.teamMaps.teamB;
-  if (teamA.rounds !== teamB.rounds) invalid(mapKey, "teamMaps", "teamA.rounds must equal teamB.rounds");
-  if (teamA.roundWins + teamB.roundWins !== teamA.rounds) invalid(mapKey, "teamMaps", "team round wins must equal rounds");
-  if (teamA.tRounds + teamB.tRounds !== teamA.rounds) invalid(mapKey, "teamMaps", "T rounds across teams must equal map rounds");
-  if (teamA.ctRounds + teamB.ctRounds !== teamA.rounds) invalid(mapKey, "teamMaps", "CT rounds across teams must equal map rounds");
+  if (teamA.rounds !== teamB.rounds)
+    invalid(mapKey, 'teamMaps', 'teamA.rounds must equal teamB.rounds');
+  if (teamA.roundWins + teamB.roundWins !== teamA.rounds)
+    invalid(mapKey, 'teamMaps', 'team round wins must equal rounds');
+  if (teamA.tRounds + teamB.tRounds !== teamA.rounds)
+    invalid(mapKey, 'teamMaps', 'T rounds across teams must equal map rounds');
+  if (teamA.ctRounds + teamB.ctRounds !== teamA.rounds)
+    invalid(mapKey, 'teamMaps', 'CT rounds across teams must equal map rounds');
 
-  assertWinLoss(facts.pistolSides.t, mapKey, "pistolSides.t");
-  assertWinLoss(facts.pistolSides.ct, mapKey, "pistolSides.ct");
+  assertWinLoss(facts.pistolSides.t, mapKey, 'pistolSides.t');
+  assertWinLoss(facts.pistolSides.ct, mapKey, 'pistolSides.ct');
   if (facts.pistolSides.t.opportunities !== facts.pistolSides.ct.opportunities) {
-    invalid(mapKey, "pistolSides", "T and CT pistol opportunities must match");
+    invalid(mapKey, 'pistolSides', 'T and CT pistol opportunities must match');
   }
   if (facts.pistolSides.t.wins + facts.pistolSides.ct.wins !== facts.pistolSides.t.opportunities) {
-    invalid(mapKey, "pistolSides", "T and CT pistol wins must equal pistol opportunities");
+    invalid(mapKey, 'pistolSides', 'T and CT pistol wins must equal pistol opportunities');
   }
 
-  const conversionOpportunities = TEAM_SLOTS.reduce((sum, slot) => sum + facts.teamConversions[slot].round2.conversion.opportunities, 0);
-  const breakOpportunities = TEAM_SLOTS.reduce((sum, slot) => sum + facts.teamConversions[slot].round2.break.opportunities, 0);
-  const conversionWins = TEAM_SLOTS.reduce((sum, slot) => sum + facts.teamConversions[slot].round2.conversion.wins, 0);
-  const breakWins = TEAM_SLOTS.reduce((sum, slot) => sum + facts.teamConversions[slot].round2.break.wins, 0);
-  if (conversionOpportunities !== breakOpportunities) invalid(mapKey, "teamConversions.round2", "conversion and break opportunities must match");
-  if (conversionWins + breakWins !== conversionOpportunities) invalid(mapKey, "teamConversions.round2", "conversion and break wins must equal opportunities");
+  const conversionOpportunities = TEAM_SLOTS.reduce(
+    (sum, slot) => sum + facts.teamConversions[slot].round2.conversion.opportunities,
+    0,
+  );
+  const breakOpportunities = TEAM_SLOTS.reduce(
+    (sum, slot) => sum + facts.teamConversions[slot].round2.break.opportunities,
+    0,
+  );
+  const conversionWins = TEAM_SLOTS.reduce(
+    (sum, slot) => sum + facts.teamConversions[slot].round2.conversion.wins,
+    0,
+  );
+  const breakWins = TEAM_SLOTS.reduce(
+    (sum, slot) => sum + facts.teamConversions[slot].round2.break.wins,
+    0,
+  );
+  if (conversionOpportunities !== breakOpportunities)
+    invalid(mapKey, 'teamConversions.round2', 'conversion and break opportunities must match');
+  if (conversionWins + breakWins !== conversionOpportunities)
+    invalid(mapKey, 'teamConversions.round2', 'conversion and break wins must equal opportunities');
 
-  for (const [advantage, disadvantage] of [["5v4", "4v5"], ["5v3", "3v5"]] as const) {
-    const advantageOpportunities = TEAM_SLOTS.reduce((sum, slot) => sum + facts.teamConversions[slot].manAdvantage[advantage].opportunities, 0);
-    const disadvantageOpportunities = TEAM_SLOTS.reduce((sum, slot) => sum + facts.teamConversions[slot].manAdvantage[disadvantage].opportunities, 0);
-    const advantageWins = TEAM_SLOTS.reduce((sum, slot) => sum + facts.teamConversions[slot].manAdvantage[advantage].wins, 0);
-    const disadvantageWins = TEAM_SLOTS.reduce((sum, slot) => sum + facts.teamConversions[slot].manAdvantage[disadvantage].wins, 0);
+  for (const [advantage, disadvantage] of [
+    ['5v4', '4v5'],
+    ['5v3', '3v5'],
+  ] as const) {
+    const advantageOpportunities = TEAM_SLOTS.reduce(
+      (sum, slot) => sum + facts.teamConversions[slot].manAdvantage[advantage].opportunities,
+      0,
+    );
+    const disadvantageOpportunities = TEAM_SLOTS.reduce(
+      (sum, slot) => sum + facts.teamConversions[slot].manAdvantage[disadvantage].opportunities,
+      0,
+    );
+    const advantageWins = TEAM_SLOTS.reduce(
+      (sum, slot) => sum + facts.teamConversions[slot].manAdvantage[advantage].wins,
+      0,
+    );
+    const disadvantageWins = TEAM_SLOTS.reduce(
+      (sum, slot) => sum + facts.teamConversions[slot].manAdvantage[disadvantage].wins,
+      0,
+    );
     if (advantageOpportunities !== disadvantageOpportunities) {
-      invalid(mapKey, `teamConversions.manAdvantage.${advantage}/${disadvantage}`, "paired opportunities must match");
+      invalid(
+        mapKey,
+        `teamConversions.manAdvantage.${advantage}/${disadvantage}`,
+        'paired opportunities must match',
+      );
     }
     if (advantageWins + disadvantageWins !== advantageOpportunities) {
-      invalid(mapKey, `teamConversions.manAdvantage.${advantage}/${disadvantage}`, "paired wins must equal opportunities");
+      invalid(
+        mapKey,
+        `teamConversions.manAdvantage.${advantage}/${disadvantage}`,
+        'paired wins must equal opportunities',
+      );
     }
   }
 
   facts.economyMatrix.forEach((cell, index) => {
-    if (!ECONOMY_ORDER.includes(cell.lowEconomy)) invalid(mapKey, `economyMatrix[${index}].lowEconomy`, "unknown economy type");
-    if (!ECONOMY_ORDER.includes(cell.highEconomy)) invalid(mapKey, `economyMatrix[${index}].highEconomy`, "unknown economy type");
+    if (!ECONOMY_ORDER.includes(cell.lowEconomy))
+      invalid(mapKey, `economyMatrix[${index}].lowEconomy`, 'unknown economy type');
+    if (!ECONOMY_ORDER.includes(cell.highEconomy))
+      invalid(mapKey, `economyMatrix[${index}].highEconomy`, 'unknown economy type');
     assertCount(cell.rounds, mapKey, `economyMatrix[${index}].rounds`);
     assertCount(cell.lowEconomyWins, mapKey, `economyMatrix[${index}].lowEconomyWins`);
-    if (cell.lowEconomyWins > cell.rounds) invalid(mapKey, `economyMatrix[${index}].lowEconomyWins`, "must not exceed rounds");
+    if (cell.lowEconomyWins > cell.rounds)
+      invalid(mapKey, `economyMatrix[${index}].lowEconomyWins`, 'must not exceed rounds');
   });
 
   facts.playerWeapons.forEach((row, index) => {
@@ -122,9 +188,10 @@ function assertMapFacts(facts: TournamentMapFacts): void {
     assertNonEmptyString(row.weapon, mapKey, `playerWeapons[${index}].weapon`);
     assertCount(row.kills, mapKey, `playerWeapons[${index}].kills`);
     assertCount(row.headshotKills, mapKey, `playerWeapons[${index}].headshotKills`);
-    if (row.headshotKills > row.kills) invalid(mapKey, `playerWeapons[${index}].headshotKills`, "must not exceed kills");
+    if (row.headshotKills > row.kills)
+      invalid(mapKey, `playerWeapons[${index}].headshotKills`, 'must not exceed kills');
     if (!TEAM_SLOTS.some((slot) => facts.teamEntityKeys[slot] === row.teamEntityKey)) {
-      invalid(mapKey, `playerWeapons[${index}].teamEntityKey`, "must belong to this map");
+      invalid(mapKey, `playerWeapons[${index}].teamEntityKey`, 'must belong to this map');
     }
   });
 }
@@ -134,11 +201,24 @@ function zeroCount(): MutableCount {
 }
 
 function zeroManAdvantage(): Record<TournamentManAdvantage, MutableCount> {
-  return Object.fromEntries(MAN_ADVANTAGE_KEYS.map((key) => [key, zeroCount()])) as Record<TournamentManAdvantage, MutableCount>;
+  return Object.fromEntries(MAN_ADVANTAGE_KEYS.map((key) => [key, zeroCount()])) as Record<
+    TournamentManAdvantage,
+    MutableCount
+  >;
 }
 
-function zeroTeamConversions(): { pistol: MutableCount; round2: { conversion: MutableCount; break: MutableCount }; ecoSemiUpset: MutableCount; manAdvantage: Record<TournamentManAdvantage, MutableCount> } {
-  return { pistol: zeroCount(), round2: { conversion: zeroCount(), break: zeroCount() }, ecoSemiUpset: zeroCount(), manAdvantage: zeroManAdvantage() };
+function zeroTeamConversions(): {
+  pistol: MutableCount;
+  round2: { conversion: MutableCount; break: MutableCount };
+  ecoSemiUpset: MutableCount;
+  manAdvantage: Record<TournamentManAdvantage, MutableCount>;
+} {
+  return {
+    pistol: zeroCount(),
+    round2: { conversion: zeroCount(), break: zeroCount() },
+    ecoSemiUpset: zeroCount(),
+    manAdvantage: zeroManAdvantage(),
+  };
 }
 
 function zeroRate(): RateCount {
@@ -146,7 +226,11 @@ function zeroRate(): RateCount {
 }
 
 function rate(count: MutableCount): RateCount {
-  return { opportunities: count.opportunities, wins: count.wins, rate: count.opportunities > 0 ? count.wins / count.opportunities : null };
+  return {
+    opportunities: count.opportunities,
+    wins: count.wins,
+    rate: count.opportunities > 0 ? count.wins / count.opportunities : null,
+  };
 }
 
 function addCount(target: MutableCount, source: WinLossCount): void {
@@ -154,7 +238,11 @@ function addCount(target: MutableCount, source: WinLossCount): void {
   target.wins += source.wins;
 }
 
-function entityRef(entityKey: string, labels: TournamentEntityLabels | undefined, kind: "teams" | "players"): { entityKey: string; displayName: string } {
+function entityRef(
+  entityKey: string,
+  labels: TournamentEntityLabels | undefined,
+  kind: 'teams' | 'players',
+): { entityKey: string; displayName: string } {
   return { entityKey, displayName: labels?.[kind]?.[entityKey] ?? entityKey };
 }
 
@@ -180,7 +268,9 @@ function zeroModel(): TournamentAnalytics {
       round2Conversion: zeroRate(),
       round2Break: zeroRate(),
       ecoSemiUpset: zeroRate(),
-      manAdvantage: Object.fromEntries(MAN_ADVANTAGE_KEYS.map((key) => [key, zeroRate()])) as Record<TournamentManAdvantage, RateCount>,
+      manAdvantage: Object.fromEntries(
+        MAN_ADVANTAGE_KEYS.map((key) => [key, zeroRate()]),
+      ) as Record<TournamentManAdvantage, RateCount>,
     },
     maps: [],
     teams: [],
@@ -199,14 +289,38 @@ export function buildTournamentAnalytics(
   const matchKeys = new Set<string>();
   let semanticProfile: string | null = null;
   const analysisVersions = new Set<string>();
-  const mapRows = new Map<string, { mapCount: number; roundCount: number; t: MutableCount; ct: MutableCount; pistolT: MutableCount; pistolCt: MutableCount }>();
-  const teamRows = new Map<string, {
-    mapCount: number;
-    maps: TournamentTeamMapCount;
-    conversions: ReturnType<typeof zeroTeamConversions>;
-  }>();
-  const economyRows = new Map<string, { lowEconomy: TournamentEconomyType; highEconomy: TournamentEconomyType; rounds: number; lowEconomyWins: number }>();
-  const weaponRows = new Map<string, { kills: number; headshotKills: number; players: Map<string, number> }>();
+  const mapRows = new Map<
+    string,
+    {
+      mapCount: number;
+      roundCount: number;
+      t: MutableCount;
+      ct: MutableCount;
+      pistolT: MutableCount;
+      pistolCt: MutableCount;
+    }
+  >();
+  const teamRows = new Map<
+    string,
+    {
+      mapCount: number;
+      maps: TournamentTeamMapCount;
+      conversions: ReturnType<typeof zeroTeamConversions>;
+    }
+  >();
+  const economyRows = new Map<
+    string,
+    {
+      lowEconomy: TournamentEconomyType;
+      highEconomy: TournamentEconomyType;
+      rounds: number;
+      lowEconomyWins: number;
+    }
+  >();
+  const weaponRows = new Map<
+    string,
+    { kills: number; headshotKills: number; players: Map<string, number> }
+  >();
   const totals = {
     t: zeroCount(),
     ct: zeroCount(),
@@ -221,11 +335,12 @@ export function buildTournamentAnalytics(
 
   for (const mapFacts of facts) {
     assertMapFacts(mapFacts);
-    if (mapKeys.has(mapFacts.mapKey)) invalid(mapFacts.mapKey, "mapKey", "duplicate mapKey");
+    if (mapKeys.has(mapFacts.mapKey)) invalid(mapFacts.mapKey, 'mapKey', 'duplicate mapKey');
     mapKeys.add(mapFacts.mapKey);
     matchKeys.add(mapFacts.matchKey);
     if (semanticProfile == null) semanticProfile = mapFacts.semanticProfile;
-    else if (semanticProfile !== mapFacts.semanticProfile) invalid(mapFacts.mapKey, "semanticProfile", `mixed profile; expected ${semanticProfile}`);
+    else if (semanticProfile !== mapFacts.semanticProfile)
+      invalid(mapFacts.mapKey, 'semanticProfile', `mixed profile; expected ${semanticProfile}`);
     analysisVersions.add(mapFacts.analysisVersion);
 
     const mapA = mapFacts.teamMaps.teamA;
@@ -234,7 +349,14 @@ export function buildTournamentAnalytics(
     const mapCt = { opportunities: mapA.ctRounds + mapB.ctRounds, wins: mapA.ctWins + mapB.ctWins };
     const mapPistolT = { ...mapFacts.pistolSides.t };
     const mapPistolCt = { ...mapFacts.pistolSides.ct };
-    const mapRow = mapRows.get(mapFacts.mapName) ?? { mapCount: 0, roundCount: 0, t: zeroCount(), ct: zeroCount(), pistolT: zeroCount(), pistolCt: zeroCount() };
+    const mapRow = mapRows.get(mapFacts.mapName) ?? {
+      mapCount: 0,
+      roundCount: 0,
+      t: zeroCount(),
+      ct: zeroCount(),
+      pistolT: zeroCount(),
+      pistolCt: zeroCount(),
+    };
     mapRow.mapCount += 1;
     mapRow.roundCount += mapA.rounds;
     addCount(mapRow.t, mapT);
@@ -250,7 +372,11 @@ export function buildTournamentAnalytics(
 
     for (const slot of TEAM_SLOTS) {
       const entityKey = mapFacts.teamEntityKeys[slot];
-      const row = teamRows.get(entityKey) ?? { mapCount: 0, maps: { rounds: 0, roundWins: 0, tRounds: 0, tWins: 0, ctRounds: 0, ctWins: 0 }, conversions: zeroTeamConversions() };
+      const row = teamRows.get(entityKey) ?? {
+        mapCount: 0,
+        maps: { rounds: 0, roundWins: 0, tRounds: 0, tWins: 0, ctRounds: 0, ctWins: 0 },
+        conversions: zeroTeamConversions(),
+      };
       row.mapCount += 1;
       const mapTeam = mapFacts.teamMaps[slot];
       row.maps.rounds += mapTeam.rounds;
@@ -264,29 +390,43 @@ export function buildTournamentAnalytics(
       addCount(row.conversions.round2.conversion, mapConversions.round2.conversion);
       addCount(row.conversions.round2.break, mapConversions.round2.break);
       addCount(row.conversions.ecoSemiUpset, mapConversions.ecoSemiUpset);
-      for (const key of MAN_ADVANTAGE_KEYS) addCount(row.conversions.manAdvantage[key], mapConversions.manAdvantage[key]);
+      for (const key of MAN_ADVANTAGE_KEYS)
+        addCount(row.conversions.manAdvantage[key], mapConversions.manAdvantage[key]);
       teamRows.set(entityKey, row);
 
       const teamConversion = mapConversions;
       addCount(totals.round2Conversion, teamConversion.round2.conversion);
       addCount(totals.round2Break, teamConversion.round2.break);
       addCount(totals.ecoSemiUpset, teamConversion.ecoSemiUpset);
-      for (const key of MAN_ADVANTAGE_KEYS) addCount(totals.manAdvantage[key], teamConversion.manAdvantage[key]);
+      for (const key of MAN_ADVANTAGE_KEYS)
+        addCount(totals.manAdvantage[key], teamConversion.manAdvantage[key]);
     }
 
     for (const cell of mapFacts.economyMatrix) {
       const key = `${cell.lowEconomy}:${cell.highEconomy}`;
-      const row = economyRows.get(key) ?? { lowEconomy: cell.lowEconomy, highEconomy: cell.highEconomy, rounds: 0, lowEconomyWins: 0 };
+      const row = economyRows.get(key) ?? {
+        lowEconomy: cell.lowEconomy,
+        highEconomy: cell.highEconomy,
+        rounds: 0,
+        lowEconomyWins: 0,
+      };
       row.rounds += cell.rounds;
       row.lowEconomyWins += cell.lowEconomyWins;
       economyRows.set(key, row);
     }
 
     for (const row of mapFacts.playerWeapons) {
-      const weapon = weaponRows.get(row.weapon) ?? { kills: 0, headshotKills: 0, players: new Map<string, number>() };
+      const weapon = weaponRows.get(row.weapon) ?? {
+        kills: 0,
+        headshotKills: 0,
+        players: new Map<string, number>(),
+      };
       weapon.kills += row.kills;
       weapon.headshotKills += row.headshotKills;
-      weapon.players.set(row.playerEntityKey, (weapon.players.get(row.playerEntityKey) ?? 0) + row.kills);
+      weapon.players.set(
+        row.playerEntityKey,
+        (weapon.players.get(row.playerEntityKey) ?? 0) + row.kills,
+      );
       weaponRows.set(row.weapon, weapon);
     }
   }
@@ -294,7 +434,7 @@ export function buildTournamentAnalytics(
   const teams = [...teamRows.entries()]
     .sort(([a], [b]) => lexicalCompare(a, b))
     .map(([entityKey, row]) => ({
-      team: entityRef(entityKey, options.labels, "teams"),
+      team: entityRef(entityKey, options.labels, 'teams'),
       mapCount: row.mapCount,
       rounds: row.maps.rounds,
       roundWins: row.maps.roundWins,
@@ -307,7 +447,9 @@ export function buildTournamentAnalytics(
         break: rate(row.conversions.round2.break),
       },
       ecoSemiUpset: rate(row.conversions.ecoSemiUpset),
-      manAdvantage: Object.fromEntries(MAN_ADVANTAGE_KEYS.map((key) => [key, rate(row.conversions.manAdvantage[key])])) as Record<TournamentManAdvantage, RateCount>,
+      manAdvantage: Object.fromEntries(
+        MAN_ADVANTAGE_KEYS.map((key) => [key, rate(row.conversions.manAdvantage[key])]),
+      ) as Record<TournamentManAdvantage, RateCount>,
     }));
 
   const maps = [...mapRows.entries()]
@@ -323,22 +465,31 @@ export function buildTournamentAnalytics(
     }));
 
   const economyMatrix = [...economyRows.values()]
-    .sort((a, b) => economyIndex(a.lowEconomy) - economyIndex(b.lowEconomy) || economyIndex(a.highEconomy) - economyIndex(b.highEconomy))
+    .sort(
+      (a, b) =>
+        economyIndex(a.lowEconomy) - economyIndex(b.lowEconomy) ||
+        economyIndex(a.highEconomy) - economyIndex(b.highEconomy),
+    )
     .map((row) => ({
       ...row,
-      lowWinRate: row.lowEconomy === row.highEconomy || row.rounds === 0 ? null : row.lowEconomyWins / row.rounds,
+      lowWinRate:
+        row.lowEconomy === row.highEconomy || row.rounds === 0
+          ? null
+          : row.lowEconomyWins / row.rounds,
     }));
 
   const weapons = [...weaponRows.entries()]
     .sort(([a, left], [b, right]) => right.kills - left.kills || lexicalCompare(a, b))
     .map(([weapon, row]) => {
-      const top = [...row.players.entries()].sort(([a, left], [b, right]) => right - left || lexicalCompare(a, b))[0];
+      const top = [...row.players.entries()].sort(
+        ([a, left], [b, right]) => right - left || lexicalCompare(a, b),
+      )[0];
       return {
         weapon,
         kills: row.kills,
         headshotKills: row.headshotKills,
         headshotRate: row.kills > 0 ? row.headshotKills / row.kills : null,
-        topPlayer: top ? { ...entityRef(top[0], options.labels, "players"), kills: top[1] } : null,
+        topPlayer: top ? { ...entityRef(top[0], options.labels, 'players'), kills: top[1] } : null,
       };
     });
 
@@ -355,7 +506,9 @@ export function buildTournamentAnalytics(
       round2Conversion: rate(totals.round2Conversion),
       round2Break: rate(totals.round2Break),
       ecoSemiUpset: rate(totals.ecoSemiUpset),
-      manAdvantage: Object.fromEntries(MAN_ADVANTAGE_KEYS.map((key) => [key, rate(totals.manAdvantage[key])])) as Record<TournamentManAdvantage, RateCount>,
+      manAdvantage: Object.fromEntries(
+        MAN_ADVANTAGE_KEYS.map((key) => [key, rate(totals.manAdvantage[key])]),
+      ) as Record<TournamentManAdvantage, RateCount>,
     },
     maps,
     teams,

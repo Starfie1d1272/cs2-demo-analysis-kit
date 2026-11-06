@@ -1,55 +1,89 @@
 #!/usr/bin/env node
 // Verify the actual tarball in an isolated consumer; no publish or workspace imports.
-import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const temporary = mkdtempSync(join(tmpdir(), "dak-maps-consumer-"));
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const temporary = mkdtempSync(join(tmpdir(), 'dak-maps-consumer-'));
 function command(program, args, options = {}) {
-  execFileSync(program, args, { cwd: root, stdio: "inherit", ...options });
+  execFileSync(program, args, { cwd: root, stdio: 'inherit', ...options });
 }
 try {
-  command("pnpm", ["-r", "--filter", "@cs2dak/maps", "--filter", "@cs2dak/map-assets", "build"]);
+  command('pnpm', ['-r', '--filter', '@cs2dak/maps', '--filter', '@cs2dak/map-assets', 'build']);
   const archives = {};
-  for (const name of ["maps", "map-assets"]) {
+  for (const name of ['maps', 'map-assets']) {
     const directory = join(temporary, name);
     mkdirSync(directory);
-    command("pnpm", ["--filter", `@cs2dak/${name}`, "pack", "--pack-destination", directory]);
-    const files = readdirSync(directory).filter(name => name.endsWith('.tgz'));
+    command('pnpm', ['--filter', `@cs2dak/${name}`, 'pack', '--pack-destination', directory]);
+    const files = readdirSync(directory).filter((name) => name.endsWith('.tgz'));
     assert.equal(files.length, 1);
     archives[`@cs2dak/${name}`] = `file:${join(directory, files[0])}`;
   }
-  const consumer = join(temporary, "consumer");
+  const consumer = join(temporary, 'consumer');
   mkdirSync(consumer);
-  writeFileSync(join(consumer, "package.json"), JSON.stringify({ private: true, type: "module", dependencies: archives, overrides: archives }));
-  command("npm", ["install", "--no-audit", "--no-fund", "--ignore-scripts"], { cwd: consumer });
-  const installed = join(consumer, "node_modules", "@cs2dak", "maps");
-  const assetsInstalled = join(consumer, "node_modules", "@cs2dak", "map-assets");
-  const manifest = JSON.parse(readFileSync(join(installed, "package.json"), "utf8"));
-  const assetsManifest = JSON.parse(readFileSync(join(assetsInstalled, "package.json"), "utf8"));
-  assert.deepEqual(Object.keys(manifest.exports).sort(), [".", "./calibration"].sort());
-  assert.deepEqual(Object.keys(assetsManifest.exports).sort(), [".", "./callout-grid-browser", "./callout-grid-node", "./tri-assets", "./callout-grid/*.json"].sort());
-  assert.deepEqual(readdirSync(join(consumer, "node_modules", "@cs2dak")).sort(), ["map-assets", "maps"]);
+  writeFileSync(
+    join(consumer, 'package.json'),
+    JSON.stringify({ private: true, type: 'module', dependencies: archives, overrides: archives }),
+  );
+  command('npm', ['install', '--no-audit', '--no-fund', '--ignore-scripts'], { cwd: consumer });
+  const installed = join(consumer, 'node_modules', '@cs2dak', 'maps');
+  const assetsInstalled = join(consumer, 'node_modules', '@cs2dak', 'map-assets');
+  const manifest = JSON.parse(readFileSync(join(installed, 'package.json'), 'utf8'));
+  const assetsManifest = JSON.parse(readFileSync(join(assetsInstalled, 'package.json'), 'utf8'));
+  assert.deepEqual(Object.keys(manifest.exports).sort(), ['.', './calibration'].sort());
+  assert.deepEqual(
+    Object.keys(assetsManifest.exports).sort(),
+    [
+      '.',
+      './callout-grid-browser',
+      './callout-grid-node',
+      './tri-assets',
+      './callout-grid/*.json',
+    ].sort(),
+  );
+  assert.deepEqual(readdirSync(join(consumer, 'node_modules', '@cs2dak')).sort(), [
+    'map-assets',
+    'maps',
+  ]);
   assert.deepEqual(Object.keys(manifest.dependencies ?? {}), []);
-  for (const assetDirectory of ['map-zones', 'map-routes', 'map-nav', 'callout-grid']) assert.ok(!readdirSync(installed).includes(assetDirectory));
-  assert.ok(!readdirSync(installed).includes("src"));
-  assert.ok(readdirSync(join(installed, "dist"), { withFileTypes: true }).every((entry) =>
-    entry.isFile() && !entry.name.includes(".test.") && (entry.name.endsWith(".js") || entry.name.endsWith(".d.ts"))));
+  for (const assetDirectory of ['map-zones', 'map-routes', 'map-nav', 'callout-grid'])
+    assert.ok(!readdirSync(installed).includes(assetDirectory));
+  assert.ok(!readdirSync(installed).includes('src'));
+  assert.ok(
+    readdirSync(join(installed, 'dist'), { withFileTypes: true }).every(
+      (entry) =>
+        entry.isFile() &&
+        !entry.name.includes('.test.') &&
+        (entry.name.endsWith('.js') || entry.name.endsWith('.d.ts')),
+    ),
+  );
   for (const entry of Object.values(manifest.exports)) {
     assert.match(entry.import, /^\.\/dist\/.*\.js$/);
     assert.match(entry.types, /^\.\/dist\/.*\.d\.ts$/);
     readFileSync(join(installed, entry.import));
     readFileSync(join(installed, entry.types));
   }
-  for (const asset of ["map-zones/de_ancient.json", "map-routes/de_ancient.json", "map-nav/de_ancient.nav.json", "callout-grid/de_ancient.json"]) {
+  for (const asset of [
+    'map-zones/de_ancient.json',
+    'map-routes/de_ancient.json',
+    'map-nav/de_ancient.nav.json',
+    'callout-grid/de_ancient.json',
+  ]) {
     readFileSync(join(assetsInstalled, asset));
   }
-  assert.ok(!/\b(?:import|export)\s[^;]*\bfrom\b|\bimport\s*[('"']/.test(readFileSync(join(installed, "dist/calibration.js"), "utf8")), "calibration has zero runtime imports");
-  writeFileSync(join(consumer, "check.mjs"), `
+  assert.ok(
+    !/\b(?:import|export)\s[^;]*\bfrom\b|\bimport\s*[('"']/.test(
+      readFileSync(join(installed, 'dist/calibration.js'), 'utf8'),
+    ),
+    'calibration has zero runtime imports',
+  );
+  writeFileSync(
+    join(consumer, 'check.mjs'),
+    `
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -98,9 +132,16 @@ clearTriCache(); clearCalloutGridCache(); clearCalloutGridBrowserCache();
 const rawGrid = await import('@cs2dak/map-assets/callout-grid/de_nuke.json', { with: { type: 'json' } });
 assert.deepEqual(rawGrid.default, grid);
 console.log('Packed maps and map-assets: ESM entries, JSON asset export and actual API calls passed');
-`);
-  execFileSync(process.execPath, [join(consumer, "check.mjs")], { cwd: consumer, stdio: "inherit", env: { ...process.env, AWPY_TRIS_DIR: temporary } });
-  writeFileSync(join(consumer, "consumer.ts"), `
+`,
+  );
+  execFileSync(process.execPath, [join(consumer, 'check.mjs')], {
+    cwd: consumer,
+    stdio: 'inherit',
+    env: { ...process.env, AWPY_TRIS_DIR: temporary },
+  });
+  writeFileSync(
+    join(consumer, 'consumer.ts'),
+    `
 import { getMapCalibration, worldToRadar } from "@cs2dak/maps";
 import { getMapZones, getMapNav, getMapRoutes } from "@cs2dak/map-assets";
 import { MAP_CALIBRATION_VERSION, MAP_CALIBRATIONS, getMapCalibration as getPureCalibration, worldToRadar as pureWorldToRadar, levelAt, hasLowerLevel, type MapCalibration, type RadarPoint, type MapLevel } from '@cs2dak/maps/calibration';
@@ -123,15 +164,31 @@ void active; void spatial; void MAP_CALIBRATIONS; void MAP_CALIBRATION_VERSION;
 getMapZones('de_mirage'); getMapNav('de_nuke'); getMapRoutes('de_nuke');
 loadCalloutGrid('de_nuke'); void loadCalloutGridBrowser('de_nuke');
 hasMapTri('de_nuke'); getMapTri('de_nuke');
-`);
-  writeFileSync(join(consumer, "tsconfig.json"), JSON.stringify({ compilerOptions: {
-    strict: true, noEmit: true, module: "NodeNext", moduleResolution: "NodeNext", target: "ES2022", lib: ["ES2022", "DOM"], types: [], skipLibCheck: false,
-  }, include: ["consumer.ts"] }));
-  command("pnpm", ["exec", "tsc", "--project", join(consumer, "tsconfig.json")]);
-  console.log("Packed maps: strict NodeNext declaration consumer passed");
+`,
+  );
+  writeFileSync(
+    join(consumer, 'tsconfig.json'),
+    JSON.stringify({
+      compilerOptions: {
+        strict: true,
+        noEmit: true,
+        module: 'NodeNext',
+        moduleResolution: 'NodeNext',
+        target: 'ES2022',
+        lib: ['ES2022', 'DOM'],
+        types: [],
+        skipLibCheck: false,
+      },
+      include: ['consumer.ts'],
+    }),
+  );
+  command('pnpm', ['exec', 'tsc', '--project', join(consumer, 'tsconfig.json')]);
+  console.log('Packed maps: strict NodeNext declaration consumer passed');
   // A new process checks that the algorithm package loads after removing the asset package.
   rmSync(assetsInstalled, { recursive: true, force: true });
-  writeFileSync(join(consumer, "isolated.mjs"), `
+  writeFileSync(
+    join(consumer, 'isolated.mjs'),
+    `
 import assert from 'node:assert/strict';
 import * as maps from '@cs2dak/maps';
 import { MAP_CALIBRATIONS, MAP_CALIBRATION_VERSION, getMapCalibration, worldToRadar, levelAt, hasLowerLevel } from '@cs2dak/maps/calibration';
@@ -146,8 +203,9 @@ const origin = worldToRadar({ x: train.posX, y: train.posY }, train);
 assert.ok(origin.x === 0 && origin.y === 0 && !origin.outOfBounds);
 assert.equal(getMapCalibration('unknown'), null);
 console.log('Packed maps: root/calibration imports and calls pass with map-assets uninstalled');
-`);
-  command(process.execPath, [join(consumer, "isolated.mjs")], { cwd: consumer });
+`,
+  );
+  command(process.execPath, [join(consumer, 'isolated.mjs')], { cwd: consumer });
 } finally {
   rmSync(temporary, { recursive: true, force: true });
 }

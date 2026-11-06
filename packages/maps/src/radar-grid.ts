@@ -5,12 +5,12 @@
  * 格 = 把 nav area 质心按 cellSize 桶进规则格，只保留含 ≥1 质心的「可行走格」（稀疏）。
  * 每格代表点取桶内质心均值；z 不加靶高（靶高由 tactics 计算 LOS 时统一加，避免双份常量漂移）。
  */
-import type { CompactNav, Vec3 } from "./nav.js";
+import type { CompactNav, Vec3 } from './nav.js';
 
 /** 默认格边长（世界单位）。callout-grid 是 10u 更细；覆盖场用 128u 控制格数 ~300。 */
 export const RADAR_FIELD_CELL_SIZE = 128;
 
-export { MAP_CALIBRATION_VERSION } from "./calibration.js";
+export { MAP_CALIBRATION_VERSION } from './calibration.js';
 
 export interface RadarFieldGridIndex {
   cellSize: number;
@@ -30,7 +30,7 @@ function cellKey(x: number, y: number, cellSize: number): string {
  */
 export function buildRadarFieldGrid(
   nav: CompactNav | null,
-  cellSize: number = RADAR_FIELD_CELL_SIZE
+  cellSize: number = RADAR_FIELD_CELL_SIZE,
 ): RadarFieldGridIndex | null {
   if (!nav || nav.areas.length === 0) return null;
 

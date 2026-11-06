@@ -1,13 +1,127 @@
-import { useEffect, useState } from "react";
-import { savedAnalyses, savedScopeSummary, type SavedAnalysis } from "../../lib/saved-analysis";
-import { summarizeAnalysisContext, type AnalysisEventScope } from "../../lib/analysis-context";
-import type { StudioDemoEntry } from "../../lib/demo-entry";
+import { useEffect, useState } from 'react';
+import { savedAnalyses, savedScopeSummary, type SavedAnalysis } from '../../lib/saved-analysis';
+import { summarizeAnalysisContext, type AnalysisEventScope } from '../../lib/analysis-context';
+import type { StudioDemoEntry } from '../../lib/demo-entry';
 
-export function SavedAnalysesPanel({ entries, events, onOpen, onReset }: { entries: StudioDemoEntry[]; events: AnalysisEventScope[]; onOpen: (row: SavedAnalysis) => void; onReset: () => void }) {
- const [renameId,setRenameId] = useState<string | null>(null), [renameTitle,setRenameTitle] = useState("");
- const [rows,setRows] = useState<SavedAnalysis[]>([]), [invalid,setInvalid] = useState<string[]>([]), [error,setError] = useState("");
- const refresh = async () => { try { const result = await savedAnalyses.list(); setRows(result.rows); setInvalid(result.invalid); setError(""); } catch { setError("读取保存分析失败"); } };
- useEffect(() => { void refresh(); }, []);
- const run = async (f: () => Promise<unknown>) => { try { await f(); await refresh(); } catch (e) { setError(e instanceof Error ? e.message : "操作失败"); } };
- return <section><h2>已保存的分析</h2><p>打开后按当前比赛库和所选比赛重新计算。</p>{error && <p role="alert">{error}</p>}{invalid.length > 0 && <p role="alert">{invalid.length} 条保存记录损坏或版本不支持，原记录已保留。<button className="stu-button-sm" onClick={onReset}>重置为新分析</button></p>}{rows.map(row => <div className="stu-card" key={row.id}><strong>{row.title}</strong><p>{summarizeAnalysisContext(row.context,entries,events)} · {savedScopeSummary(row.context)} · {new Date(row.updatedAt).toLocaleString()} {row.workbenchShortcut ? "· 工作台快捷入口" : ""}</p><button className="stu-button-sm" onClick={() => onOpen(row)}>打开</button>{renameId === row.id ? <span><input className="stu-input" aria-label="新标题" value={renameTitle} onChange={e => setRenameTitle(e.target.value)} /><button className="stu-button-sm" onClick={() => { void (async () => { try { const current = await savedAnalyses.get(row.id); if (!current) throw new Error("原保存项已删除，可另存"); await savedAnalyses.update(row.id,{...current,title:renameTitle}); setRenameId(null); await refresh(); } catch (e) { setError(e instanceof Error ? e.message : "重命名失败"); } })(); }}>确认</button><button className="stu-button-sm" onClick={() => setRenameId(null)}>取消</button></span> : <button className="stu-button-sm" onClick={() => { setRenameId(row.id); setRenameTitle(row.title); }}>重命名</button>}<button className="stu-button-sm" onClick={() => void run(() => savedAnalyses.copy(row.id))}>复制</button><button className="stu-button-sm" onClick={() => { if (window.confirm(`删除“${row.title}”？`)) void run(() => savedAnalyses.remove(row.id)); }}>删除</button></div>)}</section>;
+export function SavedAnalysesPanel({
+  entries,
+  events,
+  onOpen,
+  onReset,
+}: {
+  entries: StudioDemoEntry[];
+  events: AnalysisEventScope[];
+  onOpen: (row: SavedAnalysis) => void;
+  onReset: () => void;
+}) {
+  const [renameId, setRenameId] = useState<string | null>(null),
+    [renameTitle, setRenameTitle] = useState('');
+  const [rows, setRows] = useState<SavedAnalysis[]>([]),
+    [invalid, setInvalid] = useState<string[]>([]),
+    [error, setError] = useState('');
+  const refresh = async () => {
+    try {
+      const result = await savedAnalyses.list();
+      setRows(result.rows);
+      setInvalid(result.invalid);
+      setError('');
+    } catch {
+      setError('读取保存分析失败');
+    }
+  };
+  useEffect(() => {
+    void refresh();
+  }, []);
+  const run = async (f: () => Promise<unknown>) => {
+    try {
+      await f();
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '操作失败');
+    }
+  };
+  return (
+    <section>
+      <h2>已保存的分析</h2>
+      <p>打开后按当前比赛库和所选比赛重新计算。</p>
+      {error && <p role="alert">{error}</p>}
+      {invalid.length > 0 && (
+        <p role="alert">
+          {invalid.length} 条保存记录损坏或版本不支持，原记录已保留。
+          <button className="stu-button-sm" onClick={onReset}>
+            重置为新分析
+          </button>
+        </p>
+      )}
+      {rows.map((row) => (
+        <div className="stu-card" key={row.id}>
+          <strong>{row.title}</strong>
+          <p>
+            {summarizeAnalysisContext(row.context, entries, events)} ·{' '}
+            {savedScopeSummary(row.context)} · {new Date(row.updatedAt).toLocaleString()}{' '}
+            {row.workbenchShortcut ? '· 工作台快捷入口' : ''}
+          </p>
+          <button className="stu-button-sm" onClick={() => onOpen(row)}>
+            打开
+          </button>
+          {renameId === row.id ? (
+            <span>
+              <input
+                className="stu-input"
+                aria-label="新标题"
+                value={renameTitle}
+                onChange={(e) => setRenameTitle(e.target.value)}
+              />
+              <button
+                className="stu-button-sm"
+                onClick={() => {
+                  void (async () => {
+                    try {
+                      const current = await savedAnalyses.get(row.id);
+                      if (!current) throw new Error('原保存项已删除，可另存');
+                      await savedAnalyses.update(row.id, { ...current, title: renameTitle });
+                      setRenameId(null);
+                      await refresh();
+                    } catch (e) {
+                      setError(e instanceof Error ? e.message : '重命名失败');
+                    }
+                  })();
+                }}
+              >
+                确认
+              </button>
+              <button className="stu-button-sm" onClick={() => setRenameId(null)}>
+                取消
+              </button>
+            </span>
+          ) : (
+            <button
+              className="stu-button-sm"
+              onClick={() => {
+                setRenameId(row.id);
+                setRenameTitle(row.title);
+              }}
+            >
+              重命名
+            </button>
+          )}
+          <button
+            className="stu-button-sm"
+            onClick={() => void run(() => savedAnalyses.copy(row.id))}
+          >
+            复制
+          </button>
+          <button
+            className="stu-button-sm"
+            onClick={() => {
+              if (window.confirm(`删除“${row.title}”？`))
+                void run(() => savedAnalyses.remove(row.id));
+            }}
+          >
+            删除
+          </button>
+        </div>
+      ))}
+    </section>
+  );
 }

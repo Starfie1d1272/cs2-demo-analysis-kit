@@ -1,8 +1,14 @@
-import { X, Download, ExternalLink } from "lucide-react";
-import { type UpdateInfo, RELEASES_PAGE } from "../lib/update";
-import { applyUpdate, applyWebUpdate, canSelfUpdate, downloadUpdate, type UpdateJobStatus } from "../lib/updater-bridge";
-import { useState, useCallback } from "react";
-import { Changelog } from "./Changelog";
+import { X, Download, ExternalLink } from 'lucide-react';
+import { type UpdateInfo, RELEASES_PAGE } from '../lib/update';
+import {
+  applyUpdate,
+  applyWebUpdate,
+  canSelfUpdate,
+  downloadUpdate,
+  type UpdateJobStatus,
+} from '../lib/updater-bridge';
+import { useState, useCallback } from 'react';
+import { Changelog } from './Changelog';
 
 interface Props {
   update: UpdateInfo;
@@ -21,7 +27,10 @@ export function UpdateModal({ update, onDismiss }: Props) {
 
   const canAuto = canSelfUpdate(update.asset);
   const asset = update.asset;
-  const manualUrl = asset?.kind === "runtime" ? (asset.urls[0] ?? update.url ?? RELEASES_PAGE) : (update.url || RELEASES_PAGE);
+  const manualUrl =
+    asset?.kind === 'runtime'
+      ? (asset.urls[0] ?? update.url ?? RELEASES_PAGE)
+      : update.url || RELEASES_PAGE;
 
   const runUpdate = useCallback(async () => {
     if (!asset) return;
@@ -29,18 +38,19 @@ export function UpdateModal({ update, onDismiss }: Props) {
     setFailed(null);
     try {
       const result = await downloadUpdate(asset, setJob);
-      if (result.state !== "ready") {
-        setFailed(result.error ?? "下载失败");
+      if (result.state !== 'ready') {
+        setFailed(result.error ?? '下载失败');
         setBusy(false);
         return;
       }
-      const applied = asset.kind === "web"
-        ? await applyWebUpdate(result.jobId, update.latest)
-        : await applyUpdate(result.jobId);
+      const applied =
+        asset.kind === 'web'
+          ? await applyWebUpdate(result.jobId, update.latest)
+          : await applyUpdate(result.jobId);
       if (!applied.ok) {
-        setFailed(applied.error ?? "替换失败");
+        setFailed(applied.error ?? '替换失败');
         setBusy(false);
-      } else if (asset.kind === "web") {
+      } else if (asset.kind === 'web') {
         window.location.reload();
       }
     } catch (err) {
@@ -49,21 +59,30 @@ export function UpdateModal({ update, onDismiss }: Props) {
     }
   }, [asset]);
 
-  const pct = job && job.state === "downloading" ? Math.round(job.progress * 100) : null;
+  const pct = job && job.state === 'downloading' ? Math.round(job.progress * 100) : null;
   const actionLabel = !canAuto
-    ? "手动下载"
+    ? '手动下载'
     : !busy
-      ? asset?.kind === "web" ? `增量更新到 v${update.latest}` : `更新到 v${update.latest}`
-      : job?.state === "verifying"
-        ? "校验中…"
-        : job?.state === "applying" || job?.state === "ready"
-          ? asset?.kind === "web" ? "正在刷新…" : "正在重启…"
+      ? asset?.kind === 'web'
+        ? `增量更新到 v${update.latest}`
+        : `更新到 v${update.latest}`
+      : job?.state === 'verifying'
+        ? '校验中…'
+        : job?.state === 'applying' || job?.state === 'ready'
+          ? asset?.kind === 'web'
+            ? '正在刷新…'
+            : '正在重启…'
           : pct != null
             ? `下载中 ${pct}%`
-            : "准备中…";
+            : '准备中…';
 
   return (
-    <div className="stu-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onDismiss(); }}>
+    <div
+      className="stu-modal-overlay"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onDismiss();
+      }}
+    >
       <div className="stu-dialog stu-dialog-update" role="dialog" aria-label="发现新版本">
         <div className="stu-modal-header">
           <Download size={18} />
@@ -82,16 +101,24 @@ export function UpdateModal({ update, onDismiss }: Props) {
         </div>
 
         <div className="stu-modal-footer">
-          {failed && (
-            <small className="stu-update-failed">{failed}</small>
-          )}
+          {failed && <small className="stu-update-failed">{failed}</small>}
           <div className="stu-modal-actions">
             {canAuto ? (
-              <button type="button" className="stu-btn stu-btn-primary" onClick={runUpdate} disabled={busy}>
+              <button
+                type="button"
+                className="stu-btn stu-btn-primary"
+                onClick={runUpdate}
+                disabled={busy}
+              >
                 {actionLabel}
               </button>
             ) : (
-              <a className="stu-btn stu-btn-primary" href={manualUrl} target="_blank" rel="noreferrer">
+              <a
+                className="stu-btn stu-btn-primary"
+                href={manualUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
                 <ExternalLink size={14} /> 手动下载
               </a>
             )}

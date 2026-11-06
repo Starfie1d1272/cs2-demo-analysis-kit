@@ -16,34 +16,50 @@
 // 并记录 requiredBy（哪些 bundledEvents 需要它），
 // 供 health check 提供清晰的缺失提示。
 
-import { createHash } from "node:crypto";
-import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
-import { basename } from "node:path";
-import { argv, exit } from "node:process";
-import { readEventPackageJson } from "./lib/event-package-json.mjs";
+import { createHash } from 'node:crypto';
+import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { basename } from 'node:path';
+import { argv, exit } from 'node:process';
+import { readEventPackageJson } from './lib/event-package-json.mjs';
 
 // 与 gen-update-manifest.mjs / gen-tris-manifest.mjs 的 R2_BASE 保持一致。
-const R2_BASE = "https://dakupdate.starfie1d.top";
-const OWNER_REPO = "Starfie1d1272/cs2-demo-analysis-kit";
-const BINARY_MIRROR_PREFIXES = ["", "https://ghfast.top/", "https://gh-proxy.com/", "https://ghproxy.net/"];
+const R2_BASE = 'https://dakupdate.starfie1d.top';
+const OWNER_REPO = 'Starfie1d1272/cs2-demo-analysis-kit';
+const BINARY_MIRROR_PREFIXES = [
+  '',
+  'https://ghfast.top/',
+  'https://gh-proxy.com/',
+  'https://ghproxy.net/',
+];
 
 function sha256(path) {
-  const h = createHash("sha256");
+  const h = createHash('sha256');
   h.update(readFileSync(path));
-  return h.digest("hex");
+  return h.digest('hex');
 }
 
 function parseArgs(raw) {
-  const args = { channel: "stable", "asset-set": "cologne-major-2026-full" };
-  const flags = ["--version", "--runtime-zip", "--event-packages", "--tris-manifest", "--channel", "--asset-set", "--out", "--candidate-tag"];
+  const args = { channel: 'stable', 'asset-set': 'cologne-major-2026-full' };
+  const flags = [
+    '--version',
+    '--runtime-zip',
+    '--event-packages',
+    '--tris-manifest',
+    '--channel',
+    '--asset-set',
+    '--out',
+    '--candidate-tag',
+  ];
   for (let i = 0; i < raw.length; i++) {
     const a = raw[i];
     if (flags.includes(a) && i + 1 < raw.length) {
-      args[a.replace(/^--/, "")] = raw[++i];
+      args[a.replace(/^--/, '')] = raw[++i];
     }
   }
-  if (!args.version || !args["runtime-zip"] || !args["event-packages"] || !args["tris-manifest"]) {
-    console.error("用法: gen-install-manifest.mjs --version <ver> --runtime-zip <path> --event-packages <dir> --tris-manifest <path> [--channel stable] [--asset-set ...] [--out <path>]");
+  if (!args.version || !args['runtime-zip'] || !args['event-packages'] || !args['tris-manifest']) {
+    console.error(
+      '用法: gen-install-manifest.mjs --version <ver> --runtime-zip <path> --event-packages <dir> --tris-manifest <path> [--channel stable] [--asset-set ...] [--out <path>]',
+    );
     exit(1);
   }
   return args;
@@ -51,15 +67,15 @@ function parseArgs(raw) {
 
 function assetUrls(type, version, name) {
   const tag = `v${version}`;
-  if (type === "runtime") {
+  if (type === 'runtime') {
     const r2 = `${R2_BASE}/releases/${tag}/${name}`;
     const raw = `https://github.com/${OWNER_REPO}/releases/download/${tag}/${name}`;
     const mirrors = BINARY_MIRROR_PREFIXES.map((prefix) => (prefix ? `${prefix}${raw}` : raw));
     return [r2, ...mirrors];
   }
-  if (type === "event") {
+  if (type === 'event') {
     // events/<slug>/<slug>.zip
-    const slug = basename(name, ".zip");
+    const slug = basename(name, '.zip');
     return [`${R2_BASE}/events/${slug}/${name}`];
   }
   return [];
@@ -67,25 +83,28 @@ function assetUrls(type, version, name) {
 
 function main() {
   const args = parseArgs(argv.slice(2));
-  const ver = args.version.replace(/^v/, "");
-  const runtimeZipPath = args["runtime-zip"];
-  const eventPkgDir = args["event-packages"];
-  const trisManifestPath = args["tris-manifest"];
+  const ver = args.version.replace(/^v/, '');
+  const runtimeZipPath = args['runtime-zip'];
+  const eventPkgDir = args['event-packages'];
+  const trisManifestPath = args['tris-manifest'];
   const channel = args.channel;
-  const assetSet = args["asset-set"];
-  const outPath = args.out || "install-manifest.json";
+  const assetSet = args['asset-set'];
+  const outPath = args.out || 'install-manifest.json';
 
   // 1. Runtime
   const runtimeName = basename(runtimeZipPath);
   const runtimeSize = statSync(runtimeZipPath).size;
   const runtimeSha256 = sha256(runtimeZipPath);
-  const candidateTag = args["candidate-tag"];
-  if (candidateTag && candidateTag !== `v${ver}-rc.${candidateTag.match(/-rc\.([1-9]\d*)$/)?.[1]}`) throw new Error("Candidate tag must match app version");
+  const candidateTag = args['candidate-tag'];
+  if (candidateTag && candidateTag !== `v${ver}-rc.${candidateTag.match(/-rc\.([1-9]\d*)$/)?.[1]}`)
+    throw new Error('Candidate tag must match app version');
   const runtime = {
     name: runtimeName,
     size: runtimeSize,
     sha256: runtimeSha256,
-    urls: candidateTag ? [`https://github.com/${OWNER_REPO}/releases/download/${candidateTag}/${runtimeName}`] : assetUrls("runtime", ver, runtimeName),
+    urls: candidateTag
+      ? [`https://github.com/${OWNER_REPO}/releases/download/${candidateTag}/${runtimeName}`]
+      : assetUrls('runtime', ver, runtimeName),
   };
   console.error(`runtime: ${runtimeName} (${(runtimeSize / 1024 / 1024).toFixed(1)} MB)`);
 
@@ -105,13 +124,13 @@ function main() {
       const hash = sha256(full);
       // 从 event-package.json 读取真实名称/描述/分组
       let displayName = slug;
-      let description = "";
-      let group = "";
+      let description = '';
+      let group = '';
       try {
         const pkg = readEventPackageJson(full);
         displayName = pkg.event?.name || slug;
-        description = pkg.event?.description || "";
-        group = pkg.event?.group || "";
+        description = pkg.event?.description || '';
+        group = pkg.event?.group || '';
       } catch {
         // ZIP 内无 event-package.json 时退用 slug
       }
@@ -138,13 +157,16 @@ function main() {
     try {
       const pkg = readEventPackageJson(full);
       const maps = [];
-      for (const s of (pkg.series || [])) {
-        for (const m of (s.maps || [])) {
-          if (m.mapName) { allMaps.add(m.mapName); maps.push(m.mapName); }
+      for (const s of pkg.series || []) {
+        for (const m of s.maps || []) {
+          if (m.mapName) {
+            allMaps.add(m.mapName);
+            maps.push(m.mapName);
+          }
         }
       }
       if (maps.length > 0) {
-        console.error(`  maps in ${evt.slug}: ${[...new Set(maps)].join(", ")}`);
+        console.error(`  maps in ${evt.slug}: ${[...new Set(maps)].join(', ')}`);
       }
     } catch (err) {
       console.error(`   ⚠ 读取 ${evt.slug} event-package 失败: ${err.message}`);
@@ -154,7 +176,7 @@ function main() {
   // 4. Tris manifest — cross reference
   let trisManifest = null;
   try {
-    trisManifest = JSON.parse(readFileSync(trisManifestPath, "utf-8"));
+    trisManifest = JSON.parse(readFileSync(trisManifestPath, 'utf-8'));
   } catch (err) {
     console.error(`⚠ 读取 tris-manifest 失败: ${err.message}`);
   }
@@ -172,8 +194,12 @@ function main() {
         .filter((evt) => {
           try {
             const pkg = readEventPackageJson(`${eventPkgDir}/${evt.slug}/${evt.fileName}`);
-            return (pkg.series || []).some((s) => (s.maps || []).some((m) => m.mapName === mapName));
-          } catch { return false; }
+            return (pkg.series || []).some((s) =>
+              (s.maps || []).some((m) => m.mapName === mapName),
+            );
+          } catch {
+            return false;
+          }
         })
         .map((e) => e.slug);
       requiredTris[mapName] = {
@@ -183,15 +209,17 @@ function main() {
         urls: entry.urls,
         requiredBy,
       };
-      console.error(`tri:   ${entry.name} (${(entry.size / 1024 / 1024).toFixed(1)} MB) ← ${requiredBy.join(", ")}`);
+      console.error(
+        `tri:   ${entry.name} (${(entry.size / 1024 / 1024).toFixed(1)} MB) ← ${requiredBy.join(', ')}`,
+      );
     }
   } else if (allMaps.size > 0 && !trisManifest) {
-    console.error("   ⚠ tris-manifest 不可用，requiredTris 将为空");
+    console.error('   ⚠ tris-manifest 不可用，requiredTris 将为空');
   }
 
   // 5. Build manifest
   const manifest = {
-    version: "cs2-demo-analysis-kit/install-manifest-1.0",
+    version: 'cs2-demo-analysis-kit/install-manifest-1.0',
     appVersion: ver,
     channel,
     assetSet,
@@ -206,9 +234,11 @@ function main() {
   const totalTriBytes = Object.values(requiredTris).reduce((s, t) => s + t.size, 0);
   const totalBytes = runtime.size + totalEventBytes + totalTriBytes;
 
-  writeFileSync(outPath, JSON.stringify(manifest, null, 2) + "\n");
+  writeFileSync(outPath, JSON.stringify(manifest, null, 2) + '\n');
   console.error(`wrote ${outPath}`);
-  console.error(`总计: runtime ${(runtime.size / 1024 / 1024).toFixed(0)} MB + events ${(totalEventBytes / 1024 / 1024).toFixed(0)} MB + tris ${(totalTriBytes / 1024 / 1024).toFixed(0)} MB = ${(totalBytes / 1024 / 1024).toFixed(0)} MB`);
+  console.error(
+    `总计: runtime ${(runtime.size / 1024 / 1024).toFixed(0)} MB + events ${(totalEventBytes / 1024 / 1024).toFixed(0)} MB + tris ${(totalTriBytes / 1024 / 1024).toFixed(0)} MB = ${(totalBytes / 1024 / 1024).toFixed(0)} MB`,
+  );
 }
 
 main();

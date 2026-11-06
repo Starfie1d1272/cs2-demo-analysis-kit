@@ -1,7 +1,7 @@
-import { getMapCalibration, hasLowerLevel } from "@cs2dak/maps/calibration";
-import { analyzeMatchWorkspace } from "@cs2dak/pipeline";
-import type { MatchWorkspaceModel } from "@cs2dak/presentation";
-import { getDemoPackage } from "./library";
+import { getMapCalibration, hasLowerLevel } from '@cs2dak/maps/calibration';
+import { analyzeMatchWorkspace } from '@cs2dak/pipeline';
+import type { MatchWorkspaceModel } from '@cs2dak/presentation';
+import { getDemoPackage } from './library';
 
 /**
  * 单场工作台 model 懒算：从 ZIP 重建 pkg 再构 workspace。
@@ -13,6 +13,9 @@ export async function loadMatchWorkspaceModel(demoId: string): Promise<MatchWork
   const calibration = getMapCalibration(pkg.match.mapName);
   return analyzeMatchWorkspace(pkg, {
     radarImageUrl: calibration ? `./maps/radars/${pkg.match.mapName}.png` : null,
-    lowerRadarImageUrl: calibration && hasLowerLevel(calibration) ? `./maps/radars/${pkg.match.mapName}_lower.png` : null,
+    lowerRadarImageUrl:
+      calibration && hasLowerLevel(calibration)
+        ? `./maps/radars/${pkg.match.mapName}_lower.png`
+        : null,
   });
 }

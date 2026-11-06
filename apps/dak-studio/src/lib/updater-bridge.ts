@@ -33,7 +33,12 @@ export interface UpdateJobStatus {
 interface PywebviewApi {
   /** Python 端 urllib 拉取 manifest（无 CORS），返回 {version, notes, assets} 或 None。 */
   check_update?(channel?: UpdateChannel): Promise<Record<string, unknown> | null>;
-  update_start?(urls: string[], sha256: string, size: number, name: string): Promise<{ jobId: string }>;
+  update_start?(
+    urls: string[],
+    sha256: string,
+    size: number,
+    name: string,
+  ): Promise<{ jobId: string }>;
   update_status?(jobId: string): Promise<UpdateJobStatus>;
   update_apply?(jobId: string): Promise<{ ok: boolean; error?: string }>;
   /** Capability is provided by the safe native runtime, never by web overlay version. */
@@ -41,7 +46,9 @@ interface PywebviewApi {
   update_apply_web?(jobId: string, version: string): Promise<{ ok: boolean; error?: string }>;
 }
 
-type RuntimeUpdaterApi = Required<Pick<PywebviewApi, "update_start" | "update_status" | "update_apply">>;
+type RuntimeUpdaterApi = Required<
+  Pick<PywebviewApi, "update_start" | "update_status" | "update_apply">
+>;
 
 /** 获取 pywebview API 对象（无桥时返回 null）。 */
 function getPywebviewApi(): PywebviewApi | null {
@@ -60,8 +67,11 @@ export function getUpdaterApi(): RuntimeUpdaterApi | null {
 
 /** 当前环境是否支持应用内一键更新（桌面壳 + 有当前平台资产）。 */
 export function canSelfUpdate(asset: UpdateAsset | undefined): asset is UpdateAsset {
-  return asset != null && getUpdaterApi() != null &&
-    (asset.kind === "web" || typeof getPywebviewApi()?.update_apply_runtime_safe === "function");
+  return (
+    asset != null &&
+    getUpdaterApi() != null &&
+    (asset.kind === "web" || typeof getPywebviewApi()?.update_apply_runtime_safe === "function")
+  );
 }
 
 /**
@@ -70,7 +80,9 @@ export function canSelfUpdate(asset: UpdateAsset | undefined): asset is UpdateAs
  *
  * 返回的 UpdateInfo 带 asset（manifest 命中时），前端据此显示一键更新按钮。
  */
-export async function checkForUpdateViaBridge(channel: UpdateChannel = "stable"): Promise<{ checked: boolean; update: UpdateInfo | null }> {
+export async function checkForUpdateViaBridge(
+  channel: UpdateChannel = "stable",
+): Promise<{ checked: boolean; update: UpdateInfo | null }> {
   const api = getPywebviewApi();
   if (!api?.check_update) return { checked: false, update: null };
   try {
@@ -83,14 +95,20 @@ export async function checkForUpdateViaBridge(channel: UpdateChannel = "stable")
     const assets = raw.assets as Record<string, unknown> | undefined;
     const webAsset = assets?.web as Record<string, unknown> | undefined;
     const winAsset = assets?.windows as Record<string, unknown> | undefined;
-    const rawAsset = webAsset && typeof webAsset.name === "string" && Array.isArray(webAsset.urls) ? webAsset : winAsset;
+    const rawAsset =
+      webAsset && typeof webAsset.name === "string" && Array.isArray(webAsset.urls)
+        ? webAsset
+        : winAsset;
     const asset: UpdateAsset | undefined =
       rawAsset && typeof rawAsset.name === "string" && Array.isArray(rawAsset.urls)
         ? {
             kind: rawAsset === webAsset ? "web" : "runtime",
             name: rawAsset.name as string,
             size: typeof rawAsset.size === "number" ? (rawAsset.size as number) : 0,
-            sha256: (typeof rawAsset.sha256 === "string" ? (rawAsset.sha256 as string) : "").toLowerCase(),
+            sha256: (typeof rawAsset.sha256 === "string"
+              ? (rawAsset.sha256 as string)
+              : ""
+            ).toLowerCase(),
             urls: rawAsset.urls as string[],
           }
         : undefined;
@@ -108,10 +126,11 @@ const POLL_INTERVAL_MS = 600;
  */
 export async function downloadUpdate(
   asset: UpdateAsset,
-  onProgress: (status: UpdateJobStatus) => void
+  onProgress: (status: UpdateJobStatus) => void,
 ): Promise<UpdateJobStatus> {
   const api = getUpdaterApi();
-  if (!api || !canSelfUpdate(asset)) throw new Error("当前运行时需使用安装器升级，请先关闭 Studio 并保留原资料目录");
+  if (!api || !canSelfUpdate(asset))
+    throw new Error("当前运行时需使用安装器升级，请先关闭 Studio 并保留原资料目录");
   const { jobId } = await api.update_start(asset.urls, asset.sha256, asset.size, asset.name);
   for (;;) {
     const status = await api.update_status(jobId);
@@ -123,11 +142,15 @@ export async function downloadUpdate(
 
 export async function applyUpdate(jobId: string): Promise<{ ok: boolean; error?: string }> {
   const api = getPywebviewApi();
-  if (!api?.update_apply_runtime_safe) return { ok: false, error: "当前运行时需使用安装器升级，请先关闭 Studio 并保留原资料目录" };
+  if (!api?.update_apply_runtime_safe)
+    return { ok: false, error: "当前运行时需使用安装器升级，请先关闭 Studio 并保留原资料目录" };
   return api.update_apply_runtime_safe(jobId);
 }
 
-export async function applyWebUpdate(jobId: string, version: string): Promise<{ ok: boolean; error?: string }> {
+export async function applyWebUpdate(
+  jobId: string,
+  version: string,
+): Promise<{ ok: boolean; error?: string }> {
   const api = getPywebviewApi();
   if (!api?.update_apply_web) return { ok: false, error: "当前环境不支持前端增量更新" };
   return api.update_apply_web(jobId, version);

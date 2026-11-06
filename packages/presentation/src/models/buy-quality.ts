@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from 'zod';
 
 export const buyQualityRowSchema = z.object({
   economy: z.string(),

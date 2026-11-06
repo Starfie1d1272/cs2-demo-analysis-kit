@@ -41,6 +41,11 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - run: pnpm format:check
+
+      # Baseline covers high-confidence rules; existing broader Biome findings remain for review.
+      - run: pnpm lint:baseline
+
       - run: pnpm check:release-policy
 
       - run: pnpm check:package-boundaries
@@ -97,6 +102,12 @@ jobs:
           sudo apt-get install -y python3-tk
 
       - run: uv sync --frozen --extra dev --extra gui
+        working-directory: python
+
+      - name: Check Python source format and lint
+        run: |
+          uv run ruff format --check src
+          uv run ruff check src --select E4,E7,E9,F
         working-directory: python
 
       - name: Run pytest

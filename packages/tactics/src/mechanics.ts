@@ -1,8 +1,8 @@
-import { EYE_HEIGHT, TARGET_HEIGHT } from "@cs2dak/maps";
-import type { DemoPackage, PackageDamage } from "@cs2dak/contract";
-import { decodeDelta } from "@cs2dak/contract";
-import { staticLineOfSight, type TriangleBvh, type Vec3 } from "@cs2dak/maps";
-import { buildDuelsSignals, type DuelRecord } from "./duels.js";
+import { EYE_HEIGHT, TARGET_HEIGHT } from '@cs2dak/maps';
+import type { DemoPackage, PackageDamage } from '@cs2dak/contract';
+import { decodeDelta } from '@cs2dak/contract';
+import { staticLineOfSight, type TriangleBvh, type Vec3 } from '@cs2dak/maps';
+import { buildDuelsSignals, type DuelRecord } from './duels.js';
 import {
   VIEW_CONE_HALF_DEGREES,
   aimErrorDegrees,
@@ -13,10 +13,10 @@ import {
   smokeBlocksRay,
   tickAtFrame,
   visibleOnsetFrame,
-  type VisibilityContext
-} from "./duel-window.js";
-import { createResolverFromPackage, type PlayerResolver } from "@cs2dak/core";
-import { activePhaseDamages, normalizeWeapon, round } from "@cs2dak/core";
+  type VisibilityContext,
+} from './duel-window.js';
+import { createResolverFromPackage, type PlayerResolver } from '@cs2dak/core';
+import { activePhaseDamages, normalizeWeapon, round } from '@cs2dak/core';
 
 const BURST_GAP_SECONDS = 0.25;
 const PRE_MOVE_START_SECONDS = 0.2; // 开枪前 200ms
@@ -46,7 +46,7 @@ export interface WeaponCounterStrafeThreshold {
   accurateMoveRatio: number;
   /** 停稳速度阈值（兼容旧字段名）：weaponMaxSpeed × accurateMoveRatio。 */
   maxSpeed: number;
-  source: "weapon" | "fallback";
+  source: 'weapon' | 'fallback';
 }
 
 /** 命中/尝试型指标：value 为百分比（successes/attempts×100），attempts=0 时 value=null。 */
@@ -111,7 +111,7 @@ export interface PlayerMechanicsFact extends MechanicsMetricSet {
 }
 
 export interface MechanicsSignals {
-  version: "cs2-demo-analysis-kit/mechanics-signals-0.2";
+  version: 'cs2-demo-analysis-kit/mechanics-signals-0.2';
   tickrate: number;
   burstGapSeconds: number;
   rows: PlayerMechanicsFact[];
@@ -176,26 +176,85 @@ const WEAPON_COUNTER_STRAFE_MAX_SPEED: Record<string, number> = {
   mag7: 225,
   sawedoff: 210,
   m249: 195,
-  negev: 150
+  negev: 150,
 };
 
 const FIREARM_WEAPONS = new Set([
-  "ak47", "m4a1", "m4a4", "m4a1_silencer", "aug", "sg556", "sg553", "famas", "galilar", "galil",
-  "awp", "ssg08", "scar20", "g3sg1", "deagle", "revolver", "glock", "usp_silencer", "usp",
-  "hkp2000", "p2000", "p250", "fiveseven", "tec9", "cz75a", "cz75", "elite", "mp9", "mp7",
-  "mp5sd", "ump45", "p90", "bizon", "mac10", "nova", "xm1014", "mag7", "sawedoff", "m249", "negev"
+  'ak47',
+  'm4a1',
+  'm4a4',
+  'm4a1_silencer',
+  'aug',
+  'sg556',
+  'sg553',
+  'famas',
+  'galilar',
+  'galil',
+  'awp',
+  'ssg08',
+  'scar20',
+  'g3sg1',
+  'deagle',
+  'revolver',
+  'glock',
+  'usp_silencer',
+  'usp',
+  'hkp2000',
+  'p2000',
+  'p250',
+  'fiveseven',
+  'tec9',
+  'cz75a',
+  'cz75',
+  'elite',
+  'mp9',
+  'mp7',
+  'mp5sd',
+  'ump45',
+  'p90',
+  'bizon',
+  'mac10',
+  'nova',
+  'xm1014',
+  'mag7',
+  'sawedoff',
+  'm249',
+  'negev',
 ]);
 
 /** 全自动连发武器（步枪 / 冲锋枪 / 机枪）。只有这些武器统计扫射命中率。 */
 const AUTO_WEAPONS = new Set([
-  "ak47", "m4a1", "m4a4", "m4a1_silencer", "aug", "sg556", "sg553", "famas", "galilar", "galil",
-  "mp9", "mp7", "mp5sd", "ump45", "p90", "bizon", "mac10", "m249", "negev"
+  'ak47',
+  'm4a1',
+  'm4a4',
+  'm4a1_silencer',
+  'aug',
+  'sg556',
+  'sg553',
+  'famas',
+  'galilar',
+  'galil',
+  'mp9',
+  'mp7',
+  'mp5sd',
+  'ump45',
+  'p90',
+  'bizon',
+  'mac10',
+  'm249',
+  'negev',
 ]);
 
 const ONE_TAP_CAPABLE_WEAPONS = new Set([
-  "ak47", "sg556", "sg553",
-  "deagle", "revolver",
-  "awp", "ssg08", "scar20", "g3sg1"
+  'ak47',
+  'sg556',
+  'sg553',
+  'deagle',
+  'revolver',
+  'awp',
+  'ssg08',
+  'scar20',
+  'g3sg1',
 ]);
 
 function tickrateOf(pkg: DemoPackage): number {
@@ -218,7 +277,9 @@ function median(values: number[]): number | null {
   if (values.length === 0) return null;
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0 ? round((sorted[mid - 1]! + sorted[mid]!) / 2, 1) : round(sorted[mid]!, 1);
+  return sorted.length % 2 === 0
+    ? round((sorted[mid - 1]! + sorted[mid]!) / 2, 1)
+    : round(sorted[mid]!, 1);
 }
 
 function planarSpeed(vx: number, vy: number): number {
@@ -229,9 +290,21 @@ export function counterStrafeThresholdForWeapon(weaponName: string): WeaponCount
   const weapon = normalizeWeapon(weaponName);
   const weaponMaxSpeed = WEAPON_COUNTER_STRAFE_MAX_SPEED[weapon] ?? null;
   if (weaponMaxSpeed != null) {
-    return { weapon, weaponMaxSpeed, accurateMoveRatio: ACCURATE_MOVE_RATIO, maxSpeed: round(weaponMaxSpeed * ACCURATE_MOVE_RATIO, 1), source: "weapon" };
+    return {
+      weapon,
+      weaponMaxSpeed,
+      accurateMoveRatio: ACCURATE_MOVE_RATIO,
+      maxSpeed: round(weaponMaxSpeed * ACCURATE_MOVE_RATIO, 1),
+      source: 'weapon',
+    };
   }
-  return { weapon, weaponMaxSpeed: null, accurateMoveRatio: ACCURATE_MOVE_RATIO, maxSpeed: 80, source: "fallback" };
+  return {
+    weapon,
+    weaponMaxSpeed: null,
+    accurateMoveRatio: ACCURATE_MOVE_RATIO,
+    maxSpeed: 80,
+    source: 'fallback',
+  };
 }
 
 function isFirearmWeapon(weapon: string): boolean {
@@ -253,7 +326,7 @@ function flattenShots(pkg: DemoPackage): FlatShot[] {
     const pitch = decodeDelta(track.pitch);
     for (let i = 0; i < shotTicks.length; i++) {
       const weaponIdx = track.weapon[i] ?? -1;
-      const weapon = normalizeWeapon(weaponIdx >= 0 ? (shots.weaponDict[weaponIdx] ?? "") : "");
+      const weapon = normalizeWeapon(weaponIdx >= 0 ? (shots.weaponDict[weaponIdx] ?? '') : '');
       if (!isFirearmWeapon(weapon)) continue;
       out.push({
         roundNumber: track.roundNumber,
@@ -266,7 +339,7 @@ function flattenShots(pkg: DemoPackage): FlatShot[] {
         y: (y[i] ?? 0) / coordScale,
         z: (z[i] ?? 0) / coordScale,
         yaw: (yaw[i] ?? 0) / angleScale,
-        pitch: (pitch[i] ?? 0) / angleScale
+        pitch: (pitch[i] ?? 0) / angleScale,
       });
     }
   }
@@ -296,16 +369,21 @@ function bucketBursts(bursts: FlatShot[][]): BurstLengthBuckets {
 }
 
 function hasDamageMatch(damages: PackageDamage[], shot: FlatShot): boolean {
-  return damages.some((damage) =>
-    damage.roundNumber === shot.roundNumber &&
-    damage.attackerIndex === shot.playerIndex &&
-    normalizeWeapon(damage.weapon) === shot.weapon &&
-    Math.abs(damage.tick - shot.tick) <= DAMAGE_MATCH_TICKS
+  return damages.some(
+    (damage) =>
+      damage.roundNumber === shot.roundNumber &&
+      damage.attackerIndex === shot.playerIndex &&
+      normalizeWeapon(damage.weapon) === shot.weapon &&
+      Math.abs(damage.tick - shot.tick) <= DAMAGE_MATCH_TICKS,
   );
 }
 
 /** 在开枪 tick，射手视野锥 + LOS + 无烟内是否存在一名活着的敌人（用 shots.json 精确视角）。 */
-function firstShotSeesEnemy(ctx: VisibilityContext, resolver: PlayerResolver, shot: FlatShot): boolean {
+function firstShotSeesEnemy(
+  ctx: VisibilityContext,
+  resolver: PlayerResolver,
+  shot: FlatShot,
+): boolean {
   const window = findWindowCovering(ctx.pkg, shot.roundNumber, shot.tick);
   if (!window) return false;
   const view = decodeDuelWindow(ctx.pkg, window);
@@ -318,7 +396,11 @@ function firstShotSeesEnemy(ctx: VisibilityContext, resolver: PlayerResolver, sh
     const enemy = resolver.byIndexOrNull(index);
     if (!enemy || enemy.teamKey === shooter.teamKey) continue;
     if ((track.hp[frame] ?? 0) <= 0) continue;
-    const target: Vec3 = { x: track.x[frame] ?? 0, y: track.y[frame] ?? 0, z: (track.z[frame] ?? 0) + TARGET_HEIGHT };
+    const target: Vec3 = {
+      x: track.x[frame] ?? 0,
+      y: track.y[frame] ?? 0,
+      z: (track.z[frame] ?? 0) + TARGET_HEIGHT,
+    };
     const err = aimErrorDegrees(shot.yaw, shot.pitch, eye, target);
     if (err == null || err > VIEW_CONE_HALF_DEGREES) continue;
     if (ctx.visibility && !staticLineOfSight(ctx.visibility, eye, target)) continue;
@@ -329,7 +411,12 @@ function firstShotSeesEnemy(ctx: VisibilityContext, resolver: PlayerResolver, sh
 }
 
 /** 该 burst 是否为「交火 burst」：造成了敌方伤害，或首发开枪时视野内有敌人。 */
-function isCombatBurst(ctx: VisibilityContext, resolver: PlayerResolver, damages: PackageDamage[], burst: FlatShot[]): boolean {
+function isCombatBurst(
+  ctx: VisibilityContext,
+  resolver: PlayerResolver,
+  damages: PackageDamage[],
+  burst: FlatShot[],
+): boolean {
   if (burst.some((shot) => hasDamageMatch(damages, shot))) return true;
   return firstShotSeesEnemy(ctx, resolver, burst[0]!);
 }
@@ -351,7 +438,10 @@ function preMoveSpeed(ctx: VisibilityContext, shot: FlatShot, tickrate: number):
     if (tick < view.startTick) continue;
     const frame = frameIndexForTick(view, tick);
     if (frame - k < 0) continue;
-    const distance = Math.hypot((track.x[frame] ?? 0) - (track.x[frame - k] ?? 0), (track.y[frame] ?? 0) - (track.y[frame - k] ?? 0));
+    const distance = Math.hypot(
+      (track.x[frame] ?? 0) - (track.x[frame - k] ?? 0),
+      (track.y[frame] ?? 0) - (track.y[frame - k] ?? 0),
+    );
     peak = Math.max(peak, distance / dtSeconds);
     sampled = true;
   }
@@ -370,17 +460,25 @@ function trackSpeedAtShot(ctx: VisibilityContext, shot: FlatShot, tickrate: numb
   for (const prevFrame of [frame - 1, frame]) {
     const nextFrame = prevFrame + 1;
     if (prevFrame < 0 || nextFrame >= track.x.length) continue;
-    const distance = Math.hypot((track.x[nextFrame] ?? 0) - (track.x[prevFrame] ?? 0), (track.y[nextFrame] ?? 0) - (track.y[prevFrame] ?? 0));
+    const distance = Math.hypot(
+      (track.x[nextFrame] ?? 0) - (track.x[prevFrame] ?? 0),
+      (track.y[nextFrame] ?? 0) - (track.y[prevFrame] ?? 0),
+    );
     samples.push(distance / dtSeconds);
   }
   return samples.length > 0 ? Math.min(...samples) : null;
 }
 
-/** 
+/**
  * 急停成功率（移动后停稳口径）：对每个交火开火段第一发，若开枪前确实在移动则计一次尝试，
  * 开枪时速度已降到武器判定用最大移动速度约 34% 以下则计一次成功。只把 attempt=true 的样本放入分母。
  */
-function counterStrafeRate(ctx: VisibilityContext, combatBursts: FlatShot[][], weapon: string, tickrate: number): RateSample {
+function counterStrafeRate(
+  ctx: VisibilityContext,
+  combatBursts: FlatShot[][],
+  weapon: string,
+  tickrate: number,
+): RateSample {
   const threshold = counterStrafeThresholdForWeapon(weapon).maxSpeed;
   let attempts = 0;
   let successes = 0;
@@ -409,34 +507,42 @@ function isCleanBurstForMechanics(burst: FlatShot[], duels: DuelRecord[]): boole
   return !duels.some((duel) => {
     const firstShotTick = duel.evidenceTicks.killerFirstShotTick;
     if (firstShotTick == null) return false;
-    return duel.roundNumber === first.roundNumber
-      && normalizeWeapon(duel.weapon) === first.weapon
-      && firstShotTick >= first.tick
-      && firstShotTick <= last.tick
-      && !isCleanGunfightKill(duel);
+    return (
+      duel.roundNumber === first.roundNumber &&
+      normalizeWeapon(duel.weapon) === first.weapon &&
+      firstShotTick >= first.tick &&
+      firstShotTick <= last.tick &&
+      !isCleanGunfightKill(duel)
+    );
   });
 }
 
-function firingPatternRatio(buckets: BurstLengthBuckets, total: number): MechanicsMetricSet["firingPatternRatio"] {
+function firingPatternRatio(
+  buckets: BurstLengthBuckets,
+  total: number,
+): MechanicsMetricSet['firingPatternRatio'] {
   if (total <= 0) return { tap: 0, burst: 0, spray: 0 };
   return {
     tap: round((buckets.single / total) * 100, 1),
     burst: round(((buckets.short + buckets.medium) / total) * 100, 1),
-    spray: round((buckets.long / total) * 100, 1)
+    spray: round((buckets.long / total) * 100, 1),
   };
 }
 
 function medianShotIntervalMs(shots: FlatShot[], tickrate: number): number | null {
   const intervals: number[] = [];
   const sorted = [...shots].sort((a, b) => a.tick - b.tick);
-  for (let i = 1; i < sorted.length; i++) intervals.push(((sorted[i]!.tick - sorted[i - 1]!.tick) / tickrate) * 1000);
+  for (let i = 1; i < sorted.length; i++)
+    intervals.push(((sorted[i]!.tick - sorted[i - 1]!.tick) / tickrate) * 1000);
   return median(intervals);
 }
 
 function medianBurstIntervalMs(bursts: FlatShot[][], tickrate: number): number | null {
   const intervals: number[] = [];
   for (let i = 1; i < bursts.length; i++) {
-    intervals.push(((bursts[i]![0]!.tick - bursts[i - 1]![bursts[i - 1]!.length - 1]!.tick) / tickrate) * 1000);
+    intervals.push(
+      ((bursts[i]![0]!.tick - bursts[i - 1]![bursts[i - 1]!.length - 1]!.tick) / tickrate) * 1000,
+    );
   }
   return median(intervals);
 }
@@ -447,7 +553,11 @@ function medianBurstIntervalMs(bursts: FlatShot[][], tickrate: number): number |
  * prefire（首发时不可见）、左截断（可见段延伸到窗口起点）、>1s 跟踪 均剔除。
  * 返回原始数组而非聚合值，以便 presentation 跨场 concat 后再算中位/比例。
  */
-function reactionAndPreaimSamples(ctx: VisibilityContext, duels: DuelRecord[], tickrate: number): { reactionMs: number[]; preaimErrors: number[] } {
+function reactionAndPreaimSamples(
+  ctx: VisibilityContext,
+  duels: DuelRecord[],
+  tickrate: number,
+): { reactionMs: number[]; preaimErrors: number[] } {
   const reactionMs: number[] = [];
   const preaimErrors: number[] = [];
   for (const duel of duels) {
@@ -473,7 +583,7 @@ function reactionAnchorFrame(
   view: ReturnType<typeof decodeDuelWindow>,
   killerIndex: number,
   victimIndex: number,
-  shotTick: number
+  shotTick: number,
 ): number {
   const shotFrame = frameIndexForTick(view, shotTick);
   if (isVisibleAt(ctx, view, killerIndex, victimIndex, shotFrame)) return shotFrame;
@@ -491,19 +601,32 @@ function preaimSampleFrom(preaimErrors: number[]): PreaimSample {
     medianDegrees: median(preaimErrors),
     withinFiveRatio: percent(withinFiveCount, preaimErrors.length),
     withinFiveCount,
-    sampleSize: preaimErrors.length
+    sampleSize: preaimErrors.length,
   };
 }
 
-function preaimErrorAtOnset(view: ReturnType<typeof decodeDuelWindow>, killerIndex: number, victimIndex: number, onset: number): number | null {
+function preaimErrorAtOnset(
+  view: ReturnType<typeof decodeDuelWindow>,
+  killerIndex: number,
+  victimIndex: number,
+  onset: number,
+): number | null {
   const killer = view.tracks.get(killerIndex);
   const victim = view.tracks.get(victimIndex);
   if (!killer || !victim) return null;
   const samples: number[] = [];
   for (const frame of [onset - 1, onset - 2, onset - 3]) {
     if (frame < 0) continue;
-    const eye: Vec3 = { x: killer.x[frame] ?? 0, y: killer.y[frame] ?? 0, z: (killer.z[frame] ?? 0) + EYE_HEIGHT };
-    const target: Vec3 = { x: victim.x[frame] ?? 0, y: victim.y[frame] ?? 0, z: (victim.z[frame] ?? 0) + TARGET_HEIGHT };
+    const eye: Vec3 = {
+      x: killer.x[frame] ?? 0,
+      y: killer.y[frame] ?? 0,
+      z: (killer.z[frame] ?? 0) + EYE_HEIGHT,
+    };
+    const target: Vec3 = {
+      x: victim.x[frame] ?? 0,
+      y: victim.y[frame] ?? 0,
+      z: (victim.z[frame] ?? 0) + TARGET_HEIGHT,
+    };
     const error = aimErrorDegrees(killer.yaw[frame] ?? 0, killer.pitch[frame] ?? 0, eye, target);
     if (error != null) samples.push(error);
   }
@@ -513,7 +636,7 @@ function preaimErrorAtOnset(view: ReturnType<typeof decodeDuelWindow>, killerInd
 export function buildMechanicsSignals(
   pkg: DemoPackage,
   duels: DuelRecord[] = buildDuelsSignals(pkg).records,
-  options: MechanicsSignalsOptions = {}
+  options: MechanicsSignalsOptions = {},
 ): MechanicsSignals {
   const resolver = createResolverFromPackage(pkg);
   const tickrate = tickrateOf(pkg);
@@ -539,89 +662,115 @@ export function buildMechanicsSignals(
     grouped.set(key, list);
   }
 
-  const rows = [...grouped.entries()].map(([key, playerShots]): PlayerMechanicsFact | null => {
-    const colonIdx = key.indexOf(":");
-    const playerIdx = parseInt(key.slice(0, colonIdx), 10);
-    const weapon = key.slice(colonIdx + 1);
-    const player = resolver.byIndexOrNull(playerIdx);
-    if (!player) return null;
+  const rows = [...grouped.entries()]
+    .map(([key, playerShots]): PlayerMechanicsFact | null => {
+      const colonIdx = key.indexOf(':');
+      const playerIdx = parseInt(key.slice(0, colonIdx), 10);
+      const weapon = key.slice(colonIdx + 1);
+      const player = resolver.byIndexOrNull(playerIdx);
+      if (!player) return null;
 
-    const bursts = splitBursts(playerShots, tickrate);
-    const combatBursts = bursts.filter((burst) => isCombatBurst(ctx, resolver, damages, burst));
-    const buckets = bucketBursts(bursts);
-    const playerDuels = duelsByKey.get(key) ?? [];
-    const cleanPlayerDuels = playerDuels.filter(isCleanGunfightKill);
-    const cleanCombatBursts = combatBursts.filter((burst) => isCleanBurstForMechanics(burst, playerDuels));
+      const bursts = splitBursts(playerShots, tickrate);
+      const combatBursts = bursts.filter((burst) => isCombatBurst(ctx, resolver, damages, burst));
+      const buckets = bucketBursts(bursts);
+      const playerDuels = duelsByKey.get(key) ?? [];
+      const cleanPlayerDuels = playerDuels.filter(isCleanGunfightKill);
+      const cleanCombatBursts = combatBursts.filter((burst) =>
+        isCleanBurstForMechanics(burst, playerDuels),
+      );
 
-    // 首发命中率（交火开火段第一发）
-    const firstShotHit = rate(
-      cleanCombatBursts.filter((burst) => hasDamageMatch(damages, burst[0]!)).length,
-      cleanCombatBursts.length
-    );
+      // 首发命中率（交火开火段第一发）
+      const firstShotHit = rate(
+        cleanCombatBursts.filter((burst) => hasDamageMatch(damages, burst[0]!)).length,
+        cleanCombatBursts.length,
+      );
 
-    // 扫射命中率（仅自动武器、burst≥5 的第 4 发起）
-    let sprayHit: RateSample | null = null;
-    if (AUTO_WEAPONS.has(weapon)) {
-      const sprayShots = cleanCombatBursts.filter((burst) => burst.length >= 5).flatMap((burst) => burst.slice(3));
-      sprayHit = rate(sprayShots.filter((shot) => hasDamageMatch(damages, shot)).length, sprayShots.length);
-    }
+      // 扫射命中率（仅自动武器、burst≥5 的第 4 发起）
+      let sprayHit: RateSample | null = null;
+      if (AUTO_WEAPONS.has(weapon)) {
+        const sprayShots = cleanCombatBursts
+          .filter((burst) => burst.length >= 5)
+          .flatMap((burst) => burst.slice(3));
+        sprayHit = rate(
+          sprayShots.filter((shot) => hasDamageMatch(damages, shot)).length,
+          sprayShots.length,
+        );
+      }
 
-    // 急停成功率（移动后停稳）；导出器无 velocity 时整体置空
-    const counterStrafe = allZeroVelocity ? rate(0, 0) : counterStrafeRate(ctx, cleanCombatBursts, weapon, tickrate);
+      // 急停成功率（移动后停稳）；导出器无 velocity 时整体置空
+      const counterStrafe = allZeroVelocity
+        ? rate(0, 0)
+        : counterStrafeRate(ctx, cleanCombatBursts, weapon, tickrate);
 
-    // one tap 率（满血单发终结 / 满血无第三方击杀）
-    const cleanFullHp = cleanPlayerDuels.filter((duel) => duel.victimHealthBefore === 100);
-    const oneTapCandidates = cleanFullHp.filter(isOneTapEligible);
-    const oneTap = rate(oneTapCandidates.filter((duel) => duel.oneShotKill).length, oneTapCandidates.length);
+      // one tap 率（满血单发终结 / 满血无第三方击杀）
+      const cleanFullHp = cleanPlayerDuels.filter((duel) => duel.victimHealthBefore === 100);
+      const oneTapCandidates = cleanFullHp.filter(isOneTapEligible);
+      const oneTap = rate(
+        oneTapCandidates.filter((duel) => duel.oneShotKill).length,
+        oneTapCandidates.length,
+      );
 
-    // 击杀耗时中位（击杀开火段第一枪 → 击杀）
-    const ttkSamples = cleanPlayerDuels
-      .map((duel) => duel.ttkMs)
-      .filter((value): value is number => value != null);
-    const ttk: MedianSample = { value: median(ttkSamples), sampleSize: ttkSamples.length };
+      // 击杀耗时中位（击杀开火段第一枪 → 击杀）
+      const ttkSamples = cleanPlayerDuels
+        .map((duel) => duel.ttkMs)
+        .filter((value): value is number => value != null);
+      const ttk: MedianSample = { value: median(ttkSamples), sampleSize: ttkSamples.length };
 
-    const { reactionMs, preaimErrors } = reactionAndPreaimSamples(ctx, cleanPlayerDuels, tickrate);
-    const reaction: MedianSample = { value: median(reactionMs), sampleSize: reactionMs.length };
-    const preaim = preaimSampleFrom(preaimErrors);
+      const { reactionMs, preaimErrors } = reactionAndPreaimSamples(
+        ctx,
+        cleanPlayerDuels,
+        tickrate,
+      );
+      const reaction: MedianSample = { value: median(reactionMs), sampleSize: reactionMs.length };
+      const preaim = preaimSampleFrom(preaimErrors);
 
-    return {
-      steamId64: player.steamId64,
-      playerName: player.name,
-      teamKey: player.teamKey,
-      weapon,
-      killCount: playerDuels.length,
-      cleanKillCount: cleanPlayerDuels.length,
-      headshotKills: playerDuels.filter((duel) => duel.headshot).length,
-      cleanHeadshotKills: cleanPlayerDuels.filter((duel) => duel.headshot).length,
-      burstCount: bursts.length,
-      shotCount: playerShots.length,
-      firstShotHit,
-      sprayHit,
-      counterStrafe,
-      oneTap,
-      ttk,
-      reaction,
-      preaim,
-      medianShotIntervalMs: medianShotIntervalMs(playerShots, tickrate),
-      medianBurstIntervalMs: medianBurstIntervalMs(bursts, tickrate),
-      burstLengthBuckets: buckets,
-      firingPatternRatio: firingPatternRatio(buckets, bursts.length),
-      counterStrafeThreshold: counterStrafeThresholdForWeapon(weapon),
-      ttkSamplesMs: ttkSamples,
-      reactionSamplesMs: reactionMs,
-      preaimSamplesDeg: preaimErrors
-    };
-  }).filter((row): row is PlayerMechanicsFact => row != null);
+      return {
+        steamId64: player.steamId64,
+        playerName: player.name,
+        teamKey: player.teamKey,
+        weapon,
+        killCount: playerDuels.length,
+        cleanKillCount: cleanPlayerDuels.length,
+        headshotKills: playerDuels.filter((duel) => duel.headshot).length,
+        cleanHeadshotKills: cleanPlayerDuels.filter((duel) => duel.headshot).length,
+        burstCount: bursts.length,
+        shotCount: playerShots.length,
+        firstShotHit,
+        sprayHit,
+        counterStrafe,
+        oneTap,
+        ttk,
+        reaction,
+        preaim,
+        medianShotIntervalMs: medianShotIntervalMs(playerShots, tickrate),
+        medianBurstIntervalMs: medianBurstIntervalMs(bursts, tickrate),
+        burstLengthBuckets: buckets,
+        firingPatternRatio: firingPatternRatio(buckets, bursts.length),
+        counterStrafeThreshold: counterStrafeThresholdForWeapon(weapon),
+        ttkSamplesMs: ttkSamples,
+        reactionSamplesMs: reactionMs,
+        preaimSamplesDeg: preaimErrors,
+      };
+    })
+    .filter((row): row is PlayerMechanicsFact => row != null);
 
   return {
-    version: "cs2-demo-analysis-kit/mechanics-signals-0.2",
+    version: 'cs2-demo-analysis-kit/mechanics-signals-0.2',
     tickrate,
     burstGapSeconds: BURST_GAP_SECONDS,
-    rows: rows.sort((a, b) => b.killCount - a.killCount || b.shotCount - a.shotCount || a.playerName.localeCompare(b.playerName)),
-    visibilityAvailable: options.visibility != null
+    rows: rows.sort(
+      (a, b) =>
+        b.killCount - a.killCount ||
+        b.shotCount - a.shotCount ||
+        a.playerName.localeCompare(b.playerName),
+    ),
+    visibilityAvailable: options.visibility != null,
   };
 }
 
-export function derivePlayerMechanics(pkg: DemoPackage, options: MechanicsSignalsOptions = {}): PlayerMechanicsFact[] {
+export function derivePlayerMechanics(
+  pkg: DemoPackage,
+  options: MechanicsSignalsOptions = {},
+): PlayerMechanicsFact[] {
   return buildMechanicsSignals(pkg, buildDuelsSignals(pkg, options).records, options).rows;
 }

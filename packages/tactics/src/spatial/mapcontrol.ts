@@ -12,14 +12,14 @@
  * 仍缺：denial 的 LOS/nav 距离精修、nonUtilityAssistedAdvanceUnits、UtilitySpatial
  * actual-effect（需 zone 多边形标定）。
  */
-import type { DemoPackage } from "@cs2dak/contract";
-import { deriveKillTrades } from "@cs2dak/core";
-import { routeIndex, type MapRoute, type MapRoutes } from "@cs2dak/maps";
-import { createResolverFromPackage, type PlayerResolver } from "@cs2dak/core";
-import { clamp, groupBy } from "@cs2dak/core";
-import { annotatePositions, type SpatialAssets, type AnnotatedSample } from "./annotate.js";
-import { inferRoundPhases, phaseAtTick } from "./phase.js";
-import { isOfficialScoringPhase, type RoundPhase, type RoundPhaseModel } from "./types.js";
+import type { DemoPackage } from '@cs2dak/contract';
+import { deriveKillTrades } from '@cs2dak/core';
+import { routeIndex, type MapRoute, type MapRoutes } from '@cs2dak/maps';
+import { createResolverFromPackage, type PlayerResolver } from '@cs2dak/core';
+import { clamp, groupBy } from '@cs2dak/core';
+import { annotatePositions, type SpatialAssets, type AnnotatedSample } from './annotate.js';
+import { inferRoundPhases, phaseAtTick } from './phase.js';
+import { isOfficialScoringPhase, type RoundPhase, type RoundPhaseModel } from './types.js';
 
 export interface OfficialMapControl {
   activeSoloPressureSeconds: number;
@@ -61,8 +61,8 @@ export function buildOfficialMapControl(
   const teamByPlayer = new Map(pkg.players.map((p) => [p.steamId64, p.teamKey]));
   const sideByTeam = new Map<number, { defendPre: Team | null; t: Team | null; ct: Team | null }>();
   for (const round of pkg.rounds) {
-    const t = round.teamASide === "t" ? "teamA" : round.teamBSide === "t" ? "teamB" : null;
-    const ct = round.teamASide === "ct" ? "teamA" : round.teamBSide === "ct" ? "teamB" : null;
+    const t = round.teamASide === 't' ? 'teamA' : round.teamBSide === 't' ? 'teamB' : null;
+    const ct = round.teamASide === 'ct' ? 'teamA' : round.teamBSide === 'ct' ? 'teamB' : null;
     sideByTeam.set(round.roundNumber, { defendPre: ct, t, ct });
   }
   const plantByRound = plantTicks(pkg);
@@ -84,7 +84,7 @@ export function buildOfficialMapControl(
     const takenRoutes = new Set<string>(); // firstControl 去重：每回合每动线一次
 
     for (const [tick, tickRows] of groupBy(rows, (r) => r.tick)) {
-      const ph: RoundPhase = phase ? phaseAtTick(phase, tick) : "default";
+      const ph: RoundPhase = phase ? phaseAtTick(phase, tick) : 'default';
       if (!isOfficialScoringPhase(ph)) continue;
       const presence = routePresence(tickRows, routes, teamByPlayer);
       const defenderTeam = plantTick != null && tick >= plantTick ? sides.t : sides.ct;
@@ -92,7 +92,16 @@ export function buildOfficialMapControl(
       const solo = new Set<string>();
       const denial = new Set<string>();
       for (const [route, byTeam] of presence) {
-        deriveSoloAndDenial(byTeam, defenderTeam, ph, solo, denial, perRoundSolo, perRoundDenial, SAMPLE_SECONDS);
+        deriveSoloAndDenial(
+          byTeam,
+          defenderTeam,
+          ph,
+          solo,
+          denial,
+          perRoundSolo,
+          perRoundDenial,
+          SAMPLE_SECONDS,
+        );
         // firstMeaningfulControlEvents：T 首次到达关键段（neutral/key index）
         recordFirstControl(route, byTeam, sides.t, takenRoutes, firstControlEvents, ph);
       }
@@ -101,7 +110,10 @@ export function buildOfficialMapControl(
     }
 
     for (const [id, secs] of perRoundSolo) {
-      pressureSeconds.set(id, (pressureSeconds.get(id) ?? 0) + Math.min(secs, SOLO_PRESSURE_PER_ROUND_CAP));
+      pressureSeconds.set(
+        id,
+        (pressureSeconds.get(id) ?? 0) + Math.min(secs, SOLO_PRESSURE_PER_ROUND_CAP),
+      );
     }
     for (const [id, secs] of perRoundDenial) {
       denialSeconds.set(id, (denialSeconds.get(id) ?? 0) + Math.min(secs, DENIAL_PER_ROUND_CAP));
@@ -109,7 +121,13 @@ export function buildOfficialMapControl(
     evidenceByRound.set(roundNumber, evidence);
   }
 
-  const credits = buildIsolationCredits(pkg, evidenceByRound, phaseModels, SAMPLE_SECONDS, resolver);
+  const credits = buildIsolationCredits(
+    pkg,
+    evidenceByRound,
+    phaseModels,
+    SAMPLE_SECONDS,
+    resolver,
+  );
 
   const ids = new Set<string>([
     ...pressureSeconds.keys(),
@@ -194,11 +212,13 @@ function recordFirstControl(
   phase: RoundPhase,
 ): void {
   if (tTeam == null || taken.has(route.id)) return;
-  if (phase !== "default" && phase !== "take" && phase !== "execute") return;
+  if (phase !== 'default' && phase !== 'take' && phase !== 'execute') return;
   const tMembers = byTeam.get(tTeam);
   if (!tMembers) return;
   const threshold = Math.max(1, Math.ceil(route.zones.length * 0.4));
-  const frontier = tMembers.filter((m) => m.index >= threshold).sort((a, b) => b.index - a.index)[0];
+  const frontier = tMembers
+    .filter((m) => m.index >= threshold)
+    .sort((a, b) => b.index - a.index)[0];
   if (!frontier) return;
   taken.add(route.id);
   firstControlEvents.set(frontier.id, (firstControlEvents.get(frontier.id) ?? 0) + 1);
@@ -232,7 +252,8 @@ function buildIsolationCredits(
     const lo = kill.tick - windowTicks;
     const pressure = secondsInWindow(evidence.soloByTick, victim, lo, kill.tick, sampleSecs);
     const denial = secondsInWindow(evidence.denialByTick, victim, lo, kill.tick, sampleSecs);
-    if (pressure < ISOLATION_MIN_TRIGGER_SECONDS && denial < ISOLATION_MIN_TRIGGER_SECONDS) continue;
+    if (pressure < ISOLATION_MIN_TRIGGER_SECONDS && denial < ISOLATION_MIN_TRIGGER_SECONDS)
+      continue;
 
     // credit = clamp(0.25 + 0.10×pressure + 0.10×denial, 0, 1)（doc §10.3 子集）
     const credit = clamp(0.25 + 0.1 * pressure + 0.1 * denial, 0, 1);
@@ -241,7 +262,13 @@ function buildIsolationCredits(
   return credits;
 }
 
-function secondsInWindow(byTick: Map<number, Set<string>>, id: string, lo: number, hi: number, sampleSecs: number): number {
+function secondsInWindow(
+  byTick: Map<number, Set<string>>,
+  id: string,
+  lo: number,
+  hi: number,
+  sampleSecs: number,
+): number {
   let secs = 0;
   for (const [tick, set] of byTick) {
     if (tick > hi || tick < lo) continue;
@@ -252,14 +279,14 @@ function secondsInWindow(byTick: Map<number, Set<string>>, id: string, lo: numbe
 
 function phaseFactor(phase: RoundPhase): number {
   switch (phase) {
-    case "execute":
-    case "postPlant":
-    case "retake":
-    case "clutch":
+    case 'execute':
+    case 'postPlant':
+    case 'retake':
+    case 'clutch':
       return 1.2;
-    case "take":
+    case 'take':
       return 1.0;
-    case "default":
+    case 'default':
       return 0.5;
     default:
       return 0;
@@ -269,7 +296,7 @@ function phaseFactor(phase: RoundPhase): number {
 function plantTicks(pkg: DemoPackage): Map<number, number> {
   const out = new Map<number, number>();
   for (const bomb of pkg.bombs) {
-    if (bomb.type === "planted" && !out.has(bomb.roundNumber)) out.set(bomb.roundNumber, bomb.tick);
+    if (bomb.type === 'planted' && !out.has(bomb.roundNumber)) out.set(bomb.roundNumber, bomb.tick);
   }
   return out;
 }

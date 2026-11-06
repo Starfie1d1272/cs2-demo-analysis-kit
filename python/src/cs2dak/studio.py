@@ -278,7 +278,9 @@ class _StudioStaticHandler(SimpleHTTPRequestHandler):
         if cls._tris_manifest is not None:
             return cls._tris_manifest
         try:
-            req = urllib.request.Request(TRIS_MANIFEST_URL, headers={"User-Agent": "DAK-Studio-Tri"})
+            req = urllib.request.Request(
+                TRIS_MANIFEST_URL, headers={"User-Agent": "DAK-Studio-Tri"}
+            )
             with urllib.request.urlopen(req, timeout=TRIS_MANIFEST_TIMEOUT_S) as resp:  # noqa: S310 - https
                 cls._tris_manifest = json.loads(resp.read().decode("utf-8"))
         except Exception as exc:  # noqa: BLE001 - 缺失只降级
@@ -349,7 +351,11 @@ class _StudioStaticHandler(SimpleHTTPRequestHandler):
         path = urllib.parse.urlparse(self.path).path
         if path == "/" or path.endswith("/index.html"):
             self.send_header("Cache-Control", "no-cache")
-        elif path.startswith("/tris/") or path.startswith("/bundled-events/") or path.startswith("/maps/radars/"):
+        elif (
+            path.startswith("/tris/")
+            or path.startswith("/bundled-events/")
+            or path.startswith("/maps/radars/")
+        ):
             self.send_header("Cache-Control", "public, max-age=31536000, immutable")
         elif path.startswith("/assets/"):
             self.send_header("Cache-Control", "public, max-age=31536000, immutable")
@@ -425,10 +431,14 @@ def _setup_logging(logs_dir: Path) -> Path | None:
         try:
             directory.mkdir(parents=True, exist_ok=True)
             candidate = directory / "studio.log"
-            handlers.append(RotatingFileHandler(
-                candidate, maxBytes=2 * 1024 * 1024,
-                backupCount=3, encoding="utf-8",
-            ))
+            handlers.append(
+                RotatingFileHandler(
+                    candidate,
+                    maxBytes=2 * 1024 * 1024,
+                    backupCount=3,
+                    encoding="utf-8",
+                )
+            )
             active_path = candidate
             break
         except OSError as exc:
@@ -593,6 +603,7 @@ def _shared_library_mutation(method):
             return method(self, *args, **kwargs)
         finally:
             handle.close()
+
     # pywebview uses getfullargspec rather than following __wrapped__.
     guarded.__signature__ = inspect.signature(method)
     return guarded
@@ -603,6 +614,7 @@ def _exclusive_maintenance(method):
     def guarded(self, *args, **kwargs):
         with self._exclusive_library_maintenance():
             return method(self, *args, **kwargs)
+
     guarded.__signature__ = inspect.signature(method)
     return guarded
 
@@ -659,6 +671,7 @@ class StudioApi:
         try:
             if sys.platform == "win32":
                 import msvcrt
+
                 handle.seek(0, os.SEEK_END)
                 if handle.tell() == 0:
                     handle.write(b"\0")
@@ -668,6 +681,7 @@ class StudioApi:
                 msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
             else:
                 import fcntl
+
                 fcntl.flock(handle.fileno(), fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH)
             return handle
         except BaseException:
@@ -685,7 +699,11 @@ class StudioApi:
     def storage_demo_commit_begin(self, keys: list[str]) -> str:
         """Hold process-safe locks for one short library commit; OS releases on exit."""
         ordered = sorted(set(keys))
-        if not ordered or len(ordered) > 32 or any(not isinstance(key, str) or len(key) > 1024 for key in ordered):
+        if (
+            not ordered
+            or len(ordered) > 32
+            or any(not isinstance(key, str) or len(key) > 1024 for key in ordered)
+        ):
             raise ValueError("invalid library commit keys")
         lock_dir = self._userdata / "commit-locks"
         lock_dir.mkdir(parents=True, exist_ok=True)
@@ -697,6 +715,7 @@ class StudioApi:
                 handles.append(handle)
                 if sys.platform == "win32":
                     import msvcrt
+
                     handle.seek(0, os.SEEK_END)
                     if handle.tell() == 0:
                         handle.write(b"\0")
@@ -705,6 +724,7 @@ class StudioApi:
                     msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
                 else:
                     import fcntl
+
                     fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
             token = uuid.uuid4().hex
             with self._demo_commit_guard:
@@ -755,8 +775,17 @@ class StudioApi:
                 db.execute("begin")
                 result = []
                 for ref in refs:
-                    row = db.execute("select value from records where namespace=? and key=?", (ref["namespace"], ref["key"])).fetchone()
-                    result.append({**ref, "exists": row is not None, **({"value": json.loads(row[0])} if row is not None else {})})
+                    row = db.execute(
+                        "select value from records where namespace=? and key=?",
+                        (ref["namespace"], ref["key"]),
+                    ).fetchone()
+                    result.append(
+                        {
+                            **ref,
+                            "exists": row is not None,
+                            **({"value": json.loads(row[0])} if row is not None else {}),
+                        }
+                    )
                 db.commit()
                 return result
             except BaseException:
@@ -766,13 +795,16 @@ class StudioApi:
     @_shared_library_mutation
     def storage_records_compare_and_write(self, expected: list[dict], writes: list[dict]) -> bool:
         """Commit selected record changes only while every observed value still matches."""
+
         def same_json(left, right) -> bool:
             if isinstance(left, bool) or isinstance(right, bool):
                 return type(left) is type(right) and left == right
             if isinstance(left, (int, float)) and isinstance(right, (int, float)):
                 return left == right
             if isinstance(left, dict) and isinstance(right, dict):
-                return left.keys() == right.keys() and all(same_json(left[key], right[key]) for key in left)
+                return left.keys() == right.keys() and all(
+                    same_json(left[key], right[key]) for key in left
+                )
             if isinstance(left, list) and isinstance(right, list):
                 return len(left) == len(right) and all(same_json(a, b) for a, b in zip(left, right))
             return type(left) is type(right) and left == right
@@ -782,17 +814,28 @@ class StudioApi:
             try:
                 db.execute("begin immediate")
                 for record in expected:
-                    row = db.execute("select value from records where namespace=? and key=?", (record["namespace"], record["key"])).fetchone()
+                    row = db.execute(
+                        "select value from records where namespace=? and key=?",
+                        (record["namespace"], record["key"]),
+                    ).fetchone()
                     same_value = row is None or same_json(json.loads(row[0]), record.get("value"))
                     if (row is not None) != record["exists"] or not same_value:
                         db.rollback()
                         return False
                 for record in writes:
                     if record["kind"] == "delete":
-                        db.execute("delete from records where namespace=? and key=?", (record["namespace"], record["key"]))
+                        db.execute(
+                            "delete from records where namespace=? and key=?",
+                            (record["namespace"], record["key"]),
+                        )
                     elif record["kind"] == "put":
-                        value = json.dumps(record["value"], ensure_ascii=False, separators=(",", ":"))
-                        db.execute("insert into records(namespace,key,value) values(?,?,?) on conflict(namespace,key) do update set value=excluded.value", (record["namespace"], record["key"], value))
+                        value = json.dumps(
+                            record["value"], ensure_ascii=False, separators=(",", ":")
+                        )
+                        db.execute(
+                            "insert into records(namespace,key,value) values(?,?,?) on conflict(namespace,key) do update set value=excluded.value",
+                            (record["namespace"], record["key"], value),
+                        )
                     else:
                         raise ValueError("invalid record mutation")
                 db.commit()
@@ -804,37 +847,53 @@ class StudioApi:
     @_shared_library_mutation
     def storage_record_get(self, namespace: str, key: str):
         with self._db_lock:
-            row = self._conn().execute(
-                "select value from records where namespace=? and key=?",
-                (namespace, key),
-            ).fetchone()
+            row = (
+                self._conn()
+                .execute(
+                    "select value from records where namespace=? and key=?",
+                    (namespace, key),
+                )
+                .fetchone()
+            )
         return json.loads(row[0]) if row else None
 
     @_shared_library_mutation
     def storage_record_get_all(self, namespace: str) -> list:
         with self._db_lock:
-            rows = self._conn().execute(
-                "select value from records where namespace=?",
-                (namespace,),
-            ).fetchall()
+            rows = (
+                self._conn()
+                .execute(
+                    "select value from records where namespace=?",
+                    (namespace,),
+                )
+                .fetchall()
+            )
         return [json.loads(row[0]) for row in rows]
 
     @_shared_library_mutation
     def storage_record_entries(self, namespace: str) -> list:
         with self._db_lock:
-            rows = self._conn().execute(
-                "select key, value from records where namespace=?",
-                (namespace,),
-            ).fetchall()
+            rows = (
+                self._conn()
+                .execute(
+                    "select key, value from records where namespace=?",
+                    (namespace,),
+                )
+                .fetchall()
+            )
         return [[key, json.loads(value)] for key, value in rows]
 
     @_shared_library_mutation
     def storage_record_keys(self, namespace: str) -> list[str]:
         with self._db_lock:
-            rows = self._conn().execute(
-                "select key from records where namespace=?",
-                (namespace,),
-            ).fetchall()
+            rows = (
+                self._conn()
+                .execute(
+                    "select key from records where namespace=?",
+                    (namespace,),
+                )
+                .fetchall()
+            )
         return [row[0] for row in rows]
 
     @_shared_library_mutation
@@ -851,7 +910,9 @@ class StudioApi:
     @_shared_library_mutation
     def storage_record_delete(self, namespace: str, key: str) -> None:
         with self._db_lock:
-            self._conn().execute("delete from records where namespace=? and key=?", (namespace, key))
+            self._conn().execute(
+                "delete from records where namespace=? and key=?", (namespace, key)
+            )
             self._conn().commit()
 
     @_shared_library_mutation
@@ -873,7 +934,12 @@ class StudioApi:
 
     def rivalhub_open_external_url(self, url: str) -> bool:
         parsed = urllib.parse.urlparse(url)
-        if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.username or parsed.password:
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not parsed.netloc
+            or parsed.username
+            or parsed.password
+        ):
             return False
         try:
             return bool(webbrowser.open(url, new=0, autoraise=True))
@@ -882,10 +948,16 @@ class StudioApi:
 
     def _rivalhub_credential_call(self, operation: str, service: str, account: str, *args):
         adapters = {
-            "win32": {"read": _windows_credential_get, "write": _windows_credential_set,
-                      "delete": _windows_credential_delete},
-            "darwin": {"read": _macos_credential_get, "write": _macos_credential_set,
-                       "delete": _macos_credential_delete},
+            "win32": {
+                "read": _windows_credential_get,
+                "write": _windows_credential_set,
+                "delete": _windows_credential_delete,
+            },
+            "darwin": {
+                "read": _macos_credential_get,
+                "write": _macos_credential_set,
+                "delete": _macos_credential_delete,
+            },
         }
         if sys.platform not in adapters:
             return None if operation == "read" else False
@@ -1019,8 +1091,12 @@ class StudioApi:
                 "demoCount": len(demo_files),
                 "includes": ["studio.sqlite", "demos"],
             }
-            with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=3) as archive:
-                archive.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
+            with zipfile.ZipFile(
+                destination, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=3
+            ) as archive:
+                archive.writestr(
+                    "manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2)
+                )
                 archive.write(snapshot, "studio.sqlite")
                 for demo in demo_files:
                     archive.write(demo, f"demos/{demo.name}")
@@ -1122,9 +1198,7 @@ class StudioApi:
             integrity = conn.execute("pragma integrity_check").fetchone()[0]
             if integrity != "ok":
                 return {"ok": False, "error": f"SQLite integrity_check: {integrity}"}
-            record_rows = conn.execute(
-                "select key from records where namespace='demos'"
-            ).fetchall()
+            record_rows = conn.execute("select key from records where namespace='demos'").fetchall()
             record_keys = {row[0] for row in record_rows}
             blob_keys = set(self.storage_blob_keys("demos"))
             missing_blobs = sorted(record_keys - blob_keys)
@@ -1181,13 +1255,24 @@ class StudioApi:
             log_failure(log, primary, "selection.dialog.filtered")
             # 过滤器不受支持时仍允许现有无过滤 fallback，但保留首次异常。
             try:
-                result = self._window.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=True)
+                result = self._window.create_file_dialog(
+                    webview.FileDialog.OPEN, allow_multiple=True
+                )
             except Exception as secondary:  # keep both failures
                 log_failure(log, secondary, "selection.dialog.fallback")
-                raise RuntimeError("FILE_DIALOG_FAILED：文件选择器及兼容模式均失败，请重试") from secondary
-            log.info("selection stage=selection.dialog.fallback outcome=%s", "selected" if result else "cancelled")
+                raise RuntimeError(
+                    "FILE_DIALOG_FAILED：文件选择器及兼容模式均失败，请重试"
+                ) from secondary
+            log.info(
+                "selection stage=selection.dialog.fallback outcome=%s",
+                "selected" if result else "cancelled",
+            )
         paths = list(result or [])
-        log.info("selection stage=selection.dialog code=%s count=%d", "FILE_SELECTION_SELECTED" if paths else "FILE_SELECTION_CANCELLED", len(paths))
+        log.info(
+            "selection stage=selection.dialog code=%s count=%d",
+            "FILE_SELECTION_SELECTED" if paths else "FILE_SELECTION_CANCELLED",
+            len(paths),
+        )
         return paths
 
     # --- event packages ------------------------------------------------
@@ -1284,13 +1369,16 @@ class StudioApi:
         partial = directory / f"{job.id}.part"
         destination = directory / f"{job.id}.zip"
         try:
+
             def on_progress(received: int) -> None:
                 if getattr(job, "cancelled", False):
                     raise RuntimeError("用户已取消赛事下载")
                 job.received = received
 
             updater.download_with_fallback(
-                job.urls, partial, expected_sha256=job.sha256,
+                job.urls,
+                partial,
+                expected_sha256=job.sha256,
                 expected_size=job.size or None,
                 on_progress=on_progress,
                 on_mirror=lambda index, _url: setattr(job, "stage", f"下载中（镜像 {index + 1}）"),
@@ -1309,9 +1397,16 @@ class StudioApi:
 
     def event_download_status(self, job_id: str) -> dict:
         job = self._event_download_jobs.get(job_id)
-        return job.status() if job else {
-            "jobId": job_id, "state": "error", "error": "未知下载任务", "progress": 0,
-        }
+        return (
+            job.status()
+            if job
+            else {
+                "jobId": job_id,
+                "state": "error",
+                "error": "未知下载任务",
+                "progress": 0,
+            }
+        )
 
     def event_download_open(self, job_id: str) -> dict:
         job = self._event_download_jobs.pop(job_id, None)
@@ -1357,15 +1452,18 @@ class StudioApi:
                 match = json.loads(archive.read("match.json"))
             digest = updater.sha256_file(output)
             return {
-                "ok": True, "path": str(output), "fileName": output.name.split("-", 1)[-1],
+                "ok": True,
+                "path": str(output),
+                "fileName": output.name.split("-", 1)[-1],
                 "sha256": digest,
-                "occurredAt": datetime.fromtimestamp(
-                    source.stat().st_mtime
-                ).astimezone().isoformat(),
+                "occurredAt": datetime.fromtimestamp(source.stat().st_mtime)
+                .astimezone()
+                .isoformat(),
                 "mapName": match["mapName"],
                 "teamAName": match["teamA"]["name"],
                 "teamBName": match["teamB"]["name"],
-                "scoreA": match["teamA"]["score"], "scoreB": match["teamB"]["score"],
+                "scoreA": match["teamA"]["score"],
+                "scoreB": match["teamB"]["score"],
             }
         except Exception as exc:  # noqa: BLE001 - surfaced to the maker UI
             return {"ok": False, "error": str(exc)}
@@ -1432,6 +1530,7 @@ class StudioApi:
                 from cs2df.package import export_demo
 
                 job.stage = "export.parse"
+
                 def on_progress(stage: str, frac: float) -> None:
                     job.stage = stage
                     job.progress = frac
@@ -1446,8 +1545,13 @@ class StudioApi:
             job.progress = 1.0
             job.state = "done"
             job.stage = "完成"
-            log.info("export job %s done: %s (%.1fs, %d bytes)", job.id,
-                     job.file_name, time.monotonic() - job.started, job.result_size)
+            log.info(
+                "export job %s done: %s (%.1fs, %d bytes)",
+                job.id,
+                job.file_name,
+                time.monotonic() - job.started,
+                job.result_size,
+            )
         except BaseException as exc:  # Worker boundary: only parser panics and ordinary failures.
             if not isinstance(exc, Exception) and not (
                 type(exc).__module__ == "pyo3_runtime" and type(exc).__name__ == "PanicException"
@@ -1456,7 +1560,9 @@ class StudioApi:
             job.diagnostic = safe_exception(exc, job.stage)
             job.error = job.diagnostic["message"]
             job.state = "error"
-            log.error("export job %s failed: %s", job.id, json.dumps(job.diagnostic, ensure_ascii=False))
+            log.error(
+                "export job %s failed: %s", job.id, json.dumps(job.diagnostic, ensure_ascii=False)
+            )
             log_failure(log, exc, job.stage)
             if job.result_path is not None:
                 try:
@@ -1470,9 +1576,17 @@ class StudioApi:
     def get_export_status(self, job_id: str) -> dict:
         job = self._jobs.get(job_id)
         if job is None:
-            return {"id": job_id, "state": "error", "code": "EXPORT_JOB_NOT_FOUND", "error": "未知任务",
-                    "stage": "", "progress": 0, "elapsedSeconds": 0,
-                    "fileName": None, "resultSize": 0}
+            return {
+                "id": job_id,
+                "state": "error",
+                "code": "EXPORT_JOB_NOT_FOUND",
+                "error": "未知任务",
+                "stage": "",
+                "progress": 0,
+                "elapsedSeconds": 0,
+                "fileName": None,
+                "resultSize": 0,
+            }
         return job.status()
 
     def get_export_result_chunk(self, job_id: str, offset: int, size: int) -> dict:
@@ -1603,9 +1717,12 @@ class StudioApi:
 
         try:
             updater.download_with_fallback(
-                job.urls, dest, expected_sha256=job.sha256,
+                job.urls,
+                dest,
+                expected_sha256=job.sha256,
                 expected_size=job.size or None,
-                on_progress=on_progress, on_mirror=on_mirror,
+                on_progress=on_progress,
+                on_mirror=on_mirror,
             )
             job.staged_path = dest
             job.state = "ready"
@@ -1619,8 +1736,14 @@ class StudioApi:
     def update_status(self, job_id: str) -> dict:
         job = self._update_jobs.get(job_id)
         if job is None:
-            return {"jobId": job_id, "state": "error", "stage": "",
-                    "progress": 0, "error": "未知任务", "receivedBytes": 0}
+            return {
+                "jobId": job_id,
+                "state": "error",
+                "stage": "",
+                "progress": 0,
+                "error": "未知任务",
+                "receivedBytes": 0,
+            }
         return job.status()
 
     def update_apply(self, job_id: str) -> dict:
@@ -1635,11 +1758,19 @@ class StudioApi:
             return {"ok": False, "error": "应用内替换目前只支持 Windows"}
         install_dir = updater.current_install_dir()
         try:
-            relative_userdata = self._userdata.resolve(strict=False).relative_to(install_dir.resolve(strict=False))
+            relative_userdata = self._userdata.resolve(strict=False).relative_to(
+                install_dir.resolve(strict=False)
+            )
         except ValueError:
             relative_userdata = None
-        if relative_userdata is not None and (not relative_userdata.parts or relative_userdata.parts[0].lower() not in updater.PERSISTENT_INSTALL_DIRS):
-            return {"ok": False, "error": "安装目录内的自定义资料位置需使用安装器升级；请关闭 Studio，保留旧目录并备份原 SQLite 和 Demo ZIP"}
+        if relative_userdata is not None and (
+            not relative_userdata.parts
+            or relative_userdata.parts[0].lower() not in updater.PERSISTENT_INSTALL_DIRS
+        ):
+            return {
+                "ok": False,
+                "error": "安装目录内的自定义资料位置需使用安装器升级；请关闭 Studio，保留旧目录并备份原 SQLite 和 Demo ZIP",
+            }
         try:
             job.state = "applying"
             # apply_windows_update 自行在 install_dir.parent 下创建 staging 目录，
@@ -1706,7 +1837,10 @@ class StudioApi:
                 else:
                     raise RuntimeError("增量包内未找到 index.html")
             (root / "version.json").write_text(
-                json.dumps({"version": version, "installedAt": datetime.now(timezone.utc).isoformat()}, ensure_ascii=False),
+                json.dumps(
+                    {"version": version, "installedAt": datetime.now(timezone.utc).isoformat()},
+                    ensure_ascii=False,
+                ),
                 encoding="utf-8",
             )
             backup = self._cache_dir() / ".studio-web-old"
@@ -1739,7 +1873,9 @@ class StudioApi:
         web_version_path = self._web_overlay_dir() / "version.json"
         try:
             web_version = json.loads(web_version_path.read_text(encoding="utf-8")).get("version")
-            if isinstance(web_version, str) and _version_tuple(web_version) > _version_tuple(effective_ver):
+            if isinstance(web_version, str) and _version_tuple(web_version) > _version_tuple(
+                effective_ver
+            ):
                 effective_ver = web_version
         except Exception:
             pass
@@ -1764,7 +1900,9 @@ class StudioApi:
     def events_manifest(self) -> dict | None:
         """通过桌面桥拉取 R2 在线赛事清单，避免 WebView 直接 fetch 的 CORS/代理问题。"""
         try:
-            req = urllib.request.Request(EVENTS_MANIFEST_URL, headers={"User-Agent": "DAK-Studio-Events"})
+            req = urllib.request.Request(
+                EVENTS_MANIFEST_URL, headers={"User-Agent": "DAK-Studio-Events"}
+            )
             with urllib.request.urlopen(req, timeout=EVENTS_MANIFEST_TIMEOUT_S) as resp:  # noqa: S310 - https
                 return json.loads(resp.read().decode("utf-8"))
         except Exception as exc:  # noqa: BLE001 - online gallery is best-effort
@@ -1793,7 +1931,10 @@ class StudioApi:
         m = self.bundled_events_manifest()
         if not m or not isinstance(m.get("events"), list):
             return []
-        return [{"slug": e["slug"], "name": e.get("name", e["slug"]), "size": e.get("size", 0)} for e in m["events"]]
+        return [
+            {"slug": e["slug"], "name": e.get("name", e["slug"]), "size": e.get("size", 0)}
+            for e in m["events"]
+        ]
 
     # --- asset health check（启动完整性校验 + 修复）----------------------------
     _INSTALL_MANIFEST_URLS = [
@@ -1879,14 +2020,20 @@ class StudioApi:
                 continue
             actual_size = fpath.stat().st_size
             if expected_size is not None and actual_size != expected_size:
-                result["missingEvents"].append({"slug": slug, "name": name, "reason": "size_mismatch"})
+                result["missingEvents"].append(
+                    {"slug": slug, "name": name, "reason": "size_mismatch"}
+                )
                 continue
             if deep and expected_sha256:
                 try:
                     if updater.sha256_file(fpath) != expected_sha256:
-                        result["missingEvents"].append({"slug": slug, "name": name, "reason": "hash_mismatch"})
+                        result["missingEvents"].append(
+                            {"slug": slug, "name": name, "reason": "hash_mismatch"}
+                        )
                 except Exception:  # noqa: BLE001
-                    result["missingEvents"].append({"slug": slug, "name": name, "reason": "hash_mismatch"})
+                    result["missingEvents"].append(
+                        {"slug": slug, "name": name, "reason": "hash_mismatch"}
+                    )
 
         tris_dir = self._assets_dir() / "tris"
         for map_name, entry in (manifest.get("requiredTris", {}) or {}).items():
@@ -1896,18 +2043,30 @@ class StudioApi:
             required_by = entry.get("requiredBy", [])
 
             if not fpath.is_file():
-                result["missingTris"].append({"mapName": map_name, "requiredBy": required_by, "reason": "missing"})
+                result["missingTris"].append(
+                    {"mapName": map_name, "requiredBy": required_by, "reason": "missing"}
+                )
                 continue
             actual_size = fpath.stat().st_size
             if expected_size is not None and actual_size != expected_size:
-                result["missingTris"].append({"mapName": map_name, "requiredBy": required_by, "reason": "size_mismatch"})
+                result["missingTris"].append(
+                    {"mapName": map_name, "requiredBy": required_by, "reason": "size_mismatch"}
+                )
                 continue
             if deep and expected_sha256:
                 try:
                     if updater.sha256_file(fpath) != expected_sha256:
-                        result["missingTris"].append({"mapName": map_name, "requiredBy": required_by, "reason": "hash_mismatch"})
+                        result["missingTris"].append(
+                            {
+                                "mapName": map_name,
+                                "requiredBy": required_by,
+                                "reason": "hash_mismatch",
+                            }
+                        )
                 except Exception:  # noqa: BLE001
-                    result["missingTris"].append({"mapName": map_name, "requiredBy": required_by, "reason": "hash_mismatch"})
+                    result["missingTris"].append(
+                        {"mapName": map_name, "requiredBy": required_by, "reason": "hash_mismatch"}
+                    )
 
         has_missing = len(result["missingEvents"]) > 0 or len(result["missingTris"]) > 0
         if deep and has_missing:
@@ -1954,7 +2113,10 @@ class StudioApi:
                 try:
                     if item.get("type") == "event":
                         slug = item["slug"]
-                        evt = next((e for e in manifest.get("bundledEvents", []) if e.get("slug") == slug), None)
+                        evt = next(
+                            (e for e in manifest.get("bundledEvents", []) if e.get("slug") == slug),
+                            None,
+                        )
                         if not evt:
                             job["errors"].append(f"{slug}: manifest 中未找到")
                             continue
@@ -1992,7 +2154,8 @@ class StudioApi:
             try:
                 be_manifest = bundled_dir / "manifest.json"
                 installed_events = [
-                    e for e in manifest.get("bundledEvents", [])
+                    e
+                    for e in manifest.get("bundledEvents", [])
                     if (bundled_dir / f"{e.get('slug')}.zip").is_file()
                 ]
                 be_data = {
@@ -2000,7 +2163,9 @@ class StudioApi:
                     "events": installed_events,
                 }
                 if be_data["events"]:
-                    be_manifest.write_text(json.dumps(be_data, ensure_ascii=False, indent=2), "utf-8")
+                    be_manifest.write_text(
+                        json.dumps(be_data, ensure_ascii=False, indent=2), "utf-8"
+                    )
             except Exception as exc:  # noqa: BLE001
                 log.warning("写入 bundled-events manifest 失败：%s", exc)
 
@@ -2054,7 +2219,9 @@ class StudioApi:
     def report_diagnostic(self, diagnostic: dict) -> dict:
         """Persist only the bounded, sanitized frontend diagnostic allowlist."""
         try:
-            log.warning("frontend diagnostic %s", json.dumps(safe_metadata(diagnostic), ensure_ascii=False))
+            log.warning(
+                "frontend diagnostic %s", json.dumps(safe_metadata(diagnostic), ensure_ascii=False)
+            )
             return {"ok": True}
         except Exception:  # noqa: BLE001 - diagnostic reporting must not change task outcome
             return {"ok": False}
@@ -2065,7 +2232,8 @@ class StudioApi:
             import webview
 
             result = self._window.create_file_dialog(
-                webview.FileDialog.SAVE, save_filename="dak-studio-diagnostics.log",
+                webview.FileDialog.SAVE,
+                save_filename="dak-studio-diagnostics.log",
                 file_types=("Log (*.log)",),
             )
             if not result:
@@ -2114,6 +2282,7 @@ def _launch_studio(storage: Path) -> None:
     # pywebview element.events.drop 注册监听器后才会计数；而我们
     # 使用 React onDrop，永远不会触发该计数。
     from webview.dom import _dnd_state
+
     _dnd_state["num_listeners"] = max(_dnd_state["num_listeners"], 1)
 
     api = StudioApi()
@@ -2122,7 +2291,14 @@ def _launch_studio(storage: Path) -> None:
     assets = _assets_dir_for(storage)
     cache = _cache_dir_for(storage)
     updates = _updates_dir_for(storage)
-    log.info("DAK Studio %s 启动，userdata=%s assets=%s cache=%s updates=%s", __version__, storage, assets, cache, updates)
+    log.info(
+        "DAK Studio %s 启动，userdata=%s assets=%s cache=%s updates=%s",
+        __version__,
+        storage,
+        assets,
+        cache,
+        updates,
+    )
 
     index = WEB_DIR / "index.html"
     if not index.exists():

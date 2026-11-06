@@ -1,17 +1,21 @@
-import type { SeriesVeto } from "@cs2dak/contract";
-import { deriveSideChoice } from "../lib/series";
+import type { SeriesVeto } from '@cs2dak/contract';
+import { deriveSideChoice } from '../lib/series';
 
-const ACTION_LABEL: Record<string, string> = { ban: "BAN", pick: "PICK", decider: "DECIDER" };
-const ACTION_VERB: Record<string, string> = { ban: "removed", pick: "picked", decider: "was left over" };
+const ACTION_LABEL: Record<string, string> = { ban: 'BAN', pick: 'PICK', decider: 'DECIDER' };
+const ACTION_VERB: Record<string, string> = {
+  ban: 'removed',
+  pick: 'picked',
+  decider: 'was left over',
+};
 
-function teamName(veto: SeriesVeto, teamKey: "teamA" | "teamB" | null): string | null {
-  if (teamKey === "teamA") return veto.teamAName;
-  if (teamKey === "teamB") return veto.teamBName;
+function teamName(veto: SeriesVeto, teamKey: 'teamA' | 'teamB' | null): string | null {
+  if (teamKey === 'teamA') return veto.teamAName;
+  if (teamKey === 'teamB') return veto.teamBName;
   return null;
 }
 
 function displayMapName(mapName: string): string {
-  const base = mapName.replace(/^de_/, "");
+  const base = mapName.replace(/^de_/, '');
   return base.charAt(0).toUpperCase() + base.slice(1);
 }
 
@@ -30,18 +34,30 @@ export function BpView({ veto, matchUrl }: { veto: SeriesVeto; matchUrl?: string
         return (
           <li key={step.stepOrder} className="stu-bp-step">
             <span className="stu-bp-order">{step.stepOrder}.</span>
-            <span className={`stu-bp-action stu-bp-action-${step.actionType}`}>{ACTION_LABEL[step.actionType]}</span>
+            <span className={`stu-bp-action stu-bp-action-${step.actionType}`}>
+              {ACTION_LABEL[step.actionType]}
+            </span>
             {actor && <b className="stu-bp-team">{actor}</b>}
             <span className="stu-bp-verb">{ACTION_VERB[step.actionType]}</span>
             <b className="stu-bp-map">{displayMapName(step.mapName)}</b>
             {sideChoice && sideChooser && (
-              <span className="stu-bp-side">→ {sideChooser} chose {sideChoice.side.toUpperCase()}</span>
+              <span className="stu-bp-side">
+                → {sideChooser} chose {sideChoice.side.toUpperCase()}
+              </span>
             )}
           </li>
         );
       })}
       {matchUrl && (
-        <a href={matchUrl} target="_blank" rel="noreferrer" className="stu-dim" style={{ fontSize: "0.8em" }}>HLTV ↗</a>
+        <a
+          href={matchUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="stu-dim"
+          style={{ fontSize: '0.8em' }}
+        >
+          HLTV ↗
+        </a>
       )}
     </ol>
   );

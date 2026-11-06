@@ -1,5 +1,5 @@
 /** Map display names to product grouping keys without changing canonical identities. */
-import { displayTeamName } from "./team-identity.js";
+import { displayTeamName } from './team-identity.js';
 
 export function withTacticalDisplayGroupKeys<T extends { teamName: string; opponentName: string }>(
   rows: readonly T[],

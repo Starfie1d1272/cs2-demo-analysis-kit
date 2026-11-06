@@ -126,7 +126,9 @@ def download_with_fallback(
             try:
                 part.unlink(missing_ok=True)
             except OSError as cleanup_error:
-                log_failure(logging.getLogger("cs2dak.updater"), cleanup_error, "update_download.cleanup")
+                log_failure(
+                    logging.getLogger("cs2dak.updater"), cleanup_error, "update_download.cleanup"
+                )
     raise failures from None
 
 
@@ -141,7 +143,9 @@ def _find_app_root(extract_dir: Path, exe_name: str) -> Path:
     raise UpdateError(f"更新包内未找到 {exe_name}")
 
 
-def install_runtime_archive(zip_path: Path, install_dir: Path, exe_name: str = "dak-studio.exe") -> Path:
+def install_runtime_archive(
+    zip_path: Path, install_dir: Path, exe_name: str = "dak-studio.exe"
+) -> Path:
     """将 runtime ZIP 的 app root 内容安装到选定目录并返回新 exe。
 
     runtime ZIP 可以带一个顶层 onedir，也可以直接包含 exe。最终安装目录
@@ -160,12 +164,26 @@ def install_runtime_archive(zip_path: Path, install_dir: Path, exe_name: str = "
         configured = os.environ.get("DAK_STUDIO_DATA_DIR")
         if configured:
             try:
-                relative_data = Path(configured).expanduser().resolve(strict=False).relative_to(install_dir.resolve(strict=False))
+                relative_data = (
+                    Path(configured)
+                    .expanduser()
+                    .resolve(strict=False)
+                    .relative_to(install_dir.resolve(strict=False))
+                )
             except ValueError:
                 relative_data = None
-            incoming = {path.name.lower() for path in archive_root.iterdir() if path.name.lower() not in PERSISTENT_INSTALL_DIRS}
-            if relative_data is not None and (not relative_data.parts or relative_data.parts[0].lower() in incoming):
-                raise UpdateError("自定义资料位置会被运行时文件覆盖；安装已停止，未删除原资料。请保留原目录、备份 SQLite 和 Demo ZIP 并联系支持确认安全迁移位置。", "install_runtime.custom_data")
+            incoming = {
+                path.name.lower()
+                for path in archive_root.iterdir()
+                if path.name.lower() not in PERSISTENT_INSTALL_DIRS
+            }
+            if relative_data is not None and (
+                not relative_data.parts or relative_data.parts[0].lower() in incoming
+            ):
+                raise UpdateError(
+                    "自定义资料位置会被运行时文件覆盖；安装已停止，未删除原资料。请保留原目录、备份 SQLite 和 Demo ZIP 并联系支持确认安全迁移位置。",
+                    "install_runtime.custom_data",
+                )
 
         # 清理旧 installer 产生的 install_dir/<top-level>/... 嵌套 runtime。
         nested_root = install_dir / archive_root.name
@@ -205,13 +223,16 @@ def _relaunch_bat(pid: int, install_dir: Path, new_dir: Path, exe_name: str) -> 
     ts = time.strftime("%Y%m%d%H%M%S")
     old_dir = install_dir.parent / f"{install_dir.name}.old-{ts}"
     target_exe = install_dir / exe_name
-    migrate = "\n".join(f'''if not exist "{old_dir}\\{name}" goto migrated_{name}
+    migrate = "\n".join(
+        f'''if not exist "{old_dir}\\{name}" goto migrated_{name}
 if exist "{install_dir}\\{name}" goto migrationfailed
 move "{old_dir}\\{name}" "{install_dir}\\{name}" >> "%LOG%" 2>&1
 if errorlevel 1 goto migrationfailed
 if exist "{old_dir}\\{name}" goto migrationfailed
 if not exist "{install_dir}\\{name}\\" goto migrationfailed
-:migrated_{name}''' for name in PERSISTENT_INSTALL_DIRS)
+:migrated_{name}'''
+        for name in PERSISTENT_INSTALL_DIRS
+    )
     return f"""@echo off
 setlocal
 set "LOG=%~dp0apply-update.log"

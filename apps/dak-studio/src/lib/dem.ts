@@ -7,47 +7,66 @@
  * - "dev"：pnpm dev:studio 时的 Vite 中间件（POST /api/export-dem → uv run cs2df export）。
  */
 
-import { ExportPolling, normalizeDiagnostic, sanitizeDiagnosticText, type SafeDiagnostic } from "@cs2dak/rivalhub-upload";
-import { bytesToBase64, base64ToBytes } from "./storage/base64";
+import {
+  ExportPolling,
+  normalizeDiagnostic,
+  sanitizeDiagnosticText,
+  type SafeDiagnostic,
+} from '@cs2dak/rivalhub-upload';
+import { bytesToBase64, base64ToBytes } from './storage/base64';
 
 interface ExportJobStatus {
   id: string;
-  state: "running" | "done" | "error";
+  state: 'running' | 'done' | 'error';
   stage: string;
   progress: number;
   elapsedSeconds: number;
   error: string | null;
-  diagnostic?: { stage: string; type: string; message: string; causes: { type: string; message: string; relation: string }[] };
+  diagnostic?: {
+    stage: string;
+    type: string;
+    message: string;
+    causes: { type: string; message: string; relation: string }[];
+  };
   fileName: string | null;
   resultSize: number;
 }
 
 interface PywebviewStudioApi {
   report_diagnostic?: (diagnostic: SafeDiagnostic) => Promise<{ ok: boolean }>;
-  export_diagnostics?: () => Promise<{ ok: boolean; cancelled?: boolean; error?: string; path?: string }>;
+  export_diagnostics?: () => Promise<{
+    ok: boolean;
+    cancelled?: boolean;
+    error?: string;
+    path?: string;
+  }>;
   pick_dems: () => Promise<string[]>;
-  hash_file_path?: (path: string) => Promise<
-    { ok: true; sha256: string } | { ok: false; error: string }
-  >;
+  hash_file_path?: (
+    path: string,
+  ) => Promise<{ ok: true; sha256: string } | { ok: false; error: string }>;
   path_exists?: (path: string) => Promise<boolean>;
-  watch_demo?: (path: string, tick?: number | null) => Promise<
-    { ok: true; warning?: string } | { ok: false; error: string }
-  >;
-  export_dem_path: (path: string) => Promise<
-    { ok: true; fileName: string; dataBase64: string } | { ok: false; error: string }
-  >;
-  export_dem_bytes: (name: string, data_b64: string) => Promise<
-    { ok: true; fileName: string; dataBase64: string } | { ok: false; error: string }
-  >;
+  watch_demo?: (
+    path: string,
+    tick?: number | null,
+  ) => Promise<{ ok: true; warning?: string } | { ok: false; error: string }>;
+  export_dem_path: (
+    path: string,
+  ) => Promise<{ ok: true; fileName: string; dataBase64: string } | { ok: false; error: string }>;
+  export_dem_bytes: (
+    name: string,
+    data_b64: string,
+  ) => Promise<{ ok: true; fileName: string; dataBase64: string } | { ok: false; error: string }>;
   /** 拖拽后按文件名解析本机路径（macOS WKWebView 下标准 drop 事件不走 pywebview DOM 系统） */
   get_drop_path?: (filename: string) => Promise<string | null>;
   /** 0.3.0+：异步导出任务（后台线程解析 + 小负载状态轮询 + 分块取回 ZIP），
    *  避免单条 bridge 调用长时间阻塞或回传超大 payload 导致 promise 永不 resolve。 */
   start_export_job?: (path: string) => Promise<{ jobId: string }>;
   get_export_status?: (jobId: string) => Promise<ExportJobStatus>;
-  get_export_result_chunk?: (jobId: string, offset: number, size: number) => Promise<
-    { ok: true; data: string; done: boolean } | { ok: false; error: string }
-  >;
+  get_export_result_chunk?: (
+    jobId: string,
+    offset: number,
+    size: number,
+  ) => Promise<{ ok: true; data: string; done: boolean } | { ok: false; error: string }>;
 }
 
 declare global {
@@ -56,7 +75,7 @@ declare global {
   }
 }
 
-export type DemBackend = "pywebview" | "dev" | null;
+export type DemBackend = 'pywebview' | 'dev' | null;
 
 export interface ExportedDemoFile {
   file: File;
@@ -76,19 +95,19 @@ export function fileFromNativePath(path: string): File {
 /** Return the path attached by the existing pywebview desktop acquisition path. */
 export function nativePathForFile(file: File): string | null {
   const path = (file as PathBackedFile).pywebviewFullPath;
-  return typeof path === "string" && path.length > 0 ? path : null;
+  return typeof path === 'string' && path.length > 0 ? path : null;
 }
 
 /** Hash a native file without reading it through the webview or invoking cs2df. */
 export async function hashNativePath(path: string): Promise<string> {
   const api = window.pywebview?.api;
-  if (typeof api?.hash_file_path !== "function") {
-    throw new Error("当前桌面壳不支持 raw Demo hash 预检查，请先更新 DAK Studio");
+  if (typeof api?.hash_file_path !== 'function') {
+    throw new Error('当前桌面壳不支持 raw Demo hash 预检查，请先更新 DAK Studio');
   }
   const result = await api.hash_file_path(path);
   if (!result.ok) throw new Error(result.error);
   const sha256 = result.sha256.toLowerCase();
-  if (!/^[a-f0-9]{64}$/.test(sha256)) throw new Error("桌面壳返回了无效的 raw Demo SHA-256");
+  if (!/^[a-f0-9]{64}$/.test(sha256)) throw new Error('桌面壳返回了无效的 raw Demo SHA-256');
   return sha256;
 }
 
@@ -105,10 +124,8 @@ let devProbe: Promise<boolean> | null = null;
  */
 export function triggerWindowsDropCapture(files: FileList | File[]): void {
   try {
-    if (
-      typeof (window as any).chrome?.webview?.postMessageWithAdditionalObjects === "function"
-    ) {
-      (window as any).chrome.webview.postMessageWithAdditionalObjects("FilesDropped", files);
+    if (typeof (window as any).chrome?.webview?.postMessageWithAdditionalObjects === 'function') {
+      (window as any).chrome.webview.postMessageWithAdditionalObjects('FilesDropped', files);
     }
   } catch {
     // best-effort: 路径捕获失败时回退到字节传输
@@ -116,27 +133,30 @@ export function triggerWindowsDropCapture(files: FileList | File[]): void {
 }
 
 export async function detectDemBackend(): Promise<DemBackend> {
-  if (typeof window.pywebview?.api?.export_dem_path === "function") return "pywebview";
-  devProbe ??= fetch("/api/export-dem", { method: "GET" })
+  if (typeof window.pywebview?.api?.export_dem_path === 'function') return 'pywebview';
+  devProbe ??= fetch('/api/export-dem', { method: 'GET' })
     .then((res) => res.ok)
     .catch(() => false);
-  return (await devProbe) ? "dev" : null;
+  return (await devProbe) ? 'dev' : null;
 }
 
 export function isDemFile(file: File): boolean {
-  return file.name.toLowerCase().endsWith(".dem");
+  return file.name.toLowerCase().endsWith('.dem');
 }
 
 export async function pickDemPaths(): Promise<string[]> {
   const api = window.pywebview?.api;
-  if (!api?.pick_dems) throw new Error("桌面壳不可用，无法选择本机 demo");
+  if (!api?.pick_dems) throw new Error('桌面壳不可用，无法选择本机 demo');
   return api.pick_dems();
 }
 
-export async function watchDemoPath(path: string, tick?: number): Promise<{ ok: true; warning?: string } | { ok: false; error: string }> {
+export async function watchDemoPath(
+  path: string,
+  tick?: number,
+): Promise<{ ok: true; warning?: string } | { ok: false; error: string }> {
   const api = window.pywebview?.api;
   if (!api?.watch_demo) {
-    return { ok: false, error: "当前环境不支持直接打开 CS2，请使用桌面版 DAK Studio" };
+    return { ok: false, error: '当前环境不支持直接打开 CS2，请使用桌面版 DAK Studio' };
   }
   return api.watch_demo(path, tick ?? null);
 }
@@ -145,36 +165,51 @@ export async function watchDemoPath(path: string, tick?: number): Promise<{ ok: 
 async function exportViaDev(file: File): Promise<File> {
   // lastModified 透传给中间件：exporter 用 .dem 的 mtime 生成比赛日期前缀，
   // 字节流落盘会丢失原始时间，必须在服务端 utimes 还原。
-  const res = await fetch(`/api/export-dem?name=${encodeURIComponent(file.name)}&mtime=${file.lastModified}`, {
-    method: "POST",
-    body: file
-  });
+  const res = await fetch(
+    `/api/export-dem?name=${encodeURIComponent(file.name)}&mtime=${file.lastModified}`,
+    {
+      method: 'POST',
+      body: file,
+    },
+  );
   if (!res.ok) {
     throw new Error(`${file.name}: ${await res.text()}`);
   }
-  const zipName = decodeURIComponent(res.headers.get("X-Zip-Name") ?? "") || file.name.replace(/\.dem$/i, ".zip");
-  return new File([await res.blob()], zipName, { type: "application/zip" });
+  const zipName =
+    decodeURIComponent(res.headers.get('X-Zip-Name') ?? '') || file.name.replace(/\.dem$/i, '.zip');
+  return new File([await res.blob()], zipName, { type: 'application/zip' });
 }
 
 /** pywebview 模式：优先按路径导出；无路径时（如 Windows/macOS 拖入）调用 get_drop_path
  *  解析本机路径；再不行才走字节回退。前两级覆盖了绝大多数场景，
  *  字节回退仅当桌面壳版本过旧且不提供 get_drop_path 时触发。 */
-async function exportViaPywebview(file: File, onProgress?: (message: string) => void): Promise<ExportedDemoFile> {
+async function exportViaPywebview(
+  file: File,
+  onProgress?: (message: string) => void,
+): Promise<ExportedDemoFile> {
   const path = nativePathForFile(file);
-  if (path) return { file: await exportPathViaPywebview(path, file.name, onProgress), sourceDemPath: isDemFile(file) ? path : null };
+  if (path)
+    return {
+      file: await exportPathViaPywebview(path, file.name, onProgress),
+      sourceDemPath: isDemFile(file) ? path : null,
+    };
 
   // 拖拽时 pywebviewFullPath 可能缺失（标准浏览器 drop 事件，非 pywebview DOM 系统），
   // 尝试通过 Python 端 _dnd_state 解析本机路径。
   const api = window.pywebview!.api;
   const resolvedPath = await api.get_drop_path?.(file.name);
-  if (resolvedPath) return { file: await exportPathViaPywebview(resolvedPath, file.name, onProgress), sourceDemPath: isDemFile(file) ? resolvedPath : null };
+  if (resolvedPath)
+    return {
+      file: await exportPathViaPywebview(resolvedPath, file.name, onProgress),
+      sourceDemPath: isDemFile(file) ? resolvedPath : null,
+    };
 
   // 无文件系统路径：仅剩字节传输。走到这里说明桌面壳版本过旧
   // （不提供 get_drop_path），或文件来自浏览器 <input type="file">
   // 而非拖拽/原生对话框——此时建议用户使用「导入 .dem」按钮。
-  if (typeof api.export_dem_bytes !== "function") {
+  if (typeof api.export_dem_bytes !== 'function') {
     throw new Error(
-      `${file.name}: 桌面壳版本过旧，不支持字节导入，请点右上角「导入 .dem」使用对话框`
+      `${file.name}: 桌面壳版本过旧，不支持字节导入，请点右上角「导入 .dem」使用对话框`,
     );
   }
   const buf = await file.arrayBuffer();
@@ -182,8 +217,10 @@ async function exportViaPywebview(file: File, onProgress?: (message: string) => 
   const result = await api.export_dem_bytes(file.name, dataB64);
   if (!result.ok) throw new Error(`${file.name}: ${result.error}`);
   return {
-    file: new File([base64ToBytes(result.dataBase64) as BlobPart], result.fileName, { type: "application/zip" }),
-    sourceDemPath: null
+    file: new File([base64ToBytes(result.dataBase64) as BlobPart], result.fileName, {
+      type: 'application/zip',
+    }),
+    sourceDemPath: null,
   };
 }
 
@@ -193,27 +230,44 @@ export const exportPolling = new ExportPolling();
 const RESULT_CHUNK_SIZE = 512 * 1024;
 
 function formatEta(status: ExportJobStatus): string {
-  if (!Number.isFinite(status.elapsedSeconds) || status.elapsedSeconds < 0 || status.progress < 0.03) return "";
+  if (
+    !Number.isFinite(status.elapsedSeconds) ||
+    status.elapsedSeconds < 0 ||
+    status.progress < 0.03
+  )
+    return '';
   const remain = (status.elapsedSeconds / status.progress) * (1 - status.progress);
-  return remain > 1 ? `，预计还需 ${Math.ceil(remain)}s` : "";
+  return remain > 1 ? `，预计还需 ${Math.ceil(remain)}s` : '';
 }
 
 /** 异步任务后端：启动 → 轮询状态（驱动进度提示）→ 分块取回 ZIP。 */
 async function exportPathViaJob(
   path: string,
   displayName: string,
-  onProgress?: (message: string) => void
+  onProgress?: (message: string) => void,
 ): Promise<File> {
   const api = window.pywebview!.api;
   const { jobId } = await api.start_export_job!(path);
   let final: ExportJobStatus;
   try {
-    final = await exportPolling.wait(jobId, () => api.get_export_status!(jobId), status => {
-      onProgress?.(`${displayName}：${sanitizeDiagnosticText(status.stage)} ${Math.round(status.progress * 100)}%（已用 ${Number.isFinite(status.elapsedSeconds) ? Math.round(status.elapsedSeconds) + "s" : "未知"}${formatEta(status)}）`);
-    });
+    final = await exportPolling.wait(
+      jobId,
+      () => api.get_export_status!(jobId),
+      (status) => {
+        onProgress?.(
+          `${displayName}：${sanitizeDiagnosticText(status.stage)} ${Math.round(status.progress * 100)}%（已用 ${Number.isFinite(status.elapsedSeconds) ? Math.round(status.elapsedSeconds) + 's' : '未知'}${formatEta(status)}）`,
+        );
+      },
+    );
   } catch (error) {
-    const cause = normalizeDiagnostic(error, { stage: normalizeDiagnostic(error).stage ?? "export", fileId: jobId });
-    throw new Error(`${sanitizeDiagnosticText(displayName)}: ${cause.message}（阶段：${cause.stage}；任务：${jobId}；可在管理页导出诊断日志）`, { cause });
+    const cause = normalizeDiagnostic(error, {
+      stage: normalizeDiagnostic(error).stage ?? 'export',
+      fileId: jobId,
+    });
+    throw new Error(
+      `${sanitizeDiagnosticText(displayName)}: ${cause.message}（阶段：${cause.stage}；任务：${jobId}；可在管理页导出诊断日志）`,
+      { cause },
+    );
   }
   onProgress?.(`${displayName}：传输结果…`);
   // Decode each bridge chunk as it arrives. Keeping one full base64 string in
@@ -225,43 +279,49 @@ async function exportPathViaJob(
     byteParts.push(base64ToBytes(chunk.data) as BlobPart);
     if (chunk.done) break;
   }
-  return new File(byteParts, final.fileName ?? displayName.replace(/\.dem$/i, ".zip"), {
-    type: "application/zip"
+  return new File(byteParts, final.fileName ?? displayName.replace(/\.dem$/i, '.zip'), {
+    type: 'application/zip',
   });
 }
 
 async function exportPathViaPywebview(
   path: string,
   displayName: string,
-  onProgress?: (message: string) => void
+  onProgress?: (message: string) => void,
 ): Promise<File> {
   const api = window.pywebview!.api;
   // 0.3.0+ 桌面壳：异步任务 + 进度轮询；旧壳回退同步调用
-  if (typeof api.start_export_job === "function") {
+  if (typeof api.start_export_job === 'function') {
     return exportPathViaJob(path, displayName, onProgress);
   }
   const result = await api.export_dem_path(path);
   if (!result.ok) {
     throw new Error(`${displayName}: ${result.error}`);
   }
-  return new File([base64ToBytes(result.dataBase64) as BlobPart], result.fileName, { type: "application/zip" });
+  return new File([base64ToBytes(result.dataBase64) as BlobPart], result.fileName, {
+    type: 'application/zip',
+  });
 }
 
 /** 把单个 .dem 转成 v3 ZIP File；onProgress 用于界面提示。 */
 export async function exportDemToZip(
   file: File,
   backend: DemBackend,
-  onProgress?: (message: string) => void
+  onProgress?: (message: string) => void,
 ): Promise<ExportedDemoFile> {
-  if (backend === "dev") return { file: await exportViaDev(file), sourceDemPath: null };
-  if (backend === "pywebview") return exportViaPywebview(file, onProgress);
-  throw new Error(`${file.name}: 当前环境不支持 .dem 直接导入（开发模式跑 pnpm dev:studio，或使用打包版桌面应用）`);
+  if (backend === 'dev') return { file: await exportViaDev(file), sourceDemPath: null };
+  if (backend === 'pywebview') return exportViaPywebview(file, onProgress);
+  throw new Error(
+    `${file.name}: 当前环境不支持 .dem 直接导入（开发模式跑 pnpm dev:studio，或使用打包版桌面应用）`,
+  );
 }
 
 /** pywebview 原生文件对话框：选多个 .dem/.zip 并逐个导出。paths 为空时 cancelled 为 true。 */
-export async function pickAndExportDems(onProgress: (message: string) => void): Promise<{ files: ExportedDemoFile[]; errors: string[]; cancelled: boolean }> {
+export async function pickAndExportDems(
+  onProgress: (message: string) => void,
+): Promise<{ files: ExportedDemoFile[]; errors: string[]; cancelled: boolean }> {
   const api = window.pywebview?.api;
-  if (!api) return { files: [], errors: ["桌面壳不可用"], cancelled: false };
+  if (!api) return { files: [], errors: ['桌面壳不可用'], cancelled: false };
   const paths = await api.pick_dems();
   if (paths.length === 0) return { files: [], errors: [], cancelled: true };
   const files: ExportedDemoFile[] = [];
@@ -271,7 +331,10 @@ export async function pickAndExportDems(onProgress: (message: string) => void): 
     const prefix = `（${files.length + errors.length + 1}/${paths.length}）`;
     onProgress(`正在导出 ${name}…${prefix}`);
     try {
-      files.push({ file: await exportPathViaPywebview(path, name, (msg) => onProgress(`${prefix}${msg}`)), sourceDemPath: path });
+      files.push({
+        file: await exportPathViaPywebview(path, name, (msg) => onProgress(`${prefix}${msg}`)),
+        sourceDemPath: path,
+      });
     } catch (err) {
       errors.push(err instanceof Error ? err.message : String(err));
     }

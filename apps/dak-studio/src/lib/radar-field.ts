@@ -9,22 +9,22 @@
  * 缓存 key 不含版本号，版本写进 blob header；读时校验 computeVersion/calibrationVersion
  * 不符即当未命中重算覆盖（无泄漏）。算法/标定变更 → core 的 RADAR_FIELD_VERSION +1 即可。
  */
-import type { RadarField, RadarFieldBase } from "@cs2dak/tactics";
-import { RADAR_FIELD_BASES, createRadarFieldAccumulator } from "@cs2dak/tactics";
-import { RADAR_FIELD_VERSION } from "@cs2dak/tactics";
-import { MAP_CALIBRATION_VERSION } from "@cs2dak/maps/calibration";
-import { radarFieldInWorker } from "./library";
-import { getStorage } from "./storage";
+import type { RadarField, RadarFieldBase } from '@cs2dak/tactics';
+import { RADAR_FIELD_BASES, createRadarFieldAccumulator } from '@cs2dak/tactics';
+import { RADAR_FIELD_VERSION } from '@cs2dak/tactics';
+import { MAP_CALIBRATION_VERSION } from '@cs2dak/maps/calibration';
+import { radarFieldInWorker } from './library';
+import { getStorage } from './storage';
 
 const FIELD_BASES: readonly RadarFieldBase[] = RADAR_FIELD_BASES;
 const SERIAL_FORMAT = 2;
 const RADAR_FIELD_LOAD_CONCURRENCY = 4;
 
-const fieldBlobs = getStorage().blobs("radar_field");
+const fieldBlobs = getStorage().blobs('radar_field');
 // 只合并同 key 的并发请求；resolved 大场不常驻内存。
 const memCache = new Map<string, Promise<RadarField[]>>();
 
-function cacheKey(matchId: string, economy: "gun" | "all"): string {
+function cacheKey(matchId: string, economy: 'gun' | 'all'): string {
   return `${matchId}:${economy}`;
 }
 
@@ -39,10 +39,15 @@ interface SerialHeader {
   schemaVersion: number;
   mapName: string;
   maxSec: number;
-  triAvailability: "full" | "none";
+  triAvailability: 'full' | 'none';
   grid: { cellSize: number; cells: Array<[number, number, number]> };
   nCells: number;
-  contributions: Array<{ team: string | null; economy: "gun" | "all"; roundCount: number; matchIds: string[] }>;
+  contributions: Array<{
+    team: string | null;
+    economy: 'gun' | 'all';
+    roundCount: number;
+    matchIds: string[];
+  }>;
 }
 
 function serializeMatchRadarFields(fields: RadarField[]): ArrayBuffer {
@@ -55,9 +60,9 @@ function serializeMatchRadarFields(fields: RadarField[]): ArrayBuffer {
     computeVersion: RADAR_FIELD_VERSION,
     calibrationVersion: MAP_CALIBRATION_VERSION,
     schemaVersion: sample?.schemaVersion ?? 1,
-    mapName: sample?.mapName ?? "",
+    mapName: sample?.mapName ?? '',
     maxSec,
-    triAvailability: sample?.triAvailability ?? "none",
+    triAvailability: sample?.triAvailability ?? 'none',
     grid: { cellSize: sample?.grid.cellSize ?? 0, cells },
     nCells,
     contributions: fields.map((f) => ({
@@ -73,10 +78,15 @@ function serializeMatchRadarFields(fields: RadarField[]): ArrayBuffer {
   const ints = new Int32Array(intsPerContribution * fields.length);
   let off = 0;
   for (const f of fields) {
-    ints.set(f.denomCt, off); off += maxSec;
-    ints.set(f.denomT, off); off += maxSec;
+    ints.set(f.denomCt, off);
+    off += maxSec;
+    ints.set(f.denomT, off);
+    off += maxSec;
     for (const base of FIELD_BASES) {
-      for (let s = 0; s < maxSec; s++) { ints.set(f.fields[base][s]!, off); off += nCells; }
+      for (let s = 0; s < maxSec; s++) {
+        ints.set(f.fields[base][s]!, off);
+        off += nCells;
+      }
     }
   }
 
@@ -90,9 +100,15 @@ function serializeMatchRadarFields(fields: RadarField[]): ArrayBuffer {
 function deserializeMatchRadarFields(buf: ArrayBuffer): RadarField[] | null {
   if (buf.byteLength < 4) return null;
   const headerLen = new DataView(buf).getUint32(0, true);
-  const header = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 4, headerLen))) as SerialHeader;
+  const header = JSON.parse(
+    new TextDecoder().decode(new Uint8Array(buf, 4, headerLen)),
+  ) as SerialHeader;
   if (header.fmt !== SERIAL_FORMAT) return null;
-  if (header.computeVersion !== RADAR_FIELD_VERSION || header.calibrationVersion !== MAP_CALIBRATION_VERSION) return null;
+  if (
+    header.computeVersion !== RADAR_FIELD_VERSION ||
+    header.calibrationVersion !== MAP_CALIBRATION_VERSION
+  )
+    return null;
   if (header.contributions.length === 0) return [];
   // The producer returns either no fields or the complete [teamA, teamB] pair.
   // Reject incomplete cached pairs so an absent side cannot shift the other side.
@@ -100,17 +116,23 @@ function deserializeMatchRadarFields(buf: ArrayBuffer): RadarField[] | null {
 
   const { maxSec, nCells } = header;
   const payload = buf.slice(4 + headerLen); // slice → 4 字节对齐；rows 只建 subarray 视图。
-  const expectedInts = header.contributions.length * (maxSec * 2 + maxSec * nCells * FIELD_BASES.length);
+  const expectedInts =
+    header.contributions.length * (maxSec * 2 + maxSec * nCells * FIELD_BASES.length);
   if (payload.byteLength !== expectedInts * Int32Array.BYTES_PER_ELEMENT) return null;
   const ints = new Int32Array(payload);
   let off = 0;
   return header.contributions.map((c) => {
-    const denomCt = ints.subarray(off, off + maxSec); off += maxSec;
-    const denomT = ints.subarray(off, off + maxSec); off += maxSec;
+    const denomCt = ints.subarray(off, off + maxSec);
+    off += maxSec;
+    const denomT = ints.subarray(off, off + maxSec);
+    off += maxSec;
     const fieldRows = {} as Record<RadarFieldBase, Int32Array[]>;
     for (const base of FIELD_BASES) {
       const rows: Int32Array[] = [];
-      for (let s = 0; s < maxSec; s++) { rows.push(ints.subarray(off, off + nCells)); off += nCells; }
+      for (let s = 0; s < maxSec; s++) {
+        rows.push(ints.subarray(off, off + nCells));
+        off += nCells;
+      }
       fieldRows[base] = rows;
     }
     return {
@@ -119,7 +141,13 @@ function deserializeMatchRadarFields(buf: ArrayBuffer): RadarField[] | null {
       mapName: header.mapName,
       calibrationVersion: header.calibrationVersion,
       triAvailability: header.triAvailability,
-      scope: { kind: "team", team: c.team, economy: c.economy, roundCount: c.roundCount, matchIds: c.matchIds },
+      scope: {
+        kind: 'team',
+        team: c.team,
+        economy: c.economy,
+        roundCount: c.roundCount,
+        matchIds: c.matchIds,
+      },
       grid: header.grid,
       maxSec,
       denomCt,
@@ -129,11 +157,11 @@ function deserializeMatchRadarFields(buf: ArrayBuffer): RadarField[] | null {
   });
 }
 
-async function computeAndCache(matchId: string, economy: "gun" | "all"): Promise<RadarField[]> {
-  const buffer = await getStorage().blobs("demos").get(matchId);
+async function computeAndCache(matchId: string, economy: 'gun' | 'all'): Promise<RadarField[]> {
+  const buffer = await getStorage().blobs('demos').get(matchId);
   if (!buffer) return [];
   const fields = await radarFieldInWorker(buffer, matchId, economy, false);
-  if (fields.length !== 0 && fields.length !== 2) throw new Error("控图数据缺少一方贡献");
+  if (fields.length !== 0 && fields.length !== 2) throw new Error('控图数据缺少一方贡献');
   try {
     await fieldBlobs.put(cacheKey(matchId, economy), serializeMatchRadarFields(fields));
   } catch {
@@ -143,7 +171,10 @@ async function computeAndCache(matchId: string, economy: "gun" | "all"): Promise
 }
 
 /** 取一场的两份场贡献（[teamA, teamB]）；命中持久化缓存直接解码，否则 worker 算后落盘。 */
-export function getMatchRadarFields(matchId: string, economy: "gun" | "all" = "gun"): Promise<RadarField[]> {
+export function getMatchRadarFields(
+  matchId: string,
+  economy: 'gun' | 'all' = 'gun',
+): Promise<RadarField[]> {
   const key = cacheKey(matchId, economy);
   const inMem = memCache.get(key);
   if (inMem) return inMem;
@@ -160,14 +191,17 @@ export function getMatchRadarFields(matchId: string, economy: "gun" | "all" = "g
     return computeAndCache(matchId, economy);
   })();
   memCache.set(key, loading);
-  loading.then(() => memCache.delete(key), () => memCache.delete(key));
+  loading.then(
+    () => memCache.delete(key),
+    () => memCache.delete(key),
+  );
   return loading;
 }
 
 export interface RadarScopeRequest {
   matchIds: string[];
-  economy?: "gun" | "all";
-  scope: { kind: "league" | "team"; team: string | null };
+  economy?: 'gun' | 'all';
+  scope: { kind: 'league' | 'team'; team: string | null };
   /** team scope：仅保留 raw 队名经此判定为真的贡献（按 identity 归并后的显示名匹配）。 */
   includeTeam?: (rawTeamName: string) => boolean;
   onProgress?: (done: number, total: number) => void;
@@ -176,9 +210,12 @@ export interface RadarScopeRequest {
 
 export interface RadarScopeBatchRequest {
   matchIds: string[];
-  economy?: "gun" | "all";
+  economy?: 'gun' | 'all';
   league?: boolean;
-  team?: { name: string; includeTeam: (rawTeamName: string, slot: "teamA" | "teamB", entryId: string) => boolean };
+  team?: {
+    name: string;
+    includeTeam: (rawTeamName: string, slot: 'teamA' | 'teamB', entryId: string) => boolean;
+  };
   onProgress?: (done: number, total: number) => void;
   signal?: AbortSignal;
 }
@@ -192,7 +229,7 @@ async function forEachLimit<T>(
   items: T[],
   limit: number,
   signal: AbortSignal | undefined,
-  run: (item: T) => Promise<void>
+  run: (item: T) => Promise<void>,
 ): Promise<void> {
   let next = 0;
   const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
@@ -207,12 +244,14 @@ async function forEachLimit<T>(
 }
 
 /** 同一批 match 一次加载，同时产出赛事基线和可选队伍场；避免 49 场 scope 重复解码/合并。 */
-export async function buildScopeRadarFields(req: RadarScopeBatchRequest): Promise<RadarScopeBatchResult> {
-  const economy = req.economy ?? "gun";
+export async function buildScopeRadarFields(
+  req: RadarScopeBatchRequest,
+): Promise<RadarScopeBatchResult> {
+  const economy = req.economy ?? 'gun';
   const total = req.matchIds.length;
   let done = 0;
-  const leagueAcc = createRadarFieldAccumulator({ kind: "league", team: null });
-  const teamAcc = createRadarFieldAccumulator({ kind: "team", team: req.team?.name ?? null });
+  const leagueAcc = createRadarFieldAccumulator({ kind: 'league', team: null });
+  const teamAcc = createRadarFieldAccumulator({ kind: 'team', team: req.team?.name ?? null });
   await forEachLimit(req.matchIds, RADAR_FIELD_LOAD_CONCURRENCY, req.signal, async (id) => {
     const fields = await getMatchRadarFields(id, economy);
     if (req.signal?.aborted) return;
@@ -222,7 +261,11 @@ export async function buildScopeRadarFields(req: RadarScopeBatchRequest): Promis
       if (req.league ?? true) {
         leagueAcc.append(f);
       }
-      if (req.team && f.scope.team != null && req.team.includeTeam(f.scope.team, index === 0 ? "teamA" : "teamB", id)) {
+      if (
+        req.team &&
+        f.scope.team != null &&
+        req.team.includeTeam(f.scope.team, index === 0 ? 'teamA' : 'teamB', id)
+      ) {
         teamAcc.append(f);
       }
     }
@@ -238,13 +281,17 @@ export async function buildScopeRadarField(req: RadarScopeRequest): Promise<Rada
   const { league, team } = await buildScopeRadarFields({
     matchIds: req.matchIds,
     economy: req.economy,
-    league: req.scope.kind === "league",
-    team: req.scope.kind === "team" && req.scope.team
-      ? { name: req.scope.team, includeTeam: req.includeTeam ?? ((raw) => raw === req.scope.team) }
-      : undefined,
+    league: req.scope.kind === 'league',
+    team:
+      req.scope.kind === 'team' && req.scope.team
+        ? {
+            name: req.scope.team,
+            includeTeam: req.includeTeam ?? ((raw) => raw === req.scope.team),
+          }
+        : undefined,
     onProgress: req.onProgress,
     signal: req.signal,
   });
-  if (req.scope.kind === "league") return league;
+  if (req.scope.kind === 'league') return league;
   return team;
 }

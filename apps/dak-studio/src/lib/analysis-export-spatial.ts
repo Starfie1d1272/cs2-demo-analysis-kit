@@ -1,11 +1,8 @@
-import { RADAR_FIELD_MODES } from "@cs2dak/presentation/radar-field";
-import { economyLabelCn } from "@cs2dak/presentation";
-import type { OpeningTrailRound, RadarField } from "@cs2dak/tactics";
-import type { OpeningPageState, ControlPageState } from "./spatial-view-state";
-import {
-  captureAnalysisResult,
-  type AnalysisExportSource,
-} from "./analysis-export";
+import { RADAR_FIELD_MODES } from '@cs2dak/presentation/radar-field';
+import { economyLabelCn } from '@cs2dak/presentation';
+import type { OpeningTrailRound, RadarField } from '@cs2dak/tactics';
+import type { OpeningPageState, ControlPageState } from './spatial-view-state';
+import { captureAnalysisResult, type AnalysisExportSource } from './analysis-export';
 
 export function buildOpeningAnalysisResult(
   source: AnalysisExportSource,
@@ -15,35 +12,32 @@ export function buildOpeningAnalysisResult(
   missingReplay: string[],
 ) {
   const visible = rounds.filter(
-    (row) =>
-      !state.hiddenRoundKeys.includes(`${row.matchId}#R${row.roundNumber}`),
+    (row) => !state.hiddenRoundKeys.includes(`${row.matchId}#R${row.roundNumber}`),
   );
   return captureAnalysisResult({
     ...source,
     title: `${player} · 开局动线`,
-    page: "opening",
+    page: 'opening',
     conditions: [
       ...source.conditions,
-      `地图：${state.mapName ?? "未知"}`,
+      `地图：${state.mapName ?? '未知'}`,
       `阵营：${state.side.toUpperCase()}`,
-      `场次：${state.recentMatchCount ? `最近 ${state.recentMatchCount} 场（仅有日期）` : "全部"}`,
+      `场次：${state.recentMatchCount ? `最近 ${state.recentMatchCount} 场（仅有日期）` : '全部'}`,
       `经济：长枪局`,
       `时间：${state.timeSeconds}s / 30s`,
-      `轨迹：${state.showTrails ? "显示" : "隐藏"}；道具：${state.showGrenades ? "显示" : "隐藏"}`,
+      `轨迹：${state.showTrails ? '显示' : '隐藏'}；道具：${state.showGrenades ? '显示' : '隐藏'}`,
     ],
     sections: [
       {
-        title: "样本回合",
-        text: missingReplay.length
-          ? [`缺少回放：${missingReplay.join("、")}`]
-          : [],
+        title: '样本回合',
+        text: missingReplay.length ? [`缺少回放：${missingReplay.join('、')}`] : [],
         sampleDescription: `${visible.length} 个显示回合`,
-        limitations: ["图像和回放帧未包含。"],
+        limitations: ['图像和回放帧未包含。'],
         columns: [
-          { key: "match", label: "比赛", unit: null },
-          { key: "round", label: "回合", unit: null },
-          { key: "side", label: "阵营", unit: null },
-          { key: "economy", label: "经济", unit: null },
+          { key: 'match', label: '比赛', unit: null },
+          { key: 'round', label: '回合', unit: null },
+          { key: 'side', label: '阵营', unit: null },
+          { key: 'economy', label: '经济', unit: null },
         ],
         rows: visible.map((row) => ({
           match: row.matchId,
@@ -53,7 +47,7 @@ export function buildOpeningAnalysisResult(
         })),
       },
     ],
-    limitations: ["图像和回放帧未包含。"],
+    limitations: ['图像和回放帧未包含。'],
   });
 }
 export function buildControlAnalysisResult(
@@ -64,48 +58,45 @@ export function buildControlAnalysisResult(
 ) {
   return captureAnalysisResult({
     ...source,
-    title: "控图覆盖场",
-    page: "control",
+    title: '控图覆盖场',
+    page: 'control',
     conditions: [
       ...source.conditions,
-      ...(source.context.focus.kind === "player" ||
-      source.context.focus.kind === "self"
-        ? ["覆盖场按比赛范围计算，未按个人筛选。"]
+      ...(source.context.focus.kind === 'player' || source.context.focus.kind === 'self'
+        ? ['覆盖场按比赛范围计算，未按个人筛选。']
         : []),
       `地图：${field.mapName}`,
-      `对象：${field.scope.team ?? "赛事地图基线"}`,
-      `经济：${field.scope.economy === "gun" ? "长枪局" : "全部回合"}`,
+      `对象：${field.scope.team ?? '赛事地图基线'}`,
+      `经济：${field.scope.economy === 'gun' ? '长枪局' : '全部回合'}`,
       `模式：${RADAR_FIELD_MODES.find((mode) => mode.value === state.mode)?.label ?? state.mode}`,
       `时间：${state.second}s`,
-      `层：${state.level === "upper" ? "上层" : "下层"}`,
+      `层：${state.level === 'upper' ? '上层' : '下层'}`,
     ],
     sections: [
       {
-        title: "覆盖样本",
+        title: '覆盖样本',
         text: [
           `当前样本 ${field.scope.matchIds.length} 场、${field.scope.roundCount} 回合。`,
           ...(baseline
-            ? [
-                `比较基线 ${baseline.scope.matchIds.length} 场、${baseline.scope.roundCount} 回合。`,
-              ]
+            ? [`比较基线 ${baseline.scope.matchIds.length} 场、${baseline.scope.roundCount} 回合。`]
             : []),
-          `遮挡数据：${field.triAvailability === "full" ? "完整" : "缺失"}`,
+          `遮挡数据：${field.triAvailability === 'full' ? '完整' : '缺失'}`,
         ],
         columns: [
-          { key: "scope", label: "范围", unit: null },
-          { key: "matches", label: "场次", unit: null },
-          { key: "rounds", label: "回合", unit: null },
+          { key: 'scope', label: '范围', unit: null },
+          { key: 'matches', label: '场次', unit: null },
+          { key: 'rounds', label: '回合', unit: null },
         ],
         rows: [
           {
-            scope: field.scope.team ?? "赛事地图基线",
+            scope: field.scope.team ?? '赛事地图基线',
             matches: field.scope.matchIds.length,
             rounds: field.scope.roundCount,
           },
           ...(baseline
             ? [
                 {
-                  scope: "比较基线",
+                  scope: '比较基线',
                   matches: baseline.scope.matchIds.length,
                   rounds: baseline.scope.roundCount,
                 },
@@ -113,9 +104,9 @@ export function buildControlAnalysisResult(
             : []),
         ],
         sampleDescription: `${field.scope.roundCount} 回合`,
-        limitations: ["覆盖格不提供回合反查；图像未包含。"],
+        limitations: ['覆盖格不提供回合反查；图像未包含。'],
       },
     ],
-    limitations: ["图像未包含；覆盖结果仅为描述性观察。"],
+    limitations: ['图像未包含；覆盖结果仅为描述性观察。'],
   });
 }

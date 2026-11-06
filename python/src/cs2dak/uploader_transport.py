@@ -1,4 +1,5 @@
 """Session-scoped HTTP transport; mutations are never replayed here."""
+
 import ssl
 import threading
 import urllib.parse
@@ -17,7 +18,11 @@ class UploaderTransport:
     def request(self, origin, path, method, headers, body):
         # Match urllib's environment/system proxy discovery and bypass rules.
         url = urllib.parse.urlsplit(origin)
-        proxy = None if urllib.request.proxy_bypass(url.netloc) else urllib.request.getproxies().get(url.scheme)
+        proxy = (
+            None
+            if urllib.request.proxy_bypass(url.netloc)
+            else urllib.request.getproxies().get(url.scheme)
+        )
         route = (origin, proxy)
         with self._lock:
             if self._closed:
@@ -33,20 +38,33 @@ class UploaderTransport:
                     parsed = urllib.parse.urlsplit(proxy)
                     proxy_headers = None
                     if parsed.username is not None:
-                        auth = urllib.parse.unquote(parsed.username) + ":" + urllib.parse.unquote(parsed.password or "")
+                        auth = (
+                            urllib.parse.unquote(parsed.username)
+                            + ":"
+                            + urllib.parse.unquote(parsed.password or "")
+                        )
                         proxy_headers = urllib3.make_headers(proxy_basic_auth=auth)
-                        proxy = urllib.parse.urlunsplit(parsed._replace(netloc=parsed.netloc.rsplit("@", 1)[1]))
-                    self._pool = urllib3.ProxyManager(proxy, proxy_headers=proxy_headers,
-                                                     proxy_ssl_context=context, **options)
+                        proxy = urllib.parse.urlunsplit(
+                            parsed._replace(netloc=parsed.netloc.rsplit("@", 1)[1])
+                        )
+                    self._pool = urllib3.ProxyManager(
+                        proxy, proxy_headers=proxy_headers, proxy_ssl_context=context, **options
+                    )
                 else:
                     self._pool = urllib3.PoolManager(**options)
                 self._route = route
             # Socket inactivity budgets, not an overall wall-clock deadline.
             read_timeout = 90 if path == "/evidence" else 15
-            return self._pool.request(method, origin + "/api/integrations/dak" + path,
-                                      headers=headers, body=body, retries=False, redirect=False,
-                                      timeout=urllib3.Timeout(connect=10, read=read_timeout),
-                                      preload_content=True)
+            return self._pool.request(
+                method,
+                origin + "/api/integrations/dak" + path,
+                headers=headers,
+                body=body,
+                retries=False,
+                redirect=False,
+                timeout=urllib3.Timeout(connect=10, read=read_timeout),
+                preload_content=True,
+            )
 
     def close(self):
         with self._lock:

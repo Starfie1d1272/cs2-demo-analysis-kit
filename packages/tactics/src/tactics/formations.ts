@@ -1,4 +1,9 @@
-import { calloutCn, classifyTacticalLocation, positionGroupOf, type DefaultPositionSide } from "@cs2dak/maps";
+import {
+  calloutCn,
+  classifyTacticalLocation,
+  positionGroupOf,
+  type DefaultPositionSide,
+} from '@cs2dak/maps';
 import type {
   OpeningPattern,
   OpeningPressureEvent,
@@ -6,7 +11,7 @@ import type {
   TacticalFormationSnapshot,
   TacticalFrameSample,
   TacticalRegionCounts,
-} from "./types.js";
+} from './types.js';
 
 function emptyRegionCounts(): TacticalRegionCounts {
   return { a: 0, b: 0, mid: 0, unknown: 0 };
@@ -22,18 +27,23 @@ export function deriveOpeningPressure(
     minDwellSec?: number;
   },
 ): OpeningPressureEvent[] {
-  const opposingSide: DefaultPositionSide = options.side === "t" ? "ct" : "t";
+  const opposingSide: DefaultPositionSide = options.side === 't' ? 'ct' : 't';
   const minDwellSec = options.minDwellSec ?? 1;
   return segments
-    .filter((segment) =>
-      segment.side === options.side
-      && segment.startTick <= options.endTick
-      && segment.endTick >= options.startTick
-      && segment.durationSec >= minDwellSec
-      && segment.positionGroupId == null,
+    .filter(
+      (segment) =>
+        segment.side === options.side &&
+        segment.startTick <= options.endTick &&
+        segment.endTick >= options.startTick &&
+        segment.durationSec >= minDwellSec &&
+        segment.positionGroupId == null,
     )
     .map((segment): OpeningPressureEvent | null => {
-      const opposingPositionGroupId = positionGroupOf(options.mapName, opposingSide, segment.callout);
+      const opposingPositionGroupId = positionGroupOf(
+        options.mapName,
+        opposingSide,
+        segment.callout,
+      );
       if (!opposingPositionGroupId && !segment.primaryRegion) return null;
       return {
         playerIndex: segment.playerIndex,
@@ -43,7 +53,7 @@ export function deriveOpeningPressure(
         callout: segment.callout,
         calloutLabel: calloutCn(options.mapName, segment.callout) || segment.callout,
         primaryRegion: segment.primaryRegion,
-        kind: opposingPositionGroupId ? "deep" : "forward",
+        kind: opposingPositionGroupId ? 'deep' : 'forward',
         opposingPositionGroupId,
         evidence: segment.evidence,
       };
@@ -74,7 +84,8 @@ export function buildFormationTimeline(
         if (location.primaryRegion) regionCounts[location.primaryRegion] += 1;
         else regionCounts.unknown += 1;
         if (location.positionGroupId) {
-          positionGroupCounts[location.positionGroupId] = (positionGroupCounts[location.positionGroupId] ?? 0) + 1;
+          positionGroupCounts[location.positionGroupId] =
+            (positionGroupCounts[location.positionGroupId] ?? 0) + 1;
         }
         return {
           playerIndex: sample.playerIndex,
@@ -83,7 +94,13 @@ export function buildFormationTimeline(
           positionGroupId: location.positionGroupId,
         };
       });
-      return { tick: first.tick, side: first.side, regionCounts, positionGroupCounts, playerLocations };
+      return {
+        tick: first.tick,
+        side: first.side,
+        regionCounts,
+        positionGroupCounts,
+        playerLocations,
+      };
     })
     .sort((a, b) => a.tick - b.tick || a.side.localeCompare(b.side));
 }
@@ -92,44 +109,61 @@ function overlapTicks(segment: PlayerTacticalSegment, startTick: number, endTick
   return Math.max(0, Math.min(segment.endTick, endTick) - Math.max(segment.startTick, startTick));
 }
 
-function spreadOf(counts: TacticalRegionCounts): OpeningPattern["spread"] {
+function spreadOf(counts: TacticalRegionCounts): OpeningPattern['spread'] {
   const occupied = [counts.a, counts.mid, counts.b].filter((count) => count > 0).length;
-  if (occupied === 0) return "unknown";
-  if (occupied === 1) return "stacked";
-  if (occupied === 2) return "split";
-  return "balanced";
+  if (occupied === 0) return 'unknown';
+  if (occupied === 1) return 'stacked';
+  if (occupied === 2) return 'split';
+  return 'balanced';
 }
 
 export function deriveOpeningPattern(
   segments: readonly PlayerTacticalSegment[],
-  options: { side: DefaultPositionSide; startTick: number; endTick: number; minDefaultDwellSec?: number },
+  options: {
+    side: DefaultPositionSide;
+    startTick: number;
+    endTick: number;
+    minDefaultDwellSec?: number;
+  },
 ): OpeningPattern {
   const byPlayer = new Map<number, PlayerTacticalSegment[]>();
   for (const segment of segments) {
-    if (segment.side !== options.side || segment.endTick < options.startTick || segment.startTick > options.endTick) continue;
+    if (
+      segment.side !== options.side ||
+      segment.endTick < options.startTick ||
+      segment.startTick > options.endTick
+    )
+      continue;
     const rows = byPlayer.get(segment.playerIndex) ?? [];
     rows.push(segment);
     byPlayer.set(segment.playerIndex, rows);
   }
 
   const minDefaultDwellSec = options.minDefaultDwellSec ?? 1;
-  const selected = [...byPlayer.values()].map((rows) => rows.sort((a, b) => {
-    const aDefault = a.positionGroupId != null && a.durationSec >= minDefaultDwellSec ? 1 : 0;
-    const bDefault = b.positionGroupId != null && b.durationSec >= minDefaultDwellSec ? 1 : 0;
-    const aKnown = a.primaryRegion != null ? 1 : 0;
-    const bKnown = b.primaryRegion != null ? 1 : 0;
-    return bDefault - aDefault
-      || bKnown - aKnown
-      || overlapTicks(b, options.startTick, options.endTick) - overlapTicks(a, options.startTick, options.endTick)
-      || a.startTick - b.startTick;
-  })[0]!);
+  const selected = [...byPlayer.values()].map(
+    (rows) =>
+      rows.sort((a, b) => {
+        const aDefault = a.positionGroupId != null && a.durationSec >= minDefaultDwellSec ? 1 : 0;
+        const bDefault = b.positionGroupId != null && b.durationSec >= minDefaultDwellSec ? 1 : 0;
+        const aKnown = a.primaryRegion != null ? 1 : 0;
+        const bKnown = b.primaryRegion != null ? 1 : 0;
+        return (
+          bDefault - aDefault ||
+          bKnown - aKnown ||
+          overlapTicks(b, options.startTick, options.endTick) -
+            overlapTicks(a, options.startTick, options.endTick) ||
+          a.startTick - b.startTick
+        );
+      })[0]!,
+  );
   const regionCounts = emptyRegionCounts();
   const positionGroupCounts: Record<string, number> = {};
   for (const segment of selected) {
     if (segment.primaryRegion) regionCounts[segment.primaryRegion] += 1;
     else regionCounts.unknown += 1;
     if (segment.positionGroupId) {
-      positionGroupCounts[segment.positionGroupId] = (positionGroupCounts[segment.positionGroupId] ?? 0) + 1;
+      positionGroupCounts[segment.positionGroupId] =
+        (positionGroupCounts[segment.positionGroupId] ?? 0) + 1;
     }
   }
   const spread = spreadOf(regionCounts);
@@ -138,14 +172,14 @@ export function deriveOpeningPattern(
   const groups = Object.entries(positionGroupCounts)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([id, count]) => `${id}:${count}`)
-    .join("|");
+    .join('|');
   return {
     side: options.side,
     regionCounts,
     positionGroupCounts,
     spread,
     coarseSignature,
-    detailedSignature: `${sideLabel}:${groups || "-"}`,
+    detailedSignature: `${sideLabel}:${groups || '-'}`,
     evidence: selected.map((segment) => segment.evidence),
   };
 }

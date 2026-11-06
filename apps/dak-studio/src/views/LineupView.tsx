@@ -1,42 +1,65 @@
-import { withStoredAnalysis } from "../lib/queries/query-cache";
-import { AnalysisScopeEmpty, useCapabilityBlocked } from "../components/CapabilityBar";
-import { canExportSnapshot } from "../lib/analysis-export";
-import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
-import { AnalysisExportButtons } from "../components/AnalysisExportButtons";
-import { buildLineupsAnalysisResult, LINEUPS_SCOPE_NOTE } from "../lib/analysis-export-lineups";
-import type { AnalysisExportSource } from "../lib/analysis-export";
-import { flushSync } from "react-dom";
-import { usePageReady } from "../lib/use-page-ready";
-import { STUDIO_TABLE_CLASSES } from "../components/table-styles";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { buildLineupClusters, getMapCalibration, worldToRadar, calloutCn, type LineupCluster, type LineupClusterMode, type LineupGrenadeLike } from "@cs2dak/maps";
-import { displayWeaponName } from "@cs2dak/presentation";
-import { DataTable, EmptyState, MetricInfo, EvidenceLink, type DataTableColumn } from "@cs2dak/react";
-import { listDemoEntries} from "../lib/library";
-import { matchIdForEntry, type StudioDemoEntry } from "../lib/demo-entry";
-import { mapDisplayName } from "../lib/series";
-import { getFactsStore } from "../lib/facts-store";
-import { GRENADE_COLOR } from "../components/RadarTrails";
-import { listPracticeLineups, removePracticeLineup, savePracticeLineup, type PracticeLineup } from "../lib/practice-lineups";
+import { withStoredAnalysis } from '../lib/queries/query-cache';
+import { AnalysisScopeEmpty, useCapabilityBlocked } from '../components/CapabilityBar';
+import { canExportSnapshot } from '../lib/analysis-export';
+import {
+  getAnalysisDataSnapshot,
+  subscribeAnalysisDataInvalidation,
+  assertAnalysisGeneration,
+} from '../lib/queries/query-cache';
+import { AnalysisExportButtons } from '../components/AnalysisExportButtons';
+import { buildLineupsAnalysisResult, LINEUPS_SCOPE_NOTE } from '../lib/analysis-export-lineups';
+import type { AnalysisExportSource } from '../lib/analysis-export';
+import { flushSync } from 'react-dom';
+import { usePageReady } from '../lib/use-page-ready';
+import { STUDIO_TABLE_CLASSES } from '../components/table-styles';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import {
+  buildLineupClusters,
+  getMapCalibration,
+  worldToRadar,
+  calloutCn,
+  type LineupCluster,
+  type LineupClusterMode,
+  type LineupGrenadeLike,
+} from '@cs2dak/maps';
+import { displayWeaponName } from '@cs2dak/presentation';
+import {
+  DataTable,
+  EmptyState,
+  MetricInfo,
+  EvidenceLink,
+  type DataTableColumn,
+} from '@cs2dak/react';
+import { listDemoEntries } from '../lib/library';
+import { matchIdForEntry, type StudioDemoEntry } from '../lib/demo-entry';
+import { mapDisplayName } from '../lib/series';
+import { getFactsStore } from '../lib/facts-store';
+import { GRENADE_COLOR } from '../components/RadarTrails';
+import {
+  listPracticeLineups,
+  removePracticeLineup,
+  savePracticeLineup,
+  type PracticeLineup,
+} from '../lib/practice-lineups';
 
-import { assertCurrentFacts, FactsNotReadyError } from "../lib/facts-readiness";
-import { FACTS_REVISION } from "../lib/analysis-manifest";
+import { assertCurrentFacts, FactsNotReadyError } from '../lib/facts-readiness';
+import { FACTS_REVISION } from '../lib/analysis-manifest';
 
 // ── 常亮 ────────────────────────────────────────────────────────────────────
 
 const GRENADE_LABEL: Record<string, string> = {
-  flashbang: "闪光",
-  smoke: "烟",
-  molotov: "火",
-  incendiary: "火",
-  hegrenade: "雷",
-  decoy: "诱饵",
+  flashbang: '闪光',
+  smoke: '烟',
+  molotov: '火',
+  incendiary: '火',
+  hegrenade: '雷',
+  decoy: '诱饵',
 };
 
-const SIDE_LABEL: Record<string, string> = { t: "T", ct: "CT" };
+const SIDE_LABEL: Record<string, string> = { t: 'T', ct: 'CT' };
 const MODE_LABEL: Record<LineupClusterMode, { label: string; hint: string }> = {
-  strict: { label: "精聚类", hint: "固定站位 + 固定落点，用来找可学习的高频道具。" },
-  loose: { label: "粗聚类", hint: "只看落点区域，用来回答这类道具大概打哪里。" },
+  strict: { label: '精聚类', hint: '固定站位 + 固定落点，用来找可学习的高频道具。' },
+  loose: { label: '粗聚类', hint: '只看落点区域，用来回答这类道具大概打哪里。' },
 };
 
 const PAGE_SIZE = 20;
@@ -54,10 +77,12 @@ interface LoadedGrenades {
 
 async function loadAllGrenades(
   entries: StudioDemoEntry[],
-  onProgress?: (done: number) => void
+  onProgress?: (done: number) => void,
 ): Promise<LoadedGrenades[]> {
   assertCurrentFacts(entries);
-  const facts = await withStoredAnalysis(entries, () => getFactsStore().getLineups({ matchIds: entries.map(matchIdForEntry) }));
+  const facts = await withStoredAnalysis(entries, () =>
+    getFactsStore().getLineups({ matchIds: entries.map(matchIdForEntry) }),
+  );
   const entryIdByMatchId = new Map(entries.map((entry) => [matchIdForEntry(entry), entry.id]));
   onProgress?.(facts.length);
   return facts.map((fact) => {
@@ -67,7 +92,12 @@ async function loadAllGrenades(
       mapName: fact.mapName,
       tickrate: fact.tickrate,
       grenades: fact.grenades.map((grenade) => ({ ...grenade, entryId })),
-      winners: new Map(fact.roundWinners.map(([key, value]) => [key.replace(`${fact.matchId}:`, `${entryId}:`), value]))
+      winners: new Map(
+        fact.roundWinners.map(([key, value]) => [
+          key.replace(`${fact.matchId}:`, `${entryId}:`),
+          value,
+        ]),
+      ),
     };
   });
 }
@@ -81,7 +111,8 @@ function calloutName(mapName: string, place: string): string {
 
 export function LineupView({
   exportSource,
-  hasLibrary, onGoLibrary,
+  hasLibrary,
+  onGoLibrary,
   entries,
   state,
   onStateChange,
@@ -91,24 +122,36 @@ export function LineupView({
   onPageReady,
 }: {
   exportSource?: AnalysisExportSource | null;
-  hasLibrary: boolean; onGoLibrary: () => void;
+  hasLibrary: boolean;
+  onGoLibrary: () => void;
   entries: StudioDemoEntry[];
-  state: import("../lib/analysis-theme-state").LineupsPageState;
-  onStateChange: (state: import("../lib/analysis-theme-state").LineupsPageState) => void;
-  onOpenEvidence: import("../lib/evidence-continuation").OpenEvidence;
+  state: import('../lib/analysis-theme-state').LineupsPageState;
+  onStateChange: (state: import('../lib/analysis-theme-state').LineupsPageState) => void;
+  onOpenEvidence: import('../lib/evidence-continuation').OpenEvidence;
   onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onRebuild: (ids: string[]) => void;
   onPageReady?: (keys: string[]) => void;
 }) {
   const blocked = useCapabilityBlocked();
-  const [clusterSnapshot, setClusterSnapshot] = useState<{ key: string; generation: number; value: LineupCluster[] } | null>(null);
+  const [clusterSnapshot, setClusterSnapshot] = useState<{
+    key: string;
+    generation: number;
+    value: LineupCluster[];
+  } | null>(null);
   const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
   const [staleIds, setStaleIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState(0);
-  const { mapName: activeMap, grenade: typeFilter, side: sideFilter, table: tableState, radarTopN, mode: clusterMode } = state;
-  const requestKey = JSON.stringify([entries.map(entry => entry.id), clusterMode]);
+  const {
+    mapName: activeMap,
+    grenade: typeFilter,
+    side: sideFilter,
+    table: tableState,
+    radarTopN,
+    mode: clusterMode,
+  } = state;
+  const requestKey = JSON.stringify([entries.map((entry) => entry.id), clusterMode]);
   const clusters = clusterSnapshot?.key === requestKey ? clusterSnapshot.value : [];
   const hasSnapshot = clusterSnapshot?.key === requestKey;
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -126,38 +169,61 @@ export function LineupView({
   usePageReady((entries.length === 0 || !loading) && savedReady, onPageReady);
 
   function handleClusterJump(cluster: LineupCluster) {
-    const first = cluster.throws.find(row => entryById.has(row.entryId));
+    const first = cluster.throws.find((row) => entryById.has(row.entryId));
     const entry = first && entryById.get(first.entryId);
     if (!first || !entry) return;
     flushSync(() => onStateChange({ ...state, selectedClusterId: cluster.id }));
-    onOpenEvidence({ entryId: entry.id, sourceKey: `lineup:${cluster.id}`, evidence: { matchId: matchIdForEntry(entry), roundNumber: first.roundNumber, tick: first.tick, reason: "道具点位投掷", role: "example" } });
+    onOpenEvidence({
+      entryId: entry.id,
+      sourceKey: `lineup:${cluster.id}`,
+      evidence: {
+        matchId: matchIdForEntry(entry),
+        roundNumber: first.roundNumber,
+        tick: first.tick,
+        reason: '道具点位投掷',
+        role: 'example',
+      },
+    });
   }
 
   async function checkSources(cluster: LineupCluster) {
-    const ids = [...new Set(cluster.throws.map(row => row.entryId))];
+    const ids = [...new Set(cluster.throws.map((row) => row.entryId))];
     const current = await listDemoEntries();
-    const selected = current.filter(entry => ids.includes(entry.id));
-    const missing = ids.filter(id => !selected.some(entry => entry.id === id));
+    const selected = current.filter((entry) => ids.includes(entry.id));
+    const missing = ids.filter((id) => !selected.some((entry) => entry.id === id));
     if (missing.length) throw new FactsNotReadyError(missing);
     assertCurrentFacts(selected);
   }
 
   async function handleCopyPractice(cluster: LineupCluster) {
-    try { await checkSources(cluster); } catch (e) { setStaleIds(e instanceof FactsNotReadyError ? e.entryIds : []); setError(e instanceof Error ? e.message : String(e)); return; }
+    try {
+      await checkSources(cluster);
+    } catch (e) {
+      setStaleIds(e instanceof FactsNotReadyError ? e.entryIds : []);
+      setError(e instanceof Error ? e.message : String(e));
+      return;
+    }
     const command = practiceCommandForCluster(cluster);
     if (!command) return;
     try {
       await navigator.clipboard.writeText(command);
     } catch {
-      window.prompt("复制练习命令", command);
+      window.prompt('复制练习命令', command);
     }
     setCopiedClusterId(cluster.id);
-    window.setTimeout(() => setCopiedClusterId((current) => current === cluster.id ? null : current), 1400);
+    window.setTimeout(
+      () => setCopiedClusterId((current) => (current === cluster.id ? null : current)),
+      1400,
+    );
   }
 
   async function refreshSavedLineups() {
-    try { setSavedLineups(await listPracticeLineups()); setSavedError(null); }
-    catch (error) { setSavedError(`刷新列表失败：${error instanceof Error ? error.message : String(error)}`); }
+    try {
+      setSavedLineups(await listPracticeLineups());
+      setSavedError(null);
+    } catch (error) {
+      setSavedError(`刷新列表失败：${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   async function handleSavePractice(cluster: LineupCluster) {
@@ -166,30 +232,70 @@ export function LineupView({
     setSavingClusterId(cluster.id);
     setSaveError(null);
     try {
-      try { await checkSources(cluster); } catch (e) { setStaleIds(e instanceof FactsNotReadyError ? e.entryIds : []); setError(e instanceof Error ? e.message : String(e)); return; }
-      try { await savePracticeLineup({ cluster, command: practiceCommandForCluster(cluster), sourceFactsRevision: FACTS_REVISION }); }
-      catch (error) { setSaveError(`保存点位失败：${error instanceof Error ? error.message : String(error)}。请重试保存。`); return; }
+      try {
+        await checkSources(cluster);
+      } catch (e) {
+        setStaleIds(e instanceof FactsNotReadyError ? e.entryIds : []);
+        setError(e instanceof Error ? e.message : String(e));
+        return;
+      }
+      try {
+        await savePracticeLineup({
+          cluster,
+          command: practiceCommandForCluster(cluster),
+          sourceFactsRevision: FACTS_REVISION,
+        });
+      } catch (error) {
+        setSaveError(
+          `保存点位失败：${error instanceof Error ? error.message : String(error)}。请重试保存。`,
+        );
+        return;
+      }
       setSavedClusterId(cluster.id);
-      try { setSavedLineups(await listPracticeLineups()); setSavedError(null); }
-      catch (error) { setSavedError(`点位已保存，但刷新列表失败：${error instanceof Error ? error.message : String(error)}`); }
-    } finally { savingRef.current = false; setSavingClusterId(null); }
+      try {
+        setSavedLineups(await listPracticeLineups());
+        setSavedError(null);
+      } catch (error) {
+        setSavedError(
+          `点位已保存，但刷新列表失败：${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    } finally {
+      savingRef.current = false;
+      setSavingClusterId(null);
+    }
   }
 
   useEffect(() => {
     let cancelled = false;
-    void listPracticeLineups().then((rows) => { if (!cancelled) setSavedLineups(rows); })
-      .catch((reason) => { if (!cancelled) setSavedError(`读取列表失败：${reason instanceof Error ? reason.message : String(reason)}`); })
-      .finally(() => { if (!cancelled) setSavedReady(true); });
-    return () => { cancelled = true; };
+    void listPracticeLineups()
+      .then((rows) => {
+        if (!cancelled) setSavedLineups(rows);
+      })
+      .catch((reason) => {
+        if (!cancelled)
+          setSavedError(
+            `读取列表失败：${reason instanceof Error ? reason.message : String(reason)}`,
+          );
+      })
+      .finally(() => {
+        if (!cancelled) setSavedReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // ── 加载：分批 → 按地图分组 → 跨场聚类 ──────────────────────────────────
   useEffect(() => {
     let cancelled = false;
-    if (analysis.status !== "ready") return;
+    if (analysis.status !== 'ready') return;
     setError(null);
     setProgress(0);
-    if (entries.length === 0) { setLoading(false); return; }
+    if (entries.length === 0) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
 
     loadAllGrenades(entries, (done) => {
@@ -230,16 +336,26 @@ export function LineupView({
             const gt1 = counts.filter((c) => c > 1).length;
             console.log(
               `[Lineup] ${mapName}: ${result.length} clusters, ${gt1} with count>1, ` +
-                `counts: [${counts.slice(0, 15).join(",")}${counts.length > 15 ? "…" : ""}]`
+                `counts: [${counts.slice(0, 15).join(',')}${counts.length > 15 ? '…' : ''}]`,
             );
           }
           allClusters.push(...result);
         }
 
-        if (!cancelled) { assertAnalysisGeneration(analysis.generation); setClusterSnapshot({ key: requestKey, generation: analysis.generation, value: allClusters }); }
+        if (!cancelled) {
+          assertAnalysisGeneration(analysis.generation);
+          setClusterSnapshot({
+            key: requestKey,
+            generation: analysis.generation,
+            value: allClusters,
+          });
+        }
       })
       .catch((err) => {
-        if (!cancelled) { setStaleIds(err instanceof FactsNotReadyError ? err.entryIds : []); setError(err instanceof Error ? err.message : String(err)); }
+        if (!cancelled) {
+          setStaleIds(err instanceof FactsNotReadyError ? err.entryIds : []);
+          setError(err instanceof Error ? err.message : String(err));
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -274,105 +390,315 @@ export function LineupView({
   }, [clusters]);
 
   // 列定义：必须在所有 early return 之前声明，否则 Hook 数量随 loading 态变化导致崩溃
-  const lineupColumns = useMemo<DataTableColumn<LineupCluster>[]>(() => [
-    {
-      key: "grenade", label: "道具",
-      cellClassName: () => "stu-lineup-cell-nowrap",
-      render: (c) => <>
-        <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: GRENADE_COLOR[c.grenade] ?? "#888", marginRight: 6, verticalAlign: "middle" }} />
-        {GRENADE_LABEL[c.grenade] ?? displayWeaponName(c.grenade)}
-      </>
-    },
-    { key: "side", label: "方", cellClassName: () => "stu-lineup-cell-nowrap", format: (c) => c.side ? SIDE_LABEL[c.side] : "—" },
-    {
-      key: "throwPlace", label: "投掷位", cellClassName: () => "stu-lineup-place",
-      render: (c) => <span title={c.throwerPlaceName ? calloutName(c.mapName, c.throwerPlaceName) : undefined}>{c.throwerPlaceName ? calloutName(c.mapName, c.throwerPlaceName) : "—"}</span>
-    },
-    {
-      key: "effectPlace", label: "落点", cellClassName: () => "stu-lineup-place",
-      render: (c) => <span title={c.effectCalloutConfidence != null ? `confidence ${c.effectCalloutConfidence.toFixed(2)} · samples ${c.effectCalloutSamples ?? 0}` : undefined}>{c.effectCallout ? calloutName(c.mapName, c.effectCallout) : "—"}</span>,
-    },
-    { key: "time", label: "时间", cellClassName: () => "stu-lineup-cell-nowrap", format: (c) => c.throwTimeBucket ?? "—" },
-    {
-      key: "rounds",
-      label: "出现回合",
-      render: (c) => (
-        <span className="stu-lineup-rounds" title={`全部回合：${c.roundNumbers.map((n) => `R${n}`).join("、")}`}>
-          <b>{c.roundNumbers.length} 回合</b>
-          <small>{formatRoundNumbers(c.roundNumbers)}</small>
-        </span>
-      )
-    },
-    {
-      key: "sample", label: <>样本<MetricInfo note="次数 / 涉及场次 / 该点位所在回合的本方胜率；请结合样本量查看" /></>,
-      sortable: true, sortValue: (c) => c.count, cellClassName: () => "stu-lineup-sample",
-      render: (c) => <><b>{c.count} 次 · {c.demoCount} 场</b><small>{c.winRatePercent == null ? "胜率 —" : `胜率 ${c.winRatePercent.toFixed(1)}%`}</small></>
-    },
-    {
-      key: "replay", label: "操作", cellClassName: () => "stu-lineup-action-cell",
-      render: (c) => {
-        const firstThrow = c.throws[0];
-        const watchThrow = c.throws.find((row) => entryById.get(row.entryId)?.sourceDemPath);
-        const practiceCommand = practiceCommandForCluster(c);
-        return firstThrow ? (
-          <span className="stu-lineup-actions">
-            <EvidenceLink hint="打开该场比赛复盘并定位该点位投掷" onOpen={() => handleClusterJump(c)}>
-              回放
-            </EvidenceLink>
-            {practiceCommand && (
+  const lineupColumns = useMemo<DataTableColumn<LineupCluster>[]>(
+    () => [
+      {
+        key: 'grenade',
+        label: '道具',
+        cellClassName: () => 'stu-lineup-cell-nowrap',
+        render: (c) => (
+          <>
+            <span
+              style={{
+                display: 'inline-block',
+                width: 10,
+                height: 10,
+                borderRadius: '50%',
+                background: GRENADE_COLOR[c.grenade] ?? '#888',
+                marginRight: 6,
+                verticalAlign: 'middle',
+              }}
+            />
+            {GRENADE_LABEL[c.grenade] ?? displayWeaponName(c.grenade)}
+          </>
+        ),
+      },
+      {
+        key: 'side',
+        label: '方',
+        cellClassName: () => 'stu-lineup-cell-nowrap',
+        format: (c) => (c.side ? SIDE_LABEL[c.side] : '—'),
+      },
+      {
+        key: 'throwPlace',
+        label: '投掷位',
+        cellClassName: () => 'stu-lineup-place',
+        render: (c) => (
+          <span title={c.throwerPlaceName ? calloutName(c.mapName, c.throwerPlaceName) : undefined}>
+            {c.throwerPlaceName ? calloutName(c.mapName, c.throwerPlaceName) : '—'}
+          </span>
+        ),
+      },
+      {
+        key: 'effectPlace',
+        label: '落点',
+        cellClassName: () => 'stu-lineup-place',
+        render: (c) => (
+          <span
+            title={
+              c.effectCalloutConfidence != null
+                ? `confidence ${c.effectCalloutConfidence.toFixed(2)} · samples ${c.effectCalloutSamples ?? 0}`
+                : undefined
+            }
+          >
+            {c.effectCallout ? calloutName(c.mapName, c.effectCallout) : '—'}
+          </span>
+        ),
+      },
+      {
+        key: 'time',
+        label: '时间',
+        cellClassName: () => 'stu-lineup-cell-nowrap',
+        format: (c) => c.throwTimeBucket ?? '—',
+      },
+      {
+        key: 'rounds',
+        label: '出现回合',
+        render: (c) => (
+          <span
+            className="stu-lineup-rounds"
+            title={`全部回合：${c.roundNumbers.map((n) => `R${n}`).join('、')}`}
+          >
+            <b>{c.roundNumbers.length} 回合</b>
+            <small>{formatRoundNumbers(c.roundNumbers)}</small>
+          </span>
+        ),
+      },
+      {
+        key: 'sample',
+        label: (
+          <>
+            样本
+            <MetricInfo note="次数 / 涉及场次 / 该点位所在回合的本方胜率；请结合样本量查看" />
+          </>
+        ),
+        sortable: true,
+        sortValue: (c) => c.count,
+        cellClassName: () => 'stu-lineup-sample',
+        render: (c) => (
+          <>
+            <b>
+              {c.count} 次 · {c.demoCount} 场
+            </b>
+            <small>
+              {c.winRatePercent == null ? '胜率 —' : `胜率 ${c.winRatePercent.toFixed(1)}%`}
+            </small>
+          </>
+        ),
+      },
+      {
+        key: 'replay',
+        label: '操作',
+        cellClassName: () => 'stu-lineup-action-cell',
+        render: (c) => {
+          const firstThrow = c.throws[0];
+          const watchThrow = c.throws.find((row) => entryById.get(row.entryId)?.sourceDemPath);
+          const practiceCommand = practiceCommandForCluster(c);
+          return firstThrow ? (
+            <span className="stu-lineup-actions">
+              <EvidenceLink
+                hint="打开该场比赛复盘并定位该点位投掷"
+                onOpen={() => handleClusterJump(c)}
+              >
+                回放
+              </EvidenceLink>
+              {practiceCommand && (
+                <button
+                  type="button"
+                  className="stu-button-sm"
+                  title={`复制跑图练习命令：传送到投掷站位并设置视角\n${practiceCommand}`}
+                  aria-label="复制跑图练习命令"
+                  onClick={() => void handleCopyPractice(c)}
+                >
+                  {copiedClusterId === c.id ? '已复制' : '复制命令'}
+                </button>
+              )}
               <button
                 type="button"
                 className="stu-button-sm"
-                title={`复制跑图练习命令：传送到投掷站位并设置视角\n${practiceCommand}`}
-                aria-label="复制跑图练习命令"
-                onClick={() => void handleCopyPractice(c)}
+                disabled={savingClusterId !== null || savedClusterId === c.id}
+                title="保存为本地点位练习素材"
+                onClick={() => void handleSavePractice(c)}
               >
-                {copiedClusterId === c.id ? "已复制" : "复制命令"}
+                {savingClusterId === c.id
+                  ? '保存中…'
+                  : savedClusterId === c.id
+                    ? '已保存'
+                    : '保存点位'}
               </button>
-            )}
-            <button type="button" className="stu-button-sm" disabled={savingClusterId !== null || savedClusterId === c.id} title="保存为本地点位练习素材" onClick={() => void handleSavePractice(c)}>
-              {savingClusterId === c.id ? "保存中…" : savedClusterId === c.id ? "已保存" : "保存点位"}
-            </button>
-            {watchThrow && onWatchDemo && (
-              <button type="button" className="stu-button-sm" title="在 CS2 中打开原始 demo，并尝试跳到该投掷 tick" onClick={() => onWatchDemo(watchThrow.entryId, { roundNumber: watchThrow.roundNumber, tick: watchThrow.tick })}>
-                进游戏
-              </button>
-            )}
-          </span>
-        ) : null;
-      }
-    },
-  ], [copiedClusterId, savedClusterId, savingClusterId, entryById, onOpenEvidence, onWatchDemo, state, onStateChange]);
+              {watchThrow && onWatchDemo && (
+                <button
+                  type="button"
+                  className="stu-button-sm"
+                  title="在 CS2 中打开原始 demo，并尝试跳到该投掷 tick"
+                  onClick={() =>
+                    onWatchDemo(watchThrow.entryId, {
+                      roundNumber: watchThrow.roundNumber,
+                      tick: watchThrow.tick,
+                    })
+                  }
+                >
+                  进游戏
+                </button>
+              )}
+            </span>
+          ) : null;
+        },
+      },
+    ],
+    [
+      copiedClusterId,
+      savedClusterId,
+      savingClusterId,
+      entryById,
+      onOpenEvidence,
+      onWatchDemo,
+      state,
+      onStateChange,
+    ],
+  );
 
   // ── 渲染（空态提前返回） ──────────────────────────────────────────────
 
-  const savedErrorNotice = (savedError || saveError) && <div className="stu-card"><h3>已保存练习点位</h3>{saveError && <p className="stu-error" role="alert">{saveError}</p>}{savedError && <p className="stu-error" role="alert">{savedError} <button type="button" className="stu-button-sm" onClick={() => void refreshSavedLineups()}>重试读取列表</button></p>}</div>;
-  if (error && !hasSnapshot) return <div>
-    <EmptyState variant="error" title="Lineup 聚类失败" hint={error} action={staleIds.length ? <button type="button" className="stu-button" onClick={() => onRebuild(staleIds)}>重建 facts</button> : undefined} />
-    {savedErrorNotice}
-    {savedLineups.length > 0 && <div className="stu-card"><h3>已保存练习点位</h3>{savedLineups.map(item => <p key={item.id}>{item.label}{!item.sourceFactsRevision && " · 来源版本未知，需要核验"}</p>)}</div>}
-  </div>;
-  if ((loading || analysis.status !== "ready") && !hasSnapshot) {
+  const savedErrorNotice = (savedError || saveError) && (
+    <div className="stu-card">
+      <h3>已保存练习点位</h3>
+      {saveError && (
+        <p className="stu-error" role="alert">
+          {saveError}
+        </p>
+      )}
+      {savedError && (
+        <p className="stu-error" role="alert">
+          {savedError}{' '}
+          <button
+            type="button"
+            className="stu-button-sm"
+            onClick={() => void refreshSavedLineups()}
+          >
+            重试读取列表
+          </button>
+        </p>
+      )}
+    </div>
+  );
+  if (error && !hasSnapshot)
+    return (
+      <div>
+        <EmptyState
+          variant="error"
+          title="Lineup 聚类失败"
+          hint={error}
+          action={
+            staleIds.length ? (
+              <button type="button" className="stu-button" onClick={() => onRebuild(staleIds)}>
+                重建 facts
+              </button>
+            ) : undefined
+          }
+        />
+        {savedErrorNotice}
+        {savedLineups.length > 0 && (
+          <div className="stu-card">
+            <h3>已保存练习点位</h3>
+            {savedLineups.map((item) => (
+              <p key={item.id}>
+                {item.label}
+                {!item.sourceFactsRevision && ' · 来源版本未知，需要核验'}
+              </p>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  if ((loading || analysis.status !== 'ready') && !hasSnapshot) {
     return (
       <div className="stu-loading">
         扫描 {entries.length} 场 demo 的 grenades.json… ({progress}/{entries.length})
       </div>
     );
   }
-  const staleNotice = hasSnapshot && (loading || error || analysis.status !== "ready" || clusterSnapshot.generation !== analysis.generation) ? <p role="status" className="stu-muted">{error || analysis.status === "error" ? "更新失败，显示旧版本结果。" : "正在更新，显示旧版本结果。"}</p> : null;
+  const staleNotice =
+    hasSnapshot &&
+    (loading ||
+      error ||
+      analysis.status !== 'ready' ||
+      clusterSnapshot.generation !== analysis.generation) ? (
+      <p role="status" className="stu-muted">
+        {error || analysis.status === 'error'
+          ? '更新失败，显示旧版本结果。'
+          : '正在更新，显示旧版本结果。'}
+      </p>
+    ) : null;
   if (byMap.length === 0) {
     return (
       <div>
         {staleNotice}
         {savedErrorNotice}
-        {savedLineups.length > 0 && <div className="stu-card"><h3>已保存练习点位</h3>{savedLineups.map(item => <p key={item.id}>{item.label}{!item.sourceFactsRevision && " · 来源版本未知，需要核验"}</p>)}</div>}
-        {entries.length === 0 ? !hasLibrary ? <div className="stu-compact-empty"><EmptyState title="还没有比赛" hint="导入比赛后，即可查看道具点位。" action={<button type="button" className="stu-button-sm" onClick={onGoLibrary}>前往比赛库</button>} /></div> : !blocked && <AnalysisScopeEmpty /> : <div className="stu-compact-empty"><EmptyState variant="insufficient" title="没有可聚类道具" hint="需要 v3 ZIP 中的 grenades.json 才能生成道具库。" /></div>}
+        {savedLineups.length > 0 && (
+          <div className="stu-card">
+            <h3>已保存练习点位</h3>
+            {savedLineups.map((item) => (
+              <p key={item.id}>
+                {item.label}
+                {!item.sourceFactsRevision && ' · 来源版本未知，需要核验'}
+              </p>
+            ))}
+          </div>
+        )}
+        {entries.length === 0 ? (
+          !hasLibrary ? (
+            <div className="stu-compact-empty">
+              <EmptyState
+                title="还没有比赛"
+                hint="导入比赛后，即可查看道具点位。"
+                action={
+                  <button type="button" className="stu-button-sm" onClick={onGoLibrary}>
+                    前往比赛库
+                  </button>
+                }
+              />
+            </div>
+          ) : (
+            !blocked && <AnalysisScopeEmpty />
+          )
+        ) : (
+          <div className="stu-compact-empty">
+            <EmptyState
+              variant="insufficient"
+              title="没有可聚类道具"
+              hint="需要 v3 ZIP 中的 grenades.json 才能生成道具库。"
+            />
+          </div>
+        )}
       </div>
     );
   }
 
   if (activeMap && !byMap.some((group) => group.mapName === activeMap)) {
-    return <EmptyState variant="insufficient" title="所选地图没有点位" hint="当前范围中已没有该地图的点位，请重新选择地图。" action={<button type="button" className="stu-button" onClick={() => onStateChange({ ...state, mapName: null, selectedClusterId: null, table: { ...tableState, page: 0 } })}>返回地图列表</button>} />;
+    return (
+      <EmptyState
+        variant="insufficient"
+        title="所选地图没有点位"
+        hint="当前范围中已没有该地图的点位，请重新选择地图。"
+        action={
+          <button
+            type="button"
+            className="stu-button"
+            onClick={() =>
+              onStateChange({
+                ...state,
+                mapName: null,
+                selectedClusterId: null,
+                table: { ...tableState, page: 0 },
+              })
+            }
+          >
+            返回地图列表
+          </button>
+        }
+      />
+    );
   }
 
   // ── 当前地图数据（byMap 非空，current 安全） ─────────────────────────
@@ -385,10 +711,13 @@ export function LineupView({
     ? current.rows.filter((r) => r.side === sideFilter)
     : current.rows;
   const radarRows = radarSideFiltered.slice(0, radarTopN);
-  const selectedCluster = current.rows.find((cluster) => cluster.id === (hoveredId ?? state.selectedClusterId));
-  const radarClusters = selectedCluster && !radarRows.some((cluster) => cluster.id === selectedCluster.id)
-    ? [...radarRows, selectedCluster]
-    : radarRows;
+  const selectedCluster = current.rows.find(
+    (cluster) => cluster.id === (hoveredId ?? state.selectedClusterId),
+  );
+  const radarClusters =
+    selectedCluster && !radarRows.some((cluster) => cluster.id === selectedCluster.id)
+      ? [...radarRows, selectedCluster]
+      : radarRows;
   const savedForCurrentMap = savedLineups.filter((item) => item.mapName === current.mapName);
 
   return (
@@ -408,244 +737,341 @@ export function LineupView({
           </summary>
           {savedForCurrentMap.length > 0 ? (
             <div className="stu-chip-row">
-              {savedForCurrentMap.map((item) => <span key={item.id} className="stu-chip">{item.label}{!item.sourceFactsRevision && " · 来源版本未知，需要核验"}<button type="button" className="stu-button-sm" onClick={() => void removePracticeLineup(item.id).then(async () => { if (savedClusterId === item.clusterId) setSavedClusterId(null); await refreshSavedLineups(); })}>删除</button></span>)}
+              {savedForCurrentMap.map((item) => (
+                <span key={item.id} className="stu-chip">
+                  {item.label}
+                  {!item.sourceFactsRevision && ' · 来源版本未知，需要核验'}
+                  <button
+                    type="button"
+                    className="stu-button-sm"
+                    onClick={() =>
+                      void removePracticeLineup(item.id).then(async () => {
+                        if (savedClusterId === item.clusterId) setSavedClusterId(null);
+                        await refreshSavedLineups();
+                      })
+                    }
+                  >
+                    删除
+                  </button>
+                </span>
+              ))}
             </div>
-          ) : <p className="stu-muted">当前地图还没有保存的练习点位。</p>}
+          ) : (
+            <p className="stu-muted">当前地图还没有保存的练习点位。</p>
+          )}
         </details>
       )}
       <div className="stu-lineup-layout">
-      {/* ── 雷达 ──────────────────────────────────────────────────────── */}
-      <div className="stu-card stu-lineup-radar-card">
-        <h3>道具点位雷达 · {mapDisplayName(current.mapName)}</h3>
-        {exportSource && hasSnapshot && !loading && !error && canExportSnapshot(clusterSnapshot, analysis) && <AnalysisExportButtons capture={() => buildLineupsAnalysisResult(exportSource, sideFilteredRows, state, lineupColumns, selectedCluster ?? null, selectedCluster ? practiceCommandForCluster(selectedCluster) : null)} />}
+        {/* ── 雷达 ──────────────────────────────────────────────────────── */}
+        <div className="stu-card stu-lineup-radar-card">
+          <h3>道具点位雷达 · {mapDisplayName(current.mapName)}</h3>
+          {exportSource &&
+            hasSnapshot &&
+            !loading &&
+            !error &&
+            canExportSnapshot(clusterSnapshot, analysis) && (
+              <AnalysisExportButtons
+                capture={() =>
+                  buildLineupsAnalysisResult(
+                    exportSource,
+                    sideFilteredRows,
+                    state,
+                    lineupColumns,
+                    selectedCluster ?? null,
+                    selectedCluster ? practiceCommandForCluster(selectedCluster) : null,
+                  )
+                }
+              />
+            )}
 
-        <div className="stu-chip-row" role="tablist" aria-label="聚类模式">
-          {(["strict", "loose"] as const).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              role="tab"
-              aria-selected={clusterMode === mode}
-              className={clusterMode === mode ? "stu-chip stu-chip-active" : "stu-chip"}
-              title={MODE_LABEL[mode].hint}
-              onClick={() => {
-                onStateChange({ ...state, mode, selectedClusterId: null, table: { ...tableState, page: 0 } });
-              }}
-            >
-              {MODE_LABEL[mode].label}
-            </button>
-          ))}
-          <span className="stu-muted stu-chip-row-label">{MODE_LABEL[clusterMode].hint}</span>
-        </div>
-
-        {byMap.length > 1 && (
-          <div className="stu-chip-row" role="tablist" aria-label="地图选择">
-            {byMap.map((group) => (
+          <div className="stu-chip-row" role="tablist" aria-label="聚类模式">
+            {(['strict', 'loose'] as const).map((mode) => (
               <button
-                key={group.mapName}
+                key={mode}
                 type="button"
                 role="tab"
-                aria-selected={group.mapName === current.mapName}
-                className={
-                  group.mapName === current.mapName ? "stu-chip stu-chip-active" : "stu-chip"
-                }
+                aria-selected={clusterMode === mode}
+                className={clusterMode === mode ? 'stu-chip stu-chip-active' : 'stu-chip'}
+                title={MODE_LABEL[mode].hint}
                 onClick={() => {
-                  onStateChange({ ...state, mapName: group.mapName, selectedClusterId: null, table: { ...tableState, page: 0 } });
+                  onStateChange({
+                    ...state,
+                    mode,
+                    selectedClusterId: null,
+                    table: { ...tableState, page: 0 },
+                  });
                 }}
               >
-                {mapDisplayName(group.mapName)} · {group.rows.length}
+                {MODE_LABEL[mode].label}
               </button>
             ))}
+            <span className="stu-muted stu-chip-row-label">{MODE_LABEL[clusterMode].hint}</span>
           </div>
-        )}
 
-        {availableTypes.length > 1 && (
-          <div className="stu-chip-row" style={{ marginTop: 8 }}>
+          {byMap.length > 1 && (
+            <div className="stu-chip-row" role="tablist" aria-label="地图选择">
+              {byMap.map((group) => (
+                <button
+                  key={group.mapName}
+                  type="button"
+                  role="tab"
+                  aria-selected={group.mapName === current.mapName}
+                  className={
+                    group.mapName === current.mapName ? 'stu-chip stu-chip-active' : 'stu-chip'
+                  }
+                  onClick={() => {
+                    onStateChange({
+                      ...state,
+                      mapName: group.mapName,
+                      selectedClusterId: null,
+                      table: { ...tableState, page: 0 },
+                    });
+                  }}
+                >
+                  {mapDisplayName(group.mapName)} · {group.rows.length}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {availableTypes.length > 1 && (
+            <div className="stu-chip-row" style={{ marginTop: 8 }}>
+              <button
+                type="button"
+                className={typeFilter === null ? 'stu-chip stu-chip-active' : 'stu-chip'}
+                onClick={() => {
+                  onStateChange({
+                    ...state,
+                    grenade: null,
+                    selectedClusterId: null,
+                    table: { ...tableState, page: 0 },
+                  });
+                }}
+              >
+                全部
+              </button>
+              {availableTypes.map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  className={typeFilter === type ? 'stu-chip stu-chip-active' : 'stu-chip'}
+                  onClick={() => {
+                    onStateChange({
+                      ...state,
+                      grenade: typeFilter === type ? null : type,
+                      selectedClusterId: null,
+                      table: { ...tableState, page: 0 },
+                    });
+                  }}
+                >
+                  {GRENADE_LABEL[type] ?? type}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div
+            className="stu-chip-row"
+            role="tablist"
+            aria-label="阵营筛选"
+            style={{ marginTop: 8 }}
+          >
             <button
               type="button"
-              className={typeFilter === null ? "stu-chip stu-chip-active" : "stu-chip"}
+              role="tab"
+              aria-selected={sideFilter === null}
+              className={sideFilter === null ? 'stu-chip stu-chip-active' : 'stu-chip'}
               onClick={() => {
-                onStateChange({ ...state, grenade: null, selectedClusterId: null, table: { ...tableState, page: 0 } });
+                onStateChange({
+                  ...state,
+                  side: null,
+                  selectedClusterId: null,
+                  table: { ...tableState, page: 0 },
+                });
               }}
             >
               全部
             </button>
-            {availableTypes.map((type) => (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={sideFilter === 't'}
+              className={sideFilter === 't' ? 'stu-chip stu-chip-active' : 'stu-chip'}
+              onClick={() => {
+                onStateChange({
+                  ...state,
+                  side: 't',
+                  selectedClusterId: null,
+                  table: { ...tableState, page: 0 },
+                });
+              }}
+            >
+              T · {current.rows.filter((r) => r.side === 't').length}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={sideFilter === 'ct'}
+              className={sideFilter === 'ct' ? 'stu-chip stu-chip-active' : 'stu-chip'}
+              onClick={() => {
+                onStateChange({
+                  ...state,
+                  side: 'ct',
+                  selectedClusterId: null,
+                  table: { ...tableState, page: 0 },
+                });
+              }}
+            >
+              CT · {current.rows.filter((r) => r.side === 'ct').length}
+            </button>
+          </div>
+
+          <div className="stu-chip-row stu-lineup-topn" role="radiogroup" aria-label="雷达显示数量">
+            {TOP_N_OPTIONS.map((value) => (
               <button
-                key={type}
+                key={value}
                 type="button"
-                className={typeFilter === type ? "stu-chip stu-chip-active" : "stu-chip"}
-                onClick={() => {
-                  onStateChange({ ...state, grenade: typeFilter === type ? null : type, selectedClusterId: null, table: { ...tableState, page: 0 } });
-                }}
+                role="radio"
+                aria-checked={radarTopN === value}
+                className={radarTopN === value ? 'stu-chip stu-chip-active' : 'stu-chip'}
+                onClick={() => onStateChange({ ...state, radarTopN: value })}
               >
-                {GRENADE_LABEL[type] ?? type}
+                Top {value}
               </button>
             ))}
           </div>
-        )}
 
-        <div className="stu-chip-row" role="tablist" aria-label="阵营筛选" style={{ marginTop: 8 }}>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={sideFilter === null}
-            className={sideFilter === null ? "stu-chip stu-chip-active" : "stu-chip"}
-            onClick={() => { onStateChange({ ...state, side: null, selectedClusterId: null, table: { ...tableState, page: 0 } }); }}
-          >
-            全部
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={sideFilter === "t"}
-            className={sideFilter === "t" ? "stu-chip stu-chip-active" : "stu-chip"}
-            onClick={() => { onStateChange({ ...state, side: "t", selectedClusterId: null, table: { ...tableState, page: 0 } }); }}
-          >
-            T · {current.rows.filter((r) => r.side === "t").length}
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={sideFilter === "ct"}
-            className={sideFilter === "ct" ? "stu-chip stu-chip-active" : "stu-chip"}
-            onClick={() => { onStateChange({ ...state, side: "ct", selectedClusterId: null, table: { ...tableState, page: 0 } }); }}
-          >
-            CT · {current.rows.filter((r) => r.side === "ct").length}
-          </button>
-        </div>
-
-        <div className="stu-chip-row stu-lineup-topn" role="radiogroup" aria-label="雷达显示数量">
-          {TOP_N_OPTIONS.map((value) => (
-            <button
-              key={value}
-              type="button"
-              role="radio"
-              aria-checked={radarTopN === value}
-              className={radarTopN === value ? "stu-chip stu-chip-active" : "stu-chip"}
-              onClick={() => onStateChange({ ...state, radarTopN: value })}
+          {calibration ? (
+            <svg
+              className="stu-duel-radar"
+              viewBox={`0 0 ${calibration.radarSize} ${calibration.radarSize}`}
+              role="img"
+              aria-label={`${current.mapName} lineup 雷达图`}
             >
-              Top {value}
-            </button>
-          ))}
-        </div>
-
-        {calibration ? (
-          <svg
-            className="stu-duel-radar"
-            viewBox={`0 0 ${calibration.radarSize} ${calibration.radarSize}`}
-            role="img"
-            aria-label={`${current.mapName} lineup 雷达图`}
-          >
-            <image
-              href={`./maps/radars/${current.mapName}.png`}
-              width={calibration.radarSize}
-              height={calibration.radarSize}
-              opacity={0.85}
-            />
-            {radarClusters.map((cluster) => {
-              const from = worldToRadar(cluster.throwPosition, calibration);
-              const to = worldToRadar(cluster.effectPosition, calibration);
-              const color = GRENADE_COLOR[cluster.grenade] ?? "#888";
-              const isHovered = hoveredId === cluster.id;
-              const hoveredColor = isHovered ? "#ffffff" : color;
-              const hoveredWidth = isHovered ? 3 : 1.5;
-              return (
-                <g
-                  key={cluster.id}
-                  className={"stu-lineup-g" + (hoveredId === cluster.id ? " stu-lineup-g-hovered" : "")}
-                  role="button"
-                  tabIndex={0}
-                  style={{ cursor: "pointer" }}
-                  onMouseEnter={() => setHoveredId(cluster.id)}
-                  onMouseLeave={() => setHoveredId(null)}
-                  onFocus={() => setHoveredId(cluster.id)}
-                  onBlur={() => setHoveredId(null)}
-                  onClick={() => handleClusterJump(cluster)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      handleClusterJump(cluster);
+              <image
+                href={`./maps/radars/${current.mapName}.png`}
+                width={calibration.radarSize}
+                height={calibration.radarSize}
+                opacity={0.85}
+              />
+              {radarClusters.map((cluster) => {
+                const from = worldToRadar(cluster.throwPosition, calibration);
+                const to = worldToRadar(cluster.effectPosition, calibration);
+                const color = GRENADE_COLOR[cluster.grenade] ?? '#888';
+                const isHovered = hoveredId === cluster.id;
+                const hoveredColor = isHovered ? '#ffffff' : color;
+                const hoveredWidth = isHovered ? 3 : 1.5;
+                return (
+                  <g
+                    key={cluster.id}
+                    className={
+                      'stu-lineup-g' + (hoveredId === cluster.id ? ' stu-lineup-g-hovered' : '')
                     }
-                  }}
-                >
-                  <title>
-                    {GRENADE_LABEL[cluster.grenade] ?? cluster.grenade} · ×{cluster.count} ·{" "}
-                    {cluster.demoCount} 场 · 投掷位{" "}
-                    {cluster.throwerPlaceName
-                      ? calloutName(cluster.mapName, cluster.throwerPlaceName)
-                      : "—"}{" "}
-                    → 落点{" "}
-                    {cluster.effectCallout
-                      ? calloutName(cluster.mapName, cluster.effectCallout)
-                      : "—"}{" "}
-                    · 胜率{" "}
-                    {cluster.winRatePercent == null
-                      ? "—"
-                      : `${cluster.winRatePercent.toFixed(1)}%`}
-                  </title>
-                  <line
-                    x1={from.x}
-                    y1={from.y}
-                    x2={to.x}
-                    y2={to.y}
-                    stroke={hoveredColor}
-                    strokeWidth={hoveredWidth}
-                    strokeOpacity={isHovered ? 1 : 0.6}
-                    strokeLinecap="round"
-                  />
-                  <circle
-                    cx={from.x}
-                    cy={from.y}
-                    r={isHovered ? 6 : 4}
-                    fill={hoveredColor}
-                    stroke={isHovered ? "#fff" : "none"}
-                    strokeWidth={1.5}
-                    opacity={isHovered ? 1 : 0.7}
-                  />
-                  <circle
-                    cx={to.x}
-                    cy={to.y}
-                    r={Math.min(12, 4 + cluster.count * 1.2)}
-                    fill={color}
-                    fillOpacity={isHovered ? 0.4 : 0.2}
-                    stroke={hoveredColor}
-                    strokeWidth={isHovered ? 2 : 1}
-                    strokeOpacity={isHovered ? 1 : 0.6}
-                  />
-                </g>
-              );
-            })}
-          </svg>
-        ) : (
-          <p className="stu-muted">{mapDisplayName(current.mapName)} 缺少雷达标定，仅显示列表。</p>
-        )}
-      </div>
-
-      {/* ── 表格（DataTable：受控分页 + rowProps hover 联动雷达） ──── */}
-      <div className="stu-card stu-lineup-table-card">
-        <h3>道具点位库 · {mapDisplayName(current.mapName)}</h3>
-        <p className="stu-muted">练习命令复现投掷 tick 的玩家站位和视角；跑动、跳投和组合键细节仍建议点“回放”或“进游戏”核对原始 demo。</p>
-        <div className="stu-table-scroll stu-lineup-table-scroll" tabIndex={0} aria-label="道具点位表格，可横向滚动查看完整列">
-          <DataTable
-            classes={STUDIO_TABLE_CLASSES}
-            rows={sideFilteredRows}
-            rowKey={(c) => c.id}
-                        pageSize={PAGE_SIZE}
-            state={tableState} onStateChange={table => onStateChange({ ...state, table })}
-            paginationInfo={(total) => `${total} 条`}
-            rowProps={(cluster) => ({
-              id: `lineup:${cluster.id}`,
-              className: hoveredId === cluster.id || state.selectedClusterId === cluster.id ? "stu-lineup-row-hovered" : "",
-              onMouseEnter: () => setHoveredId(cluster.id),
-              onMouseLeave: () => setHoveredId(null),
-              onFocus: () => setHoveredId(cluster.id),
-              onBlur: () => setHoveredId(null),
-            })}
-            columns={lineupColumns}
-          />
+                    role="button"
+                    tabIndex={0}
+                    style={{ cursor: 'pointer' }}
+                    onMouseEnter={() => setHoveredId(cluster.id)}
+                    onMouseLeave={() => setHoveredId(null)}
+                    onFocus={() => setHoveredId(cluster.id)}
+                    onBlur={() => setHoveredId(null)}
+                    onClick={() => handleClusterJump(cluster)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleClusterJump(cluster);
+                      }
+                    }}
+                  >
+                    <title>
+                      {GRENADE_LABEL[cluster.grenade] ?? cluster.grenade} · ×{cluster.count} ·{' '}
+                      {cluster.demoCount} 场 · 投掷位{' '}
+                      {cluster.throwerPlaceName
+                        ? calloutName(cluster.mapName, cluster.throwerPlaceName)
+                        : '—'}{' '}
+                      → 落点{' '}
+                      {cluster.effectCallout
+                        ? calloutName(cluster.mapName, cluster.effectCallout)
+                        : '—'}{' '}
+                      · 胜率{' '}
+                      {cluster.winRatePercent == null
+                        ? '—'
+                        : `${cluster.winRatePercent.toFixed(1)}%`}
+                    </title>
+                    <line
+                      x1={from.x}
+                      y1={from.y}
+                      x2={to.x}
+                      y2={to.y}
+                      stroke={hoveredColor}
+                      strokeWidth={hoveredWidth}
+                      strokeOpacity={isHovered ? 1 : 0.6}
+                      strokeLinecap="round"
+                    />
+                    <circle
+                      cx={from.x}
+                      cy={from.y}
+                      r={isHovered ? 6 : 4}
+                      fill={hoveredColor}
+                      stroke={isHovered ? '#fff' : 'none'}
+                      strokeWidth={1.5}
+                      opacity={isHovered ? 1 : 0.7}
+                    />
+                    <circle
+                      cx={to.x}
+                      cy={to.y}
+                      r={Math.min(12, 4 + cluster.count * 1.2)}
+                      fill={color}
+                      fillOpacity={isHovered ? 0.4 : 0.2}
+                      stroke={hoveredColor}
+                      strokeWidth={isHovered ? 2 : 1}
+                      strokeOpacity={isHovered ? 1 : 0.6}
+                    />
+                  </g>
+                );
+              })}
+            </svg>
+          ) : (
+            <p className="stu-muted">
+              {mapDisplayName(current.mapName)} 缺少雷达标定，仅显示列表。
+            </p>
+          )}
         </div>
-      </div>
+
+        {/* ── 表格（DataTable：受控分页 + rowProps hover 联动雷达） ──── */}
+        <div className="stu-card stu-lineup-table-card">
+          <h3>道具点位库 · {mapDisplayName(current.mapName)}</h3>
+          <p className="stu-muted">
+            练习命令复现投掷 tick
+            的玩家站位和视角；跑动、跳投和组合键细节仍建议点“回放”或“进游戏”核对原始 demo。
+          </p>
+          <div
+            className="stu-table-scroll stu-lineup-table-scroll"
+            tabIndex={0}
+            aria-label="道具点位表格，可横向滚动查看完整列"
+          >
+            <DataTable
+              classes={STUDIO_TABLE_CLASSES}
+              rows={sideFilteredRows}
+              rowKey={(c) => c.id}
+              pageSize={PAGE_SIZE}
+              state={tableState}
+              onStateChange={(table) => onStateChange({ ...state, table })}
+              paginationInfo={(total) => `${total} 条`}
+              rowProps={(cluster) => ({
+                id: `lineup:${cluster.id}`,
+                className:
+                  hoveredId === cluster.id || state.selectedClusterId === cluster.id
+                    ? 'stu-lineup-row-hovered'
+                    : '',
+                onMouseEnter: () => setHoveredId(cluster.id),
+                onMouseLeave: () => setHoveredId(null),
+                onFocus: () => setHoveredId(cluster.id),
+                onBlur: () => setHoveredId(null),
+              })}
+              columns={lineupColumns}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -653,11 +1079,11 @@ export function LineupView({
 
 function weaponForGrenade(grenade: string): string {
   const value = grenade.toLowerCase();
-  if (value.includes("smoke")) return "weapon_smokegrenade";
-  if (value.includes("molotov")) return "weapon_molotov";
-  if (value.includes("incendiary") || value.includes("incgrenade")) return "weapon_incgrenade";
-  if (value.includes("flash")) return "weapon_flashbang";
-  if (value.includes("he")) return "weapon_hegrenade";
+  if (value.includes('smoke')) return 'weapon_smokegrenade';
+  if (value.includes('molotov')) return 'weapon_molotov';
+  if (value.includes('incendiary') || value.includes('incgrenade')) return 'weapon_incgrenade';
+  if (value.includes('flash')) return 'weapon_flashbang';
+  if (value.includes('he')) return 'weapon_hegrenade';
   return `weapon_${value}`;
 }
 
@@ -669,20 +1095,28 @@ function practiceCommandForCluster(cluster: LineupCluster): string | null {
   const sample = cluster.throws.find((row) => row.practicePose);
   const pose = sample?.practicePose;
   if (!pose) return null;
-  if (![pose.position.x, pose.position.y, pose.position.z, pose.pitch, pose.yaw].every(Number.isFinite)) return null;
+  if (
+    ![pose.position.x, pose.position.y, pose.position.z, pose.pitch, pose.yaw].every(
+      Number.isFinite,
+    )
+  )
+    return null;
   return [
-    "sv_cheats 1",
-    "bot_kick",
-    "sv_infinite_ammo 1",
-    "sv_grenade_trajectory_prac_pipreview 1",
+    'sv_cheats 1',
+    'bot_kick',
+    'sv_infinite_ammo 1',
+    'sv_grenade_trajectory_prac_pipreview 1',
     `give ${weaponForGrenade(cluster.grenade)}`,
     `setpos_exact ${formatCommandNumber(pose.position.x)} ${formatCommandNumber(pose.position.y)} ${formatCommandNumber(pose.position.z)}`,
     `setang ${formatCommandNumber(pose.pitch)} ${formatCommandNumber(pose.yaw)} 0`,
-  ].join("; ");
+  ].join('; ');
 }
 
 function formatRoundNumbers(roundNumbers: number[]): string {
   const sorted = [...new Set(roundNumbers)].sort((a, b) => a - b);
-  const head = sorted.slice(0, 5).map((n) => `R${n}`).join(" / ");
-  return sorted.length > 5 ? `${head} / …` : head || "—";
+  const head = sorted
+    .slice(0, 5)
+    .map((n) => `R${n}`)
+    .join(' / ');
+  return sorted.length > 5 ? `${head} / …` : head || '—';
 }

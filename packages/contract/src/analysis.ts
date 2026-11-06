@@ -1,5 +1,11 @@
-import { z } from "zod";
-import { teamKeySchema, sideSchema, economyTypeSchema, teamEconomySchema, grenadeTypeSchema } from "cs2-demo-format";
+import { z } from 'zod';
+import {
+  teamKeySchema,
+  sideSchema,
+  economyTypeSchema,
+  teamEconomySchema,
+  grenadeTypeSchema,
+} from 'cs2-demo-format';
 
 export const playerRoundFactSchema = z.object({
   roundNumber: z.number().int().positive(),
@@ -16,10 +22,10 @@ export const playerRoundFactSchema = z.object({
   flashAssists: z.number().int().nonnegative(),
   tradeKills: z.number().int().nonnegative(),
   tradedDeaths: z.number().int().nonnegative(),
-  openingDuel: z.enum(["none", "won", "lost"]),
-  kastTags: z.array(z.enum(["kill", "assist", "survive", "trade"])),
+  openingDuel: z.enum(['none', 'won', 'lost']),
+  kastTags: z.array(z.enum(['kill', 'assist', 'survive', 'trade'])),
   equipmentValue: z.number().int().nonnegative().nullable(),
-  economyType: economyTypeSchema.nullable()
+  economyType: economyTypeSchema.nullable(),
 });
 
 export const weaponKillRowSchema = z.object({
@@ -30,7 +36,7 @@ export const weaponKillRowSchema = z.object({
   noScopeKills: z.number().int().nonnegative(),
   throughSmokeKills: z.number().int().nonnegative(),
   wallbangKills: z.number().int().nonnegative(),
-  penetratedObjects: z.number().int().nonnegative()
+  penetratedObjects: z.number().int().nonnegative(),
 });
 
 export const playerWeaponHighlightFactsSchema = z.object({
@@ -41,8 +47,8 @@ export const playerWeaponHighlightFactsSchema = z.object({
     wallbangKills: z.number().int().nonnegative().nullable(),
     noScopeKills: z.number().int().nonnegative().nullable(),
     throughSmokeKills: z.number().int().nonnegative().nullable(),
-    collateralKills: z.number().int().nonnegative().nullable()
-  })
+    collateralKills: z.number().int().nonnegative().nullable(),
+  }),
 });
 
 export const timelineEventSchema = z.object({
@@ -50,12 +56,12 @@ export const timelineEventSchema = z.object({
   roundNumber: z.number().int().positive(),
   tick: z.number().int().positive(),
   timeSeconds: z.number().nonnegative(),
-  clockPhase: z.enum(["freeze", "round", "bomb", "round-end"]),
+  clockPhase: z.enum(['freeze', 'round', 'bomb', 'round-end']),
   clockSeconds: z.number().nonnegative(),
   clockLabel: z.string(),
-  type: z.enum(["kill", "bomb", "grenade", "round-end"]),
+  type: z.enum(['kill', 'bomb', 'grenade', 'round-end']),
   label: z.string(),
-  teamKey: teamKeySchema.nullable()
+  teamKey: teamKeySchema.nullable(),
 });
 
 export const economyPointSchema = z.object({
@@ -65,7 +71,7 @@ export const economyPointSchema = z.object({
   advantage: z.number().int(),
   teamAEconomy: teamEconomySchema,
   teamBEconomy: teamEconomySchema,
-  winnerTeamKey: teamKeySchema
+  winnerTeamKey: teamKeySchema,
 });
 
 export const heatmapPointSchema = z.object({
@@ -76,8 +82,8 @@ export const heatmapPointSchema = z.object({
   teamKey: teamKeySchema.nullable(),
   steamId64: z.string().nullable(),
   side: sideSchema.nullable(),
-  kind: z.enum(["kill", "death", "grenade"]),
-  grenadeType: grenadeTypeSchema.nullable()
+  kind: z.enum(['kill', 'death', 'grenade']),
+  grenadeType: grenadeTypeSchema.nullable(),
 });
 
 export type PlayerRoundFact = z.infer<typeof playerRoundFactSchema>;

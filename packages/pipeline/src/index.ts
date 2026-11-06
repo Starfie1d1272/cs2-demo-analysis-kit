@@ -1,24 +1,47 @@
-import type { DemoPackage } from "@cs2dak/contract";
-import type { DemoViewOptions, MatchWorkspaceModel } from "@cs2dak/presentation";
+import type { DemoPackage } from '@cs2dak/contract';
+import type { DemoViewOptions, MatchWorkspaceModel } from '@cs2dak/presentation';
 import {
-  buildPlayerRoundPerformanceFacts, assertPlayerRoundPerformanceFacts, normalizeDemoPackage,
-  buildQaReport, toPlayerRoundFacts, buildPlayerWeaponHighlights, derivePlayerWeaponHighlights,
-  buildTimeline, buildEconomy, buildHeatmap, CORE_ANALYSIS_VERSION,
+  buildPlayerRoundPerformanceFacts,
+  assertPlayerRoundPerformanceFacts,
+  normalizeDemoPackage,
+  buildQaReport,
+  toPlayerRoundFacts,
+  buildPlayerWeaponHighlights,
+  derivePlayerWeaponHighlights,
+  buildTimeline,
+  buildEconomy,
+  buildHeatmap,
+  CORE_ANALYSIS_VERSION,
   type PlayerRoundPerformanceFacts,
-} from "@cs2dak/core";
+} from '@cs2dak/core';
 import {
-  analysisBundleSchema, buildMatchWorkspaceFromAnalysis, buildPlayerIndicators, buildScoreboard,
-  deriveRRSignals, deriveRRIndicators, buildRatingSpatialContext, type AnalysisBundle,
-} from "@cs2dak/analytics";
-import { computeAccountRatings, computeIndicatorRatings } from "@cs2dak/rating";
-export { buildRatingSpatialContext } from "@cs2dak/analytics";
-export { analyzeMatchFacts, type AnalyzeMatchFactsOptions, type MatchFactsAnalysis } from "./match-facts.js";
+  analysisBundleSchema,
+  buildMatchWorkspaceFromAnalysis,
+  buildPlayerIndicators,
+  buildScoreboard,
+  deriveRRSignals,
+  deriveRRIndicators,
+  buildRatingSpatialContext,
+  type AnalysisBundle,
+} from '@cs2dak/analytics';
+import { computeAccountRatings, computeIndicatorRatings } from '@cs2dak/rating';
+export { buildRatingSpatialContext } from '@cs2dak/analytics';
+export {
+  analyzeMatchFacts,
+  type AnalyzeMatchFactsOptions,
+  type MatchFactsAnalysis,
+} from './match-facts.js';
 import {
   buildSeasonCohortFromRows,
-  type SeasonCohortFactRow, type SeasonCohortOptions, type SeasonCohortBundle,
-} from "@cs2dak/cohort";
+  type SeasonCohortFactRow,
+  type SeasonCohortOptions,
+  type SeasonCohortBundle,
+} from '@cs2dak/cohort';
 
-export function analyzeDemoPackage(input: unknown, suppliedPerformanceFacts?: PlayerRoundPerformanceFacts): AnalysisBundle {
+export function analyzeDemoPackage(
+  input: unknown,
+  suppliedPerformanceFacts?: PlayerRoundPerformanceFacts,
+): AnalysisBundle {
   const pkg = normalizeDemoPackage(input);
   const performanceFacts = suppliedPerformanceFacts ?? buildPlayerRoundPerformanceFacts(pkg);
   if (suppliedPerformanceFacts) assertPlayerRoundPerformanceFacts(pkg, performanceFacts);
@@ -35,7 +58,7 @@ export function analyzeDemoPackage(input: unknown, suppliedPerformanceFacts?: Pl
   const heatmap = buildHeatmap(pkg);
 
   return analysisBundleSchema.parse({
-    version: "cs2-demo-analysis-kit/1.0",
+    version: 'cs2-demo-analysis-kit/1.0',
     sourceSchemaVersion: pkg.manifest.schemaVersion,
     provenance: {
       analysisVersion: CORE_ANALYSIS_VERSION,
@@ -45,14 +68,14 @@ export function analyzeDemoPackage(input: unknown, suppliedPerformanceFacts?: Pl
       parser: pkg.manifest.parser,
       ratingVersions: {
         rr: playerIndicators[0]?.rr.weightsVersion ?? null,
-        valueAccounts: accountRatings[0]?.rr.weightsVersion ?? null
-      }
+        valueAccounts: accountRatings[0]?.rr.weightsVersion ?? null,
+      },
     },
     mapName: pkg.match.mapName,
     tickrate: pkg.match.tickrate,
     teams: {
-      teamA: { name: pkg.match.teamA.name ?? "Team A", score: pkg.match.teamA.score },
-      teamB: { name: pkg.match.teamB.name ?? "Team B", score: pkg.match.teamB.score }
+      teamA: { name: pkg.match.teamA.name ?? 'Team A', score: pkg.match.teamA.score },
+      teamB: { name: pkg.match.teamB.name ?? 'Team B', score: pkg.match.teamB.score },
     },
     scoreboard,
     playerWeaponHighlights,
@@ -61,11 +84,14 @@ export function analyzeDemoPackage(input: unknown, suppliedPerformanceFacts?: Pl
     timeline,
     economy,
     heatmap,
-    qa
+    qa,
   });
 }
 /** Execute the single-match analysis before projecting the UI model. */
-export function analyzeMatchWorkspace(input: unknown, options: DemoViewOptions = {}): MatchWorkspaceModel {
+export function analyzeMatchWorkspace(
+  input: unknown,
+  options: DemoViewOptions = {},
+): MatchWorkspaceModel {
   const pkg = normalizeDemoPackage(input);
   const facts = buildPlayerRoundPerformanceFacts(pkg);
   const analysis = analyzeDemoPackage(pkg, facts);
@@ -79,7 +105,7 @@ export interface SeasonCohortInput {
 
 export function buildSeasonCohort(
   demos: SeasonCohortInput[],
-  opts: SeasonCohortOptions = {}
+  opts: SeasonCohortOptions = {},
 ): SeasonCohortBundle {
   const rows: SeasonCohortFactRow[] = [];
   for (const demo of demos) {
@@ -103,12 +129,12 @@ export function buildSeasonCohort(
         teamKey: player.teamKey,
         signals: signal,
         indicators: indicator,
-        weaponHighlight: weaponHighlightBySteamId.get(player.steamId64) ?? null
+        weaponHighlight: weaponHighlightBySteamId.get(player.steamId64) ?? null,
       });
     }
   }
   return buildSeasonCohortFromRows(rows, {
     ...opts,
-    matchCount: demos.length
+    matchCount: demos.length,
   });
 }

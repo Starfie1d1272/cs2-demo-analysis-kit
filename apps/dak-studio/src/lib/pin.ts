@@ -4,7 +4,7 @@
  * 经 StorageAdapter 的 "kv" 命名空间持久化（取代旧 localStorage，统一走可换后端的接缝）。
  */
 
-import { getStorage } from "./storage";
+import { getStorage } from './storage';
 
 export interface PinnedPlayer {
   playerKey: string;
@@ -12,18 +12,23 @@ export interface PinnedPlayer {
   name: string;
 }
 
-const KEY = "pinned-player";
-const kv = getStorage().records("kv");
+const KEY = 'pinned-player';
+const kv = getStorage().records('kv');
 
 /** Read the preference with failures visible to callers that can present them. */
 export async function readPinnedPlayer(): Promise<PinnedPlayer | null> {
   const parsed = await kv.get<PinnedPlayer>(KEY);
-  if (!parsed || typeof parsed.playerKey !== "string" || !Array.isArray(parsed.steamIds)) return null;
+  if (!parsed || typeof parsed.playerKey !== 'string' || !Array.isArray(parsed.steamIds))
+    return null;
   return parsed;
 }
 
 export async function getPinnedPlayer(): Promise<PinnedPlayer | null> {
-  try { return await readPinnedPlayer(); } catch { return null; }
+  try {
+    return await readPinnedPlayer();
+  } catch {
+    return null;
+  }
 }
 
 export async function setPinnedPlayer(pinned: PinnedPlayer | null): Promise<void> {
@@ -38,7 +43,7 @@ export async function setPinnedPlayer(pinned: PinnedPlayer | null): Promise<void
 /** 在档案列表中找回关注选手：playerKey 优先，身份归并变化时退回 steamId 交集。 */
 export function matchPinned<T extends { playerKey: string; steamIds: string[] }>(
   pinned: PinnedPlayer | null,
-  profiles: T[]
+  profiles: T[],
 ): T | null {
   if (!pinned) return null;
   return (

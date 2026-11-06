@@ -1,47 +1,40 @@
-import { ANALYSIS_PAGE_LABELS } from "../lib/analysis-display-labels";
-import { useRef, useState } from "react";
-import type { ReactNode } from "react";
-import type { AnalysisFocus } from "../lib/analysis-context";
-import type { AnalysisPageId } from "../lib/studio-navigation";
+import { ANALYSIS_PAGE_LABELS } from '../lib/analysis-display-labels';
+import { useRef, useState } from 'react';
+import type { ReactNode } from 'react';
+import type { AnalysisFocus } from '../lib/analysis-context';
+import type { AnalysisPageId } from '../lib/studio-navigation';
 
-export type AnalysisTheme =
-  | "overview"
-  | "engagement"
-  | "economy"
-  | "utility"
-  | "opening"
-  | "roles";
-const themes: { key: AnalysisTheme; label: string; pages: AnalysisPageId[] }[] =
-  [
-    {
-      key: "overview",
-      label: "表现与趋势",
-      pages: ["analysis", "event-analysis", "player", "team"],
-    },
-    { key: "engagement", label: "交火与协同", pages: ["duel"] },
-    { key: "economy", label: "经济与转化", pages: ["economy"] },
-    { key: "utility", label: "道具", pages: ["utility", "lineups"] },
-    { key: "opening", label: "开局与控图", pages: ["opening", "control"] },
-    { key: "roles", label: "位置与职责", pages: ["roles"] },
-  ];
+export type AnalysisTheme = 'overview' | 'engagement' | 'economy' | 'utility' | 'opening' | 'roles';
+const themes: { key: AnalysisTheme; label: string; pages: AnalysisPageId[] }[] = [
+  {
+    key: 'overview',
+    label: '表现与趋势',
+    pages: ['analysis', 'event-analysis', 'player', 'team'],
+  },
+  { key: 'engagement', label: '交火与协同', pages: ['duel'] },
+  { key: 'economy', label: '经济与转化', pages: ['economy'] },
+  { key: 'utility', label: '道具', pages: ['utility', 'lineups'] },
+  { key: 'opening', label: '开局与控图', pages: ['opening', 'control'] },
+  { key: 'roles', label: '位置与职责', pages: ['roles'] },
+];
 const shortcuts: Record<AnalysisTheme, [AnalysisPageId, string][]> = {
   overview: [
-    ["analysis", "总体"],
-    ["player", "选手"],
-    ["team", "队伍"],
-    ["event-analysis", "赛事"],
+    ['analysis', '总体'],
+    ['player', '选手'],
+    ['team', '队伍'],
+    ['event-analysis', '赛事'],
   ],
-  engagement: [["duel", ANALYSIS_PAGE_LABELS.duel]],
-  economy: [["economy", "经济"]],
+  engagement: [['duel', ANALYSIS_PAGE_LABELS.duel]],
+  economy: [['economy', '经济']],
   utility: [
-    ["utility", "道具分析"],
-    ["lineups", "点位"],
+    ['utility', '道具分析'],
+    ['lineups', '点位'],
   ],
   opening: [
-    ["opening", "个人开局"],
-    ["control", "覆盖场"],
+    ['opening', '个人开局'],
+    ['control', '覆盖场'],
   ],
-  roles: [["roles", "位置与职责"]],
+  roles: [['roles', '位置与职责']],
 };
 export function AnalysisView({
   page,
@@ -62,14 +55,14 @@ export function AnalysisView({
 }) {
   const [showSaved, setShowSaved] = useState(false),
     [saving, setSaving] = useState(false),
-    [title, setTitle] = useState(""),
+    [title, setTitle] = useState(''),
     [shortcut, setShortcut] = useState(false),
-    [error, setError] = useState("");
+    [error, setError] = useState('');
   const [loading, setLoading] = useState(false),
     [pending, setPending] = useState(false);
   const inFlight = useRef(false);
   const request = useRef(0);
-  const defaultTitle = `${focus.kind === "aggregate" ? "整体范围" : focus.kind === "team" ? focus.teamName : focus.label} · ${ANALYSIS_PAGE_LABELS[page]}`;
+  const defaultTitle = `${focus.kind === 'aggregate' ? '整体范围' : focus.kind === 'team' ? focus.teamName : focus.label} · ${ANALYSIS_PAGE_LABELS[page]}`;
   const save = async (copy: boolean) => {
     if (inFlight.current || loading) return;
     inFlight.current = true;
@@ -77,9 +70,9 @@ export function AnalysisView({
     try {
       await onSave(title, shortcut, copy);
       setSaving(false);
-      setError("");
+      setError('');
     } catch (e) {
-      setError(e instanceof Error ? e.message : "保存失败");
+      setError(e instanceof Error ? e.message : '保存失败');
     } finally {
       inFlight.current = false;
       setPending(false);
@@ -90,7 +83,7 @@ export function AnalysisView({
     setSaving(true);
     setTitle(defaultTitle);
     setShortcut(false);
-    setError("");
+    setError('');
     setLoading(true);
     void onBeginSave()
       .then((value) => {
@@ -100,27 +93,26 @@ export function AnalysisView({
         }
       })
       .catch((e) => {
-        if (request.current === token)
-          setError(e instanceof Error ? e.message : "读取失败");
+        if (request.current === token) setError(e instanceof Error ? e.message : '读取失败');
       })
       .finally(() => {
         if (request.current === token) setLoading(false);
       });
   };
   const theme =
-    page === "patterns"
+    page === 'patterns'
       ? null
-      : (themes.find((item) => item.pages.includes(page))?.key ?? "overview");
+      : (themes.find((item) => item.pages.includes(page))?.key ?? 'overview');
   const selectTheme = (key: AnalysisTheme) =>
     onSelect(
-      key === "overview"
-        ? focus.kind === "player" || focus.kind === "self"
-          ? "player"
-          : focus.kind === "team"
-            ? "team"
-            : focus.kind === "event"
-              ? "event-analysis"
-              : "analysis"
+      key === 'overview'
+        ? focus.kind === 'player' || focus.kind === 'self'
+          ? 'player'
+          : focus.kind === 'team'
+            ? 'team'
+            : focus.kind === 'event'
+              ? 'event-analysis'
+              : 'analysis'
         : themes.find((item) => item.key === key)!.pages[0],
     );
   return (
@@ -136,7 +128,7 @@ export function AnalysisView({
       {saving && (
         <section className="stu-card">
           <label>
-            标题{" "}
+            标题{' '}
             <input
               className="stu-input"
               disabled={loading || pending}
@@ -187,10 +179,8 @@ export function AnalysisView({
           <button
             key={item.key}
             type="button"
-            aria-current={theme === item.key ? "page" : undefined}
-            className={
-              theme === item.key ? "stu-subtab stu-subtab-active" : "stu-subtab"
-            }
+            aria-current={theme === item.key ? 'page' : undefined}
+            className={theme === item.key ? 'stu-subtab stu-subtab-active' : 'stu-subtab'}
             onClick={() => selectTheme(item.key)}
           >
             {item.label}
@@ -198,25 +188,25 @@ export function AnalysisView({
         ))}
       </nav>
       <nav className="stu-chip-row" aria-label="主题快捷入口">
-        {theme === null ? <span className="stu-chip stu-chip-active" aria-current="page">战术模式与对手侦察</span> : shortcuts[theme].map(([target, label]) => (
-          <button
-            key={target}
-            type="button"
-            className={
-              page === target ? "stu-chip stu-chip-active" : "stu-chip"
-            }
-            onClick={() => onSelect(target)}
-          >
-            {label}
-          </button>
-        ))}
+        {theme === null ? (
+          <span className="stu-chip stu-chip-active" aria-current="page">
+            战术模式与对手侦察
+          </span>
+        ) : (
+          shortcuts[theme].map(([target, label]) => (
+            <button
+              key={target}
+              type="button"
+              className={page === target ? 'stu-chip stu-chip-active' : 'stu-chip'}
+              onClick={() => onSelect(target)}
+            >
+              {label}
+            </button>
+          ))
+        )}
       </nav>
-      {theme === "opening" && (
-        <button
-          type="button"
-          className="stu-button-sm"
-          onClick={() => onSelect("patterns")}
-        >
+      {theme === 'opening' && (
+        <button type="button" className="stu-button-sm" onClick={() => onSelect('patterns')}>
           战术模式与对手侦察
         </button>
       )}

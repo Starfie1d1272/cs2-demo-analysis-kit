@@ -1,1 +1,1 @@
-export * from "@cs2dak/rivalhub-upload/contract";
+export * from '@cs2dak/rivalhub-upload/contract';

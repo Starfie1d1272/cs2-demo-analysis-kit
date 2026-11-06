@@ -27,7 +27,7 @@ export function txRequest<T>(req: IDBRequest<T>): Promise<T> {
 export function createDbOpener(
   dbName: string,
   version: number,
-  upgrade: (db: IDBDatabase) => void
+  upgrade: (db: IDBDatabase) => void,
 ): () => Promise<IDBDatabase> {
   let dbPromise: Promise<IDBDatabase> | null = null;
   return () => {
@@ -37,13 +37,23 @@ export function createDbOpener(
       request.onupgradeneeded = () => upgrade(request.result);
       request.onsuccess = () => {
         const db = request.result;
-        db.onversionchange = () => { db.close(); dbPromise = null; };
-        db.onclose = () => { dbPromise = null; };
+        db.onversionchange = () => {
+          db.close();
+          dbPromise = null;
+        };
+        db.onclose = () => {
+          dbPromise = null;
+        };
         resolve(db);
       };
-      request.onerror = () => { dbPromise = null; reject(request.error); };
+      request.onerror = () => {
+        dbPromise = null;
+        reject(request.error);
+      };
     });
-    dbPromise.catch(() => { dbPromise = null; });
+    dbPromise.catch(() => {
+      dbPromise = null;
+    });
     return dbPromise;
   };
 }
@@ -59,7 +69,7 @@ export function touchLimitedCache<T>(
   cache: Map<string, Promise<T>>,
   key: string,
   value: Promise<T>,
-  limit: number
+  limit: number,
 ): Promise<T> {
   cache.delete(key);
   cache.set(key, value);

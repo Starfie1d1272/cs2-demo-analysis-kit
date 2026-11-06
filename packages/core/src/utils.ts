@@ -1,4 +1,4 @@
-import type { DemoPackage } from "@cs2dak/contract";
+import type { DemoPackage } from '@cs2dak/contract';
 
 export function round(value: number, digits: number): number {
   const factor = 10 ** digits;
@@ -13,7 +13,7 @@ export function formatClock(seconds: number): string {
   const clamped = Math.max(0, Math.ceil(seconds));
   const minutes = Math.floor(clamped / 60);
   const remainder = clamped % 60;
-  return `${minutes}:${remainder.toString().padStart(2, "0")}`;
+  return `${minutes}:${remainder.toString().padStart(2, '0')}`;
 }
 
 export function getOrInit<K, V>(map: Map<K, V>, key: K, create: () => V): V {
@@ -40,22 +40,24 @@ export function groupBy<T, K>(rows: T[], keyFor: (row: T) => K): Map<K, T[]> {
  * facts deliberately do not use this filter: the frozen v3 damage section is
  * the canonical input for aggregate player damage.
  */
-export function activePhaseDamages(pkg: DemoPackage): DemoPackage["damages"] {
+export function activePhaseDamages(pkg: DemoPackage): DemoPackage['damages'] {
   if (pkg.rounds.length === 0) return pkg.damages;
   const roundsByNumber = new Map(pkg.rounds.map((r) => [r.roundNumber, r]));
   return pkg.damages.filter((damage) => {
     const roundRow = roundsByNumber.get(damage.roundNumber);
-    return Boolean(roundRow && damage.tick >= roundRow.freezeEndTick && damage.tick <= roundRow.endTick);
+    return Boolean(
+      roundRow && damage.tick >= roundRow.freezeEndTick && damage.tick <= roundRow.endTick,
+    );
   });
 }
 
 /** @deprecated Use activePhaseDamages; this name remains for package users. */
-export function activeDamages(pkg: DemoPackage): DemoPackage["damages"] {
+export function activeDamages(pkg: DemoPackage): DemoPackage['damages'] {
   return activePhaseDamages(pkg);
 }
 
 export function normalizeWeapon(weapon: string): string {
-  return weapon.toLowerCase().replace(/^weapon_/, "");
+  return weapon.toLowerCase().replace(/^weapon_/, '');
 }
 
 export function isNamedWeapon(value: string): boolean {
@@ -63,11 +65,11 @@ export function isNamedWeapon(value: string): boolean {
 }
 
 export function isUtilityWeapon(weapon: string): boolean {
-  return ["hegrenade", "inferno", "molotov", "incgrenade"].includes(normalizeWeapon(weapon));
+  return ['hegrenade', 'inferno', 'molotov', 'incgrenade'].includes(normalizeWeapon(weapon));
 }
 
 /** Compatibility name; weapon attribution is always sourced from kill.weapon. */
-export function killWeaponName(kill: DemoPackage["kills"][number]): string {
+export function killWeaponName(kill: DemoPackage['kills'][number]): string {
   return normalizeWeapon(kill.weapon);
 }
 

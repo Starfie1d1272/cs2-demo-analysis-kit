@@ -10,7 +10,7 @@ export function Pagination({
   onChange,
   maxButtons = 8,
   info,
-  className = "dak-pagination",
+  className = 'dak-pagination',
 }: {
   page: number;
   totalPages: number;
@@ -34,7 +34,7 @@ export function Pagination({
           <button
             key={p}
             type="button"
-            className={safePage === p ? "active" : ""}
+            className={safePage === p ? 'active' : ''}
             onClick={() => onChange(p)}
           >
             {p + 1}

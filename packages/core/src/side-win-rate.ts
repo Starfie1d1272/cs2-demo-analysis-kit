@@ -1,4 +1,4 @@
-import type { DemoPackage, Side, TeamKey } from "@cs2dak/contract";
+import type { DemoPackage, Side, TeamKey } from '@cs2dak/contract';
 
 export interface SideWinRateStats {
   played: number;
@@ -25,8 +25,8 @@ function aggregateSideWinRates(rows: SideRoundResult[]): Partial<Record<Side, Si
   return Object.fromEntries(
     [...groups.entries()].map(([side, stats]) => [
       side,
-      { ...stats, winRate: stats.played > 0 ? stats.won / stats.played : 0 }
-    ])
+      { ...stats, winRate: stats.played > 0 ? stats.won / stats.played : 0 },
+    ]),
   );
 }
 
@@ -37,13 +37,17 @@ function aggregateSideWinRates(rows: SideRoundResult[]): Partial<Record<Side, Si
  */
 export function buildTeamSideWinRates(pkg: DemoPackage): TeamSideWinRates {
   return {
-    teamA: aggregateSideWinRates(pkg.rounds.map((round) => ({
-      side: round.teamASide,
-      won: round.winnerTeamKey === "teamA"
-    }))),
-    teamB: aggregateSideWinRates(pkg.rounds.map((round) => ({
-      side: round.teamBSide,
-      won: round.winnerTeamKey === "teamB"
-    })))
+    teamA: aggregateSideWinRates(
+      pkg.rounds.map((round) => ({
+        side: round.teamASide,
+        won: round.winnerTeamKey === 'teamA',
+      })),
+    ),
+    teamB: aggregateSideWinRates(
+      pkg.rounds.map((round) => ({
+        side: round.teamBSide,
+        won: round.winnerTeamKey === 'teamB',
+      })),
+    ),
   };
 }

@@ -1,4 +1,4 @@
-import { pointInPolygon as pointInPolygon2d } from "./zones.js";
+import { pointInPolygon as pointInPolygon2d } from './zones.js';
 
 export interface Vec3 {
   x: number;
@@ -82,13 +82,19 @@ export function findNavPath(nav: CompactNav, startId: number, endId: number): nu
   return [];
 }
 
-function containingNavArea(areas: readonly CompactNavArea[], point: Vec3): CompactNavArea | undefined {
+function containingNavArea(
+  areas: readonly CompactNavArea[],
+  point: Vec3,
+): CompactNavArea | undefined {
   let best: CompactNavArea | undefined;
   let bestZ = Number.POSITIVE_INFINITY;
   for (const area of areas) {
     if (!pointInPolygon(point, area.corners)) continue;
     const z = Math.abs(point.z - area.centroid.z);
-    if (z < bestZ) { best = area; bestZ = z; }
+    if (z < bestZ) {
+      best = area;
+      bestZ = z;
+    }
   }
   return best;
 }
@@ -110,23 +116,38 @@ export function nearestNavArea(nav: CompactNav, point: Vec3): CompactNavArea | u
 }
 
 /** Build a short-lived lookup for repeated queries against one nav snapshot. */
-export function createNearestNavAreaLookup(nav: CompactNav): (point: Vec3) => CompactNavArea | undefined {
+export function createNearestNavAreaLookup(
+  nav: CompactNav,
+): (point: Vec3) => CompactNavArea | undefined {
   const cellSize = 256;
   const cells = new Map<string, CompactNavArea[]>();
   for (const area of nav.areas) {
     if (!area.corners.length) continue;
-    const xs = area.corners.map(p => p.x), ys = area.corners.map(p => p.y);
-    const minX = Math.floor(Math.min(...xs) / cellSize), maxX = Math.floor(Math.max(...xs) / cellSize);
-    const minY = Math.floor(Math.min(...ys) / cellSize), maxY = Math.floor(Math.max(...ys) / cellSize);
-    if (![minX, maxX, minY, maxY].every(Number.isFinite) || (maxX - minX + 1) * (maxY - minY + 1) > 10000) {
-      return point => nearestNavArea(nav, point);
+    const xs = area.corners.map((p) => p.x),
+      ys = area.corners.map((p) => p.y);
+    const minX = Math.floor(Math.min(...xs) / cellSize),
+      maxX = Math.floor(Math.max(...xs) / cellSize);
+    const minY = Math.floor(Math.min(...ys) / cellSize),
+      maxY = Math.floor(Math.max(...ys) / cellSize);
+    if (
+      ![minX, maxX, minY, maxY].every(Number.isFinite) ||
+      (maxX - minX + 1) * (maxY - minY + 1) > 10000
+    ) {
+      return (point) => nearestNavArea(nav, point);
     }
-    for (let x = minX; x <= maxX; x++) for (let y = minY; y <= maxY; y++) {
-      const key = `${x}:${y}`; const bucket = cells.get(key) ?? []; bucket.push(area); cells.set(key, bucket);
-    }
+    for (let x = minX; x <= maxX; x++)
+      for (let y = minY; y <= maxY; y++) {
+        const key = `${x}:${y}`;
+        const bucket = cells.get(key) ?? [];
+        bucket.push(area);
+        cells.set(key, bucket);
+      }
   }
-  return point => containingNavArea(cells.get(`${Math.floor(point.x / cellSize)}:${Math.floor(point.y / cellSize)}`) ?? [], point)
-    ?? nearestNavArea(nav, point);
+  return (point) =>
+    containingNavArea(
+      cells.get(`${Math.floor(point.x / cellSize)}:${Math.floor(point.y / cellSize)}`) ?? [],
+      point,
+    ) ?? nearestNavArea(nav, point);
 }
 
 export interface NavZCluster {

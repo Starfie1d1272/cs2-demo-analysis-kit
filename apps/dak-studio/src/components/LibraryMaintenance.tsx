@@ -1,5 +1,5 @@
-import { normalizeDiagnostic } from "@cs2dak/rivalhub-upload";
-import { useEffect, useState } from "react";
+import { normalizeDiagnostic } from '@cs2dak/rivalhub-upload';
+import { useEffect, useState } from 'react';
 import {
   backupLibrary,
   cleanupStorage,
@@ -9,25 +9,38 @@ import {
   restoreLibrary,
   type StorageCategory,
   type StorageOverview,
-} from "../lib/library-maintenance";
-import { bytesLabel } from "../lib/format";
-import { listDemoEntries } from "../lib/library";
-import { repairDemoIdentityAndDuplicates } from "../lib/library-repair";
+} from '../lib/library-maintenance';
+import { bytesLabel } from '../lib/format';
+import { listDemoEntries } from '../lib/library';
+import { repairDemoIdentityAndDuplicates } from '../lib/library-repair';
 
-const LABELS: Record<StorageCategory["id"], string> = {
-  database: "资料库数据库",
-  demos: "原始 ZIP",
-  cache: "派生缓存",
-  bundledEvents: "官方赛事包",
-  tris: ".tri 地图资产",
-  updates: "更新暂存",
-  reports: "报告",
-  logs: "日志",
-  backups: "本机备份",
+const LABELS: Record<StorageCategory['id'], string> = {
+  database: '资料库数据库',
+  demos: '原始 ZIP',
+  cache: '派生缓存',
+  bundledEvents: '官方赛事包',
+  tris: '.tri 地图资产',
+  updates: '更新暂存',
+  reports: '报告',
+  logs: '日志',
+  backups: '本机备份',
 };
-const CLEANABLE = new Set<StorageCategory["id"]>(["cache", "bundledEvents", "tris", "updates", "reports", "logs"]);
+const CLEANABLE = new Set<StorageCategory['id']>([
+  'cache',
+  'bundledEvents',
+  'tris',
+  'updates',
+  'reports',
+  'logs',
+]);
 
-export function LibraryMaintenance({ onNotice, onLibraryChanged }: { onNotice: (message: string) => void; onLibraryChanged?: (entries: Awaited<ReturnType<typeof listDemoEntries>>) => void }) {
+export function LibraryMaintenance({
+  onNotice,
+  onLibraryChanged,
+}: {
+  onNotice: (message: string) => void;
+  onLibraryChanged?: (entries: Awaited<ReturnType<typeof listDemoEntries>>) => void;
+}) {
   const [overview, setOverview] = useState<StorageOverview | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -35,14 +48,16 @@ export function LibraryMaintenance({ onNotice, onLibraryChanged }: { onNotice: (
     setOverview(await loadStorageOverview());
   }
 
-  useEffect(() => { void refresh(); }, []);
+  useEffect(() => {
+    void refresh();
+  }, []);
   const desktop = hasLibraryMaintenance();
 
   async function run(action: () => Promise<{ ok: boolean; error?: string }>, success: string) {
     setBusy(true);
     try {
       const result = await action();
-      onNotice(result.ok ? success : result.error ?? "操作失败");
+      onNotice(result.ok ? success : (result.error ?? '操作失败'));
       await refresh();
     } finally {
       setBusy(false);
@@ -54,9 +69,15 @@ export function LibraryMaintenance({ onNotice, onLibraryChanged }: { onNotice: (
     try {
       const result = await window.pywebview?.api.export_diagnostics?.();
       if (result?.cancelled) return;
-      onNotice(result?.ok ? "诊断日志已导出" : normalizeDiagnostic(new Error(result?.error ?? "请更新桌面壳以导出诊断日志")).message);
+      onNotice(
+        result?.ok
+          ? '诊断日志已导出'
+          : normalizeDiagnostic(new Error(result?.error ?? '请更新桌面壳以导出诊断日志')).message,
+      );
     } catch (error) {
-      onNotice(`诊断日志导出失败：${normalizeDiagnostic(error, { stage: "diagnostics.export" }).message}`);
+      onNotice(
+        `诊断日志导出失败：${normalizeDiagnostic(error, { stage: 'diagnostics.export' }).message}`,
+      );
     } finally {
       setBusy(false);
     }
@@ -68,7 +89,11 @@ export function LibraryMaintenance({ onNotice, onLibraryChanged }: { onNotice: (
       const result = await repairDemoIdentityAndDuplicates();
       onLibraryChanged?.(await listDemoEntries());
       const summary = `Demo 身份修复完成：回填 ${result.backfilled}，合并 ${result.duplicateGroups} 组重复，移除 ${result.removed} 条，重连 ${result.rewiredSeries} 个系列`;
-      onNotice(result.errors.length > 0 ? `${summary}；${result.errors.length} 项需注意（${result.errors[0]}）` : summary);
+      onNotice(
+        result.errors.length > 0
+          ? `${summary}；${result.errors.length} 项需注意（${result.errors[0]}）`
+          : summary,
+      );
     } catch (error) {
       onNotice(`Demo 身份修复失败：${error instanceof Error ? error.message : String(error)}`);
     } finally {
@@ -78,36 +103,104 @@ export function LibraryMaintenance({ onNotice, onLibraryChanged }: { onNotice: (
 
   return (
     <details className="stu-card">
-      <summary><b>资料库备份与存储维护</b></summary>
-      {desktop && <p className="stu-muted">备份包含 SQLite 中的标签、身份、BP、Playbook、设置与原始 ZIP；缓存和官方资产可重新生成或下载，不进入备份。</p>}
+      <summary>
+        <b>资料库备份与存储维护</b>
+      </summary>
+      {desktop && (
+        <p className="stu-muted">
+          备份包含 SQLite 中的标签、身份、BP、Playbook、设置与原始
+          ZIP；缓存和官方资产可重新生成或下载，不进入备份。
+        </p>
+      )}
       <div className="stu-header-actions">
-        {desktop && <>
-          <button className="stu-button stu-button-ghost" type="button" disabled={busy} onClick={() => void run(backupLibrary, "资料库备份已写入 backups 目录")}>创建备份</button>
-          <button className="stu-button stu-button-ghost" type="button" disabled={busy} onClick={() => {
-            if (window.confirm("恢复会替换当前资料库，完成后需要重启 Studio。继续？")) void run(restoreLibrary, "备份已恢复，请重启 Studio");
-          }}>恢复备份</button>
-          <button className="stu-button stu-button-ghost" type="button" disabled={busy} onClick={() => void run(repairLibrary, "资料库一致性检查与修复完成")}>检查并修复</button>
-          <button className="stu-button stu-button-ghost" type="button" disabled={busy} onClick={() => void exportDiagnostics()}>导出诊断日志</button>
-        </>}
-        <button className="stu-button stu-button-ghost" type="button" disabled={busy} onClick={() => void repairIdentities()}>修复 Demo 身份与重复</button>
+        {desktop && (
+          <>
+            <button
+              className="stu-button stu-button-ghost"
+              type="button"
+              disabled={busy}
+              onClick={() => void run(backupLibrary, '资料库备份已写入 backups 目录')}
+            >
+              创建备份
+            </button>
+            <button
+              className="stu-button stu-button-ghost"
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                if (window.confirm('恢复会替换当前资料库，完成后需要重启 Studio。继续？'))
+                  void run(restoreLibrary, '备份已恢复，请重启 Studio');
+              }}
+            >
+              恢复备份
+            </button>
+            <button
+              className="stu-button stu-button-ghost"
+              type="button"
+              disabled={busy}
+              onClick={() => void run(repairLibrary, '资料库一致性检查与修复完成')}
+            >
+              检查并修复
+            </button>
+            <button
+              className="stu-button stu-button-ghost"
+              type="button"
+              disabled={busy}
+              onClick={() => void exportDiagnostics()}
+            >
+              导出诊断日志
+            </button>
+          </>
+        )}
+        <button
+          className="stu-button stu-button-ghost"
+          type="button"
+          disabled={busy}
+          onClick={() => void repairIdentities()}
+        >
+          修复 Demo 身份与重复
+        </button>
       </div>
       {overview && (
         <table className="stu-mini-table">
-          <thead><tr><th>分类</th><th>文件</th><th>占用</th><th /></tr></thead>
-          <tbody>{overview.categories.map((category) => (
-            <tr key={category.id}>
-              <td>{LABELS[category.id]}</td>
-              <td>{category.files}</td>
-              <td>{bytesLabel(category.bytes)}</td>
-              <td>{CLEANABLE.has(category.id) && category.bytes > 0 && (
-                <button className="stu-button-sm" type="button" disabled={busy} onClick={() => {
-                  if (window.confirm(`清理${LABELS[category.id]}？需要时会重新生成或下载。`)) {
-                    void run(() => cleanupStorage(category.id), `${LABELS[category.id]}已清理`);
-                  }
-                }}>清理</button>
-              )}</td>
+          <thead>
+            <tr>
+              <th>分类</th>
+              <th>文件</th>
+              <th>占用</th>
+              <th />
             </tr>
-          ))}</tbody>
+          </thead>
+          <tbody>
+            {overview.categories.map((category) => (
+              <tr key={category.id}>
+                <td>{LABELS[category.id]}</td>
+                <td>{category.files}</td>
+                <td>{bytesLabel(category.bytes)}</td>
+                <td>
+                  {CLEANABLE.has(category.id) && category.bytes > 0 && (
+                    <button
+                      className="stu-button-sm"
+                      type="button"
+                      disabled={busy}
+                      onClick={() => {
+                        if (
+                          window.confirm(`清理${LABELS[category.id]}？需要时会重新生成或下载。`)
+                        ) {
+                          void run(
+                            () => cleanupStorage(category.id),
+                            `${LABELS[category.id]}已清理`,
+                          );
+                        }
+                      }}
+                    >
+                      清理
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
         </table>
       )}
     </details>

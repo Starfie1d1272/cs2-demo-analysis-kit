@@ -13,11 +13,19 @@
  * - track.flags（FLAG_ALIVE）
  * - track.hp（原始值）
  */
-import type { DemoPackage } from "@cs2dak/contract";
-import { decodeDelta, FLAG_ALIVE } from "@cs2dak/contract";
-import { createResolverFromPackage } from "@cs2dak/core";
-import { getMapNav, getMapRoutes, getMapZones } from "@cs2dak/map-assets";
-import { zoneAt, type CompactNav, type MapRoutes, type MapZones, type TriangleBvh, type Vec3, type ZoneRole } from "@cs2dak/maps";
+import type { DemoPackage } from '@cs2dak/contract';
+import { decodeDelta, FLAG_ALIVE } from '@cs2dak/contract';
+import { createResolverFromPackage } from '@cs2dak/core';
+import { getMapNav, getMapRoutes, getMapZones } from '@cs2dak/map-assets';
+import {
+  zoneAt,
+  type CompactNav,
+  type MapRoutes,
+  type MapZones,
+  type TriangleBvh,
+  type Vec3,
+  type ZoneRole,
+} from '@cs2dak/maps';
 
 export interface SpatialAssets {
   mapName: string;
@@ -69,7 +77,7 @@ export interface AnnotatedSample {
   /** zone 语义角色（site/mid/connector/lane…）；无 zone 为 null。 */
   zoneRole: ZoneRole | null;
   /** zone 关联包点；无则 null。 */
-  zoneBombsite: "a" | "b" | null;
+  zoneBombsite: 'a' | 'b' | null;
   /** 最近 nav area id；无 nav 资产为 null。 */
   navAreaId: number | null;
   /** 当前血量（火焰逼退掉血判定用）；缺失为 100。 */
@@ -104,7 +112,7 @@ export function annotatePositions(pkg: DemoPackage, assets: SpatialAssets): Anno
       const ys = decodeDelta(track.y);
       const zs = decodeDelta(track.z);
       const side: string | null =
-        player.teamKey === "teamA" ? roundRow.teamASide : roundRow.teamBSide;
+        player.teamKey === 'teamA' ? roundRow.teamASide : roundRow.teamBSide;
 
       for (let i = 0; i < xs.length; i++) {
         const placeIdx = track.place[i] ?? -1;
@@ -123,7 +131,7 @@ export function annotatePositions(pkg: DemoPackage, assets: SpatialAssets): Anno
           callout: placeIdx >= 0 && placeIdx < placeDict.length ? placeDict[placeIdx] : null,
           zoneId: zone?.id ?? null,
           zoneRole: (zone?.role as ZoneRole | undefined) ?? null,
-          zoneBombsite: (zone?.bombsite as "a" | "b" | undefined) ?? null,
+          zoneBombsite: (zone?.bombsite as 'a' | 'b' | undefined) ?? null,
           navAreaId: null,
           health: track.hp[i] ?? 100,
         });

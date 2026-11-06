@@ -5,38 +5,48 @@
 // 用法（先确保 Chrome --remote-debugging-port=9222 已启动并已登录 HLTV）：
 //   node scripts/hltv/extract-stage-urls.mjs --url https://www.hltv.org/results?event=9028 --filter iem-cologne-major-2026-stage-1 --out fixtures/events/cologne-major-2026/data/matches-stage1.txt
 //   node scripts/hltv/extract-stage-urls.mjs --stage stage1  # 使用内置 Cologne 示例配置
-import { writeFileSync } from "node:fs";
+import { writeFileSync } from 'node:fs';
 
 const args = process.argv.slice(2);
 const valueOf = (name) => {
   const i = args.indexOf(name);
   return i >= 0 ? args[i + 1] : null;
 };
-const CDP = valueOf("--cdp") ?? "http://127.0.0.1:9222";
+const CDP = valueOf('--cdp') ?? 'http://127.0.0.1:9222';
 const DEFAULT_STAGES = [
   {
-    key: "stage1",
-    url: "https://www.hltv.org/results?event=9028",
-    filter: "iem-cologne-major-2026-stage-1",
-    out: "fixtures/events/cologne-major-2026/data/matches-stage1.txt",
+    key: 'stage1',
+    url: 'https://www.hltv.org/results?event=9028',
+    filter: 'iem-cologne-major-2026-stage-1',
+    out: 'fixtures/events/cologne-major-2026/data/matches-stage1.txt',
   },
   {
-    key: "stage2",
-    url: "https://www.hltv.org/results?event=9029",
-    filter: "iem-cologne-major-2026-stage-2",
-    out: "fixtures/events/cologne-major-2026/data/matches-stage2.txt",
+    key: 'stage2',
+    url: 'https://www.hltv.org/results?event=9029',
+    filter: 'iem-cologne-major-2026-stage-2',
+    out: 'fixtures/events/cologne-major-2026/data/matches-stage2.txt',
   },
 ];
 
-const customUrl = valueOf("--url");
-const customFilter = valueOf("--filter");
-const customOut = valueOf("--out");
-const only = valueOf("--stage");
-const stages = customUrl || customFilter || customOut
-  ? [{ key: only ?? "custom", url: customUrl, filter: customFilter ?? "", out: customOut ?? "matches.txt" }]
-  : DEFAULT_STAGES;
+const customUrl = valueOf('--url');
+const customFilter = valueOf('--filter');
+const customOut = valueOf('--out');
+const only = valueOf('--stage');
+const stages =
+  customUrl || customFilter || customOut
+    ? [
+        {
+          key: only ?? 'custom',
+          url: customUrl,
+          filter: customFilter ?? '',
+          out: customOut ?? 'matches.txt',
+        },
+      ]
+    : DEFAULT_STAGES;
 if (stages.some((stage) => !stage.url)) {
-  console.error("用法：extract-stage-urls.mjs --url <results-url> [--filter <substring>] [--out <file>] [--cdp <url>]");
+  console.error(
+    '用法：extract-stage-urls.mjs --url <results-url> [--filter <substring>] [--out <file>] [--cdp <url>]',
+  );
   process.exit(2);
 }
 
@@ -48,7 +58,7 @@ class CdpClient {
 
   constructor(wsUrl) {
     this.#ws = new WebSocket(wsUrl);
-    this.#ws.addEventListener("message", (event) => {
+    this.#ws.addEventListener('message', (event) => {
       const msg = JSON.parse(event.data.toString());
       if (msg.id && this.#pending.has(msg.id)) {
         const { resolve, reject } = this.#pending.get(msg.id);
@@ -62,8 +72,8 @@ class CdpClient {
   async ready() {
     if (this.#ws.readyState === WebSocket.OPEN) return;
     await new Promise((resolve, reject) => {
-      this.#ws.addEventListener("open", resolve, { once: true });
-      this.#ws.addEventListener("error", reject, { once: true });
+      this.#ws.addEventListener('open', resolve, { once: true });
+      this.#ws.addEventListener('error', reject, { once: true });
     });
   }
 
@@ -75,16 +85,18 @@ class CdpClient {
     });
   }
 
-  close() { this.#ws.close(); }
+  close() {
+    this.#ws.close();
+  }
 }
 
 async function main() {
   // 找到第一个 HLTV 页面
   const pagesResp = await fetch(`${CDP}/json`);
   const pages = await pagesResp.json();
-  const hltvPage = pages.find((p) => p.url.includes("hltv.org"));
+  const hltvPage = pages.find((p) => p.url.includes('hltv.org'));
   if (!hltvPage) {
-    console.error("❌ 未找到 HLTV 页面。请在 Chrome 中打开 HLTV 并登录。");
+    console.error('❌ 未找到 HLTV 页面。请在 Chrome 中打开 HLTV 并登录。');
     process.exit(1);
   }
   console.log(`📌 复用页面：${hltvPage.title}`);
@@ -96,8 +108,8 @@ async function main() {
     if (only && stage.key !== only) continue;
 
     console.log(`\n🌐 导航到 ${stage.key}：${stage.url}`);
-    await client.send("Page.enable");
-    await client.send("Page.navigate", { url: stage.url });
+    await client.send('Page.enable');
+    await client.send('Page.navigate', { url: stage.url });
 
     // 等待页面加载（纯超时，简单可靠）
     await new Promise((resolve) => setTimeout(resolve, 8000));
@@ -111,11 +123,13 @@ async function main() {
       return JSON.stringify(urls);
     })()`;
 
-    const result = await client.send("Runtime.evaluate", { expression: js, returnByValue: true });
-    const urls = JSON.parse(result.result?.value || "[]");
+    const result = await client.send('Runtime.evaluate', { expression: js, returnByValue: true });
+    const urls = JSON.parse(result.result?.value || '[]');
 
     if (urls.length === 0) {
-      console.log(`  ⚠️  未提取到匹配 "${stage.filter}" 的 URL（可能需在页面上选择正确的 stage filter）`);
+      console.log(
+        `  ⚠️  未提取到匹配 "${stage.filter}" 的 URL（可能需在页面上选择正确的 stage filter）`,
+      );
       // 尝试不带 filter 提取当前页全部
       const allJs = `(() => {
         const urls = [...document.querySelectorAll('a[href*="/matches/"]')]
@@ -123,15 +137,18 @@ async function main() {
           .filter((v, i, arr) => arr.indexOf(v) === i);
         return JSON.stringify(urls);
       })()`;
-      const allResult = await client.send("Runtime.evaluate", { expression: allJs, returnByValue: true });
-      const allUrls = JSON.parse(allResult.result?.value || "[]");
+      const allResult = await client.send('Runtime.evaluate', {
+        expression: allJs,
+        returnByValue: true,
+      });
+      const allUrls = JSON.parse(allResult.result?.value || '[]');
       console.log(`  ℹ️ 当前页全部 URL：${allUrls.length} 个`);
       if (allUrls.length > 0) {
         console.log(`  💡 提示：可能需要手动在页面选择 stage filter。`);
         // 尽力：如果全部 URL 数量合理（<80），直接保存让用户筛选
         if (allUrls.length <= 80) {
           const out = stage.out;
-          writeFileSync(out, allUrls.join("\n") + "\n", "utf8");
+          writeFileSync(out, allUrls.join('\n') + '\n', 'utf8');
           console.log(`  📄 已保存全部 ${allUrls.length} URL → ${out}`);
         }
       }
@@ -139,15 +156,15 @@ async function main() {
     }
 
     const out = stage.out;
-    writeFileSync(out, urls.join("\n") + "\n", "utf8");
+    writeFileSync(out, urls.join('\n') + '\n', 'utf8');
     console.log(`  ✅ ${urls.length} URL → ${out}`);
   }
 
   client.close();
-  console.log("\n🎉 完成。Chrome 保持打开。");
+  console.log('\n🎉 完成。Chrome 保持打开。');
 }
 
 main().catch((err) => {
-  console.error("❌", err);
+  console.error('❌', err);
   process.exit(1);
 });

@@ -1,8 +1,8 @@
-import { z } from "zod";
+import { z } from 'zod';
 
-import { teamKeySchema, sideSchema, grenadeTypeSchema, teamEconomySchema } from "./primitives.js";
-import { qaReportSchema } from "./summary.js";
-import { buyQualitySchema } from "./buy-quality.js";
+import { teamKeySchema, sideSchema, grenadeTypeSchema, teamEconomySchema } from './primitives.js';
+import { qaReportSchema } from './summary.js';
+import { buyQualitySchema } from './buy-quality.js';
 import {
   teamsViewSchema,
   timelineEventSchema,
@@ -10,48 +10,50 @@ import {
   playerScoreboardRowSchema,
   playerRoundFactSchema,
   mapViewSchema,
-} from "./summary.js";
+} from './summary.js';
 
 export const workspaceTabSchema = z.object({
-  key: z.enum(["overview", "rounds", "players", "economy", "weapons", "duels", "map", "replay"]),
-  label: z.string()
+  key: z.enum(['overview', 'rounds', 'players', 'economy', 'weapons', 'duels', 'map', 'replay']),
+  label: z.string(),
 });
 
 export const workspaceKpiSchema = z.object({
   key: z.string(),
   label: z.string(),
   value: z.string(),
-  detail: z.string()
+  detail: z.string(),
 });
 
 export const workspaceOverviewSchema = z.object({
   kpis: z.array(workspaceKpiSchema),
-  story: z.array(z.string())
+  story: z.array(z.string()),
 });
 
 /** 回合筛选与时间轴用的派生事实（v0.2 query-first），由 analytics 从
  *  kills/bombs/clutches 一次性算好，React 端只做谓词匹配。 */
 export const workspaceRoundFacetsSchema = z.object({
   /** 下包点；该回合未下包为 null。 */
-  bombSite: z.enum(["a", "b"]).nullable(),
+  bombSite: z.enum(['a', 'b']).nullable(),
   bombPlantTick: z.number().int().positive().nullable(),
   bombDefuseTick: z.number().int().positive().nullable(),
   firstKillTick: z.number().int().positive().nullable(),
   firstKillSteamId64: z.string().nullable(),
   firstKillTeamKey: teamKeySchema.nullable(),
   /** 该回合的残局（若有）：clutch start tick 作时间轴锚点。 */
-  clutch: z.object({
-    steamId64: z.string(),
-    teamKey: teamKeySchema,
-    opponentCount: z.number().int().min(1).max(5),
-    won: z.boolean(),
-    tick: z.number().int().positive()
-  }).nullable(),
+  clutch: z
+    .object({
+      steamId64: z.string(),
+      teamKey: teamKeySchema,
+      opponentCount: z.number().int().min(1).max(5),
+      won: z.boolean(),
+      tick: z.number().int().positive(),
+    })
+    .nullable(),
   utilityThrowerSteamIds: z.array(z.string()).optional(),
   /** 单人单回合最高击杀数（≥3 即多杀回合）。 */
   maxKillsByOnePlayer: z.number().int().nonnegative(),
   wallbangKills: z.number().int().nonnegative(),
-  throughSmokeKills: z.number().int().nonnegative()
+  throughSmokeKills: z.number().int().nonnegative(),
 });
 
 export const workspaceRoundSchema = z.object({
@@ -65,24 +67,26 @@ export const workspaceRoundSchema = z.object({
   events: z.array(timelineEventSchema),
   playerFacts: z.array(playerRoundFactSchema),
   /** 旧模型可缺省；缺省时回合筛选器自动隐藏对应维度。 */
-  facets: workspaceRoundFacetsSchema.optional()
+  facets: workspaceRoundFacetsSchema.optional(),
 });
 
 export const workspacePlayerSchema = z.object({
   row: playerScoreboardRowSchema,
   teamName: z.string(),
   summary: z.array(z.string()),
-  rrBreakdown: z.array(z.object({
-    key: z.enum(["combat", "trade", "mapControl", "clutch", "objective", "utility"]),
-    label: z.string(),
-    value: z.number()
-  })),
+  rrBreakdown: z.array(
+    z.object({
+      key: z.enum(['combat', 'trade', 'mapControl', 'clutch', 'objective', 'utility']),
+      label: z.string(),
+      value: z.number(),
+    }),
+  ),
   roundFacts: z.array(playerRoundFactSchema),
   roundSummary: z.object({
     survived: z.number().int().nonnegative(),
     openingKills: z.number().int().nonnegative(),
-    tradeKills: z.number().int().nonnegative()
-  })
+    tradeKills: z.number().int().nonnegative(),
+  }),
 });
 
 /** 武器统计行（比赛级，按击杀数降序）。 */
@@ -97,13 +101,13 @@ export const workspaceWeaponRowSchema = z.object({
   noScopeKills: z.number().int().nonnegative(),
   throughSmokeKills: z.number().int().nonnegative(),
   topKillerName: z.string().nullable(),
-  topKillerKills: z.number().int().nonnegative()
+  topKillerKills: z.number().int().nonnegative(),
 });
 
 export const workspaceDuelPlayerSchema = z.object({
   steamId64: z.string(),
   name: z.string(),
-  teamKey: teamKeySchema
+  teamKey: teamKeySchema,
 });
 
 /** 对位：击杀矩阵 + 开局对枪统计。players 顺序 = teamA 在前。 */
@@ -111,21 +115,23 @@ export const workspaceDuelsSchema = z.object({
   players: z.array(workspaceDuelPlayerSchema),
   /** matrix[i][j] = players[i] 击杀 players[j] 的次数（含队友误伤致死）。 */
   matrix: z.array(z.array(z.number().int().nonnegative())),
-  openings: z.array(z.object({
-    steamId64: z.string(),
-    name: z.string(),
-    teamKey: teamKeySchema,
-    openingKills: z.number().int().nonnegative(),
-    openingDeaths: z.number().int().nonnegative(),
-    /** 开局对枪胜率（0–100）；无开局对枪时 null。 */
-    winRatePercent: z.number().min(0).max(100).nullable()
-  }))
+  openings: z.array(
+    z.object({
+      steamId64: z.string(),
+      name: z.string(),
+      teamKey: teamKeySchema,
+      openingKills: z.number().int().nonnegative(),
+      openingDeaths: z.number().int().nonnegative(),
+      /** 开局对枪胜率（0–100）；无开局对枪时 null。 */
+      winRatePercent: z.number().min(0).max(100).nullable(),
+    }),
+  ),
 });
 
 export const workspaceMapModeSchema = z.object({
-  key: z.enum(["death", "kill", "grenade", "bomb", "position"]),
+  key: z.enum(['death', 'kill', 'grenade', 'bomb', 'position']),
   label: z.string(),
-  count: z.number().int().nonnegative()
+  count: z.number().int().nonnegative(),
 });
 
 export const workspaceSpatialPointSchema = z.object({
@@ -136,8 +142,8 @@ export const workspaceSpatialPointSchema = z.object({
   teamKey: teamKeySchema.nullable(),
   steamId64: z.string().nullable(),
   side: sideSchema.nullable(),
-  kind: z.enum(["kill", "death", "grenade", "bomb", "position"]),
-  grenadeType: grenadeTypeSchema.nullable()
+  kind: z.enum(['kill', 'death', 'grenade', 'bomb', 'position']),
+  grenadeType: grenadeTypeSchema.nullable(),
 });
 
 export const workspaceMapSchema = z.object({
@@ -147,8 +153,8 @@ export const workspaceMapSchema = z.object({
   status: z.object({
     hasRadar: z.boolean(),
     hasPositionData: z.boolean(),
-    message: z.string().nullable()
-  })
+    message: z.string().nullable(),
+  }),
 });
 
 export const workspaceReplayLoadoutSchema = z.object({
@@ -158,7 +164,7 @@ export const workspaceReplayLoadoutSchema = z.object({
   secondaryWeapon: z.string().nullable(),
   grenadeCount: z.number().int().nonnegative(),
   /** 具体持有道具类型；旧 v3 导出包只有 grenadeCount，此数组为空。 */
-  grenades: z.array(grenadeTypeSchema).default([])
+  grenades: z.array(grenadeTypeSchema).default([]),
 });
 
 export const workspaceReplayFrameSchema = z.object({
@@ -179,7 +185,7 @@ export const workspaceReplayFrameSchema = z.object({
   hasDefuseKit: z.boolean(),
   hasBomb: z.boolean(),
   /** 本回合是否有头盔（player-economies 查表，非逐帧变化）。 */
-  hasHelmet: z.boolean().optional().default(false)
+  hasHelmet: z.boolean().optional().default(false),
 });
 
 export const workspaceReplayPlayerSchema = z.object({
@@ -191,9 +197,9 @@ export const workspaceReplayPlayerSchema = z.object({
     primaryWeapon: null,
     secondaryWeapon: null,
     grenadeCount: 0,
-    grenades: []
+    grenades: [],
   }),
-  frames: z.array(workspaceReplayFrameSchema)
+  frames: z.array(workspaceReplayFrameSchema),
 });
 
 export const workspaceKillEventSchema = z.object({
@@ -215,7 +221,7 @@ export const workspaceKillEventSchema = z.object({
   killerZ: z.number().nullable().optional().default(null),
   victimX: z.number().nullable().optional().default(null),
   victimY: z.number().nullable().optional().default(null),
-  victimZ: z.number().nullable().optional().default(null)
+  victimZ: z.number().nullable().optional().default(null),
 });
 
 /** 回合内一颗道具的完整生命周期（world 坐标），来自 grenades.json。 */
@@ -232,7 +238,7 @@ export const workspaceReplayGrenadeSchema = z.object({
   effectX: z.number(),
   effectY: z.number(),
   /** 效果点 z 高度，双层地图按层过滤用；旧模型缺省 0（恒判上层兜底）。 */
-  effectZ: z.number().optional().default(0)
+  effectZ: z.number().optional().default(0),
 });
 
 /** 道具飞行轨迹（v2.3+ 导出包才有），与玩家帧同一时间网格。 */
@@ -242,7 +248,7 @@ export const workspaceReplayProjectileSchema = z.object({
   x: z.array(z.number()),
   y: z.array(z.number()),
   /** 与 x/y 同长的 z 高度序列；旧模型缺省空数组。 */
-  z: z.array(z.number()).optional().default([])
+  z: z.array(z.number()).optional().default([]),
 });
 
 /** C4 掉落期间（world 坐标）：从 dropped 到被捡起/安放之间的地面标记。 */
@@ -251,7 +257,7 @@ export const workspaceReplayGroundBombSchema = z.object({
   endTick: z.number().int().positive(),
   x: z.number(),
   y: z.number(),
-  z: z.number().optional().default(0)
+  z: z.number().optional().default(0),
 });
 
 /** 拆弹器掉落期间（world 坐标）：持 kit 的 CT 阵亡 → kit 落地，直到被捡起/回合结束。 */
@@ -260,7 +266,7 @@ export const workspaceReplayGroundDefuserSchema = z.object({
   endTick: z.number().int().positive(),
   x: z.number(),
   y: z.number(),
-  z: z.number().optional().default(0)
+  z: z.number().optional().default(0),
 });
 
 /** C4 事件锚点（world 坐标）：plant 之后在落点定格显示。 */
@@ -270,7 +276,7 @@ export const workspaceReplayBombSchema = z.object({
   y: z.number(),
   z: z.number().optional().default(0),
   defuseTick: z.number().int().positive().nullable(),
-  explodeTick: z.number().int().positive().nullable()
+  explodeTick: z.number().int().positive().nullable(),
 });
 
 export const workspaceReplayRoundSchema = z.object({
@@ -293,7 +299,7 @@ export const workspaceReplayRoundSchema = z.object({
   /** 回合官方结束 tick（rounds.json endTick）。旧缓存缺省。 */
   officialEndTick: z.number().int().positive().optional(),
   /** 回放目标结束 tick：优先使用下一回合 startTick，保留回合结束余韵但不拉到过长窗口。 */
-  targetEndTick: z.number().int().positive().optional()
+  targetEndTick: z.number().int().positive().optional(),
 });
 
 export const workspaceReplaySchema = z.object({
@@ -302,13 +308,13 @@ export const workspaceReplaySchema = z.object({
   tickrate: z.number().int().positive().nullable(),
   rounds: z.array(workspaceReplayRoundSchema),
   capabilities: z.object({
-    hasDefuseKit: z.boolean()
-  })
+    hasDefuseKit: z.boolean(),
+  }),
 });
 
 export const matchWorkspaceModelSchema = z.object({
-  version: z.literal("cs2-demo-analysis-kit/workspace-0.2"),
-  sourceSchemaVersion: z.literal("cs2-demo-format/3.0"),
+  version: z.literal('cs2-demo-analysis-kit/workspace-0.2'),
+  sourceSchemaVersion: z.literal('cs2-demo-format/3.0'),
   title: z.string(),
   subtitle: z.string(),
   scoreline: z.string(),
@@ -318,12 +324,14 @@ export const matchWorkspaceModelSchema = z.object({
   overview: workspaceOverviewSchema,
   scoreboard: z.array(playerScoreboardRowSchema),
   rounds: z.array(workspaceRoundSchema),
-  reportHighlights: z.array(z.object({
-    roundNumber: z.number().int().positive(),
-    scoreBefore: z.string(),
-    winnerSide: sideSchema,
-    tags: z.array(z.string())
-  })),
+  reportHighlights: z.array(
+    z.object({
+      roundNumber: z.number().int().positive(),
+      scoreBefore: z.string(),
+      winnerSide: sideSchema,
+      tags: z.array(z.string()),
+    }),
+  ),
   players: z.array(workspacePlayerSchema),
   economy: z.array(economyPointSchema),
   buyQuality: buyQualitySchema,
@@ -331,7 +339,7 @@ export const matchWorkspaceModelSchema = z.object({
   duels: workspaceDuelsSchema,
   map: workspaceMapSchema,
   replay: workspaceReplaySchema,
-  adminQa: qaReportSchema
+  adminQa: qaReportSchema,
 });
 
 export type WorkspaceTab = z.infer<typeof workspaceTabSchema>;

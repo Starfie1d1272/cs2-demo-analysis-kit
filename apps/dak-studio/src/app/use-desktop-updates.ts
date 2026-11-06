@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
-import { checkForUpdateOnChannel, type UpdateChannel, type UpdateInfo } from "../lib/update";
-import { checkForUpdateViaBridge } from "../lib/updater-bridge";
-const UPDATE_CHANNEL_KEY = "dak:update-channel";
+import { useEffect, useRef, useState } from 'react';
+import { checkForUpdateOnChannel, type UpdateChannel, type UpdateInfo } from '../lib/update';
+import { checkForUpdateViaBridge } from '../lib/updater-bridge';
+const UPDATE_CHANNEL_KEY = 'dak:update-channel';
 function initialUpdateChannel(): UpdateChannel {
-  return localStorage.getItem(UPDATE_CHANNEL_KEY) === "beta" ? "beta" : "stable";
+  return localStorage.getItem(UPDATE_CHANNEL_KEY) === 'beta' ? 'beta' : 'stable';
 }
 
 export function useDesktopUpdates({ onError }: { onError: (message: string) => void }) {
@@ -35,7 +35,8 @@ export function useDesktopUpdates({ onError }: { onError: (message: string) => v
         timer.current = setTimeout(() => setShowLatestMsg(false), 3000);
       }
     } catch (error) {
-      if (mounted.current && id === request.current) onError(`检查更新失败：${error instanceof Error ? error.message : String(error)}`);
+      if (mounted.current && id === request.current)
+        onError(`检查更新失败：${error instanceof Error ? error.message : String(error)}`);
     } finally {
       if (mounted.current && id === request.current) setCheckingUpdate(false);
     }
@@ -52,6 +53,23 @@ export function useDesktopUpdates({ onError }: { onError: (message: string) => v
     setShowLatestMsg(false);
   }
 
-  useEffect(() => { mounted.current = true; if (window.pywebview?.api) void doCheckUpdate(); return () => { mounted.current = false; request.current++; if (timer.current) clearTimeout(timer.current); }; }, []);
-  return { update, checkingUpdate, dismissedVersion, setDismissedVersion, showLatestMsg, updateChannel, doCheckUpdate, changeUpdateChannel };
+  useEffect(() => {
+    mounted.current = true;
+    if (window.pywebview?.api) void doCheckUpdate();
+    return () => {
+      mounted.current = false;
+      request.current++;
+      if (timer.current) clearTimeout(timer.current);
+    };
+  }, []);
+  return {
+    update,
+    checkingUpdate,
+    dismissedVersion,
+    setDismissedVersion,
+    showLatestMsg,
+    updateChannel,
+    doCheckUpdate,
+    changeUpdateChannel,
+  };
 }

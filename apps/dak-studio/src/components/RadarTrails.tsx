@@ -1,13 +1,13 @@
-import { useMemo } from "react";
-import { getMapCalibration, worldToRadar } from "@cs2dak/maps/calibration";
+import { useMemo } from 'react';
+import { getMapCalibration, worldToRadar } from '@cs2dak/maps/calibration';
 
 export const GRENADE_COLOR: Record<string, string> = {
-  flashbang: "var(--dak-grenade-flashbang)",
-  smoke: "var(--dak-grenade-smoke)",
-  molotov: "var(--dak-grenade-molotov)",
-  incendiary: "var(--dak-grenade-incendiary)",
-  hegrenade: "var(--dak-grenade-hegrenade)",
-  decoy: "var(--dak-grenade-decoy)",
+  flashbang: 'var(--dak-grenade-flashbang)',
+  smoke: 'var(--dak-grenade-smoke)',
+  molotov: 'var(--dak-grenade-molotov)',
+  incendiary: 'var(--dak-grenade-incendiary)',
+  hegrenade: 'var(--dak-grenade-hegrenade)',
+  decoy: 'var(--dak-grenade-decoy)',
 };
 
 /** 烟/火的近似作用半径（游戏单位），只服务视觉示意。 */
@@ -55,19 +55,18 @@ export function RadarTrails({
   showTrails = true,
   showGrenades = true,
   trailOpacity = 0.5,
-  className = "stu-trail-stage",
+  className = 'stu-trail-stage',
 }: RadarTrailsProps) {
   const calibration = useMemo(() => getMapCalibration(mapName), [mapName]);
   const size = calibration?.radarSize ?? 1024;
 
   const project = useMemo(
-    () =>
-      (point: { x: number; y: number }) => {
-        if (!calibration) return { x: size / 2 + point.x / 10, y: size / 2 - point.y / 10 };
-        const radar = worldToRadar(point, calibration);
-        return { x: radar.x, y: radar.y };
-      },
-    [calibration, size]
+    () => (point: { x: number; y: number }) => {
+      if (!calibration) return { x: size / 2 + point.x / 10, y: size / 2 - point.y / 10 };
+      const radar = worldToRadar(point, calibration);
+      return { x: radar.x, y: radar.y };
+    },
+    [calibration, size],
   );
 
   const projectedTrails = useMemo(
@@ -76,7 +75,7 @@ export function RadarTrails({
         ...trail,
         pts: trail.points.map((p) => project(p)),
       })),
-    [trails, project]
+    [trails, project],
   );
 
   const projectedGrenades = useMemo(
@@ -86,11 +85,16 @@ export function RadarTrails({
         throwPt: project({ x: g.x, y: g.y }),
         effectPt: project({ x: g.ex, y: g.ey }),
       })),
-    [grenades, project]
+    [grenades, project],
   );
 
   return (
-    <svg className={className} viewBox={`0 0 ${size} ${size}`} role="img" aria-label={`${mapName} 雷达图`}>
+    <svg
+      className={className}
+      viewBox={`0 0 ${size} ${size}`}
+      role="img"
+      aria-label={`${mapName} 雷达图`}
+    >
       <image href={`./maps/radars/${mapName}.png`} width={size} height={size} opacity={0.85} />
       {projectedTrails.map((trail) => {
         if (trail.pts.length === 0) return null;
@@ -100,7 +104,7 @@ export function RadarTrails({
           <g key={trail.id}>
             {showTrails && trail.pts.length > 1 && (
               <polyline
-                points={trail.pts.map((p) => `${p.x},${p.y}`).join(" ")}
+                points={trail.pts.map((p) => `${p.x},${p.y}`).join(' ')}
                 fill="none"
                 stroke={trail.color}
                 strokeWidth={size / 340}
@@ -133,7 +137,7 @@ export function RadarTrails({
                   y1={g.throwPt.y}
                   x2={g.effectPt.x}
                   y2={g.effectPt.y}
-                  stroke={GRENADE_COLOR[g.type] ?? "#fff"}
+                  stroke={GRENADE_COLOR[g.type] ?? '#fff'}
                   strokeWidth={size / 1024}
                   strokeDasharray={`${size / 256} ${size / 256}`}
                   opacity={0.55}
@@ -144,9 +148,9 @@ export function RadarTrails({
                   cx={g.effectPt.x}
                   cy={g.effectPt.y}
                   r={effectRadius / scale}
-                  fill={GRENADE_COLOR[g.type] ?? "#fff"}
+                  fill={GRENADE_COLOR[g.type] ?? '#fff'}
                   opacity={0.22}
-                  stroke={GRENADE_COLOR[g.type] ?? "#fff"}
+                  stroke={GRENADE_COLOR[g.type] ?? '#fff'}
                   strokeOpacity={0.5}
                   strokeWidth={size / 1024}
                 />
@@ -156,7 +160,7 @@ export function RadarTrails({
                   cx={g.effectPt.x}
                   cy={g.effectPt.y}
                   r={size / 170}
-                  fill={GRENADE_COLOR[g.type] ?? "#fff"}
+                  fill={GRENADE_COLOR[g.type] ?? '#fff'}
                   opacity={0.95}
                   stroke="#0b0e10"
                   strokeWidth={size / 680}
@@ -167,7 +171,7 @@ export function RadarTrails({
                 cy={g.throwPt.y}
                 r={size / 240}
                 fill="none"
-                stroke={GRENADE_COLOR[g.type] ?? "#fff"}
+                stroke={GRENADE_COLOR[g.type] ?? '#fff'}
                 strokeWidth={size / 768}
                 opacity={0.8}
               />

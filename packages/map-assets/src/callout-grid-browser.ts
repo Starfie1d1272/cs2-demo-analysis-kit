@@ -1,4 +1,4 @@
-import type { CalloutGrid } from "@cs2dak/maps";
+import type { CalloutGrid } from '@cs2dak/maps';
 
 export interface CalloutGridBrowserOptions {
   baseUrl?: string;
@@ -12,7 +12,7 @@ export function loadCalloutGridBrowser(
   mapName: string,
   options: CalloutGridBrowserOptions = {},
 ): Promise<CalloutGrid | null> {
-  const url = options.urls?.[mapName] ?? `${options.baseUrl ?? "./callout-grid"}/${mapName}.json`;
+  const url = options.urls?.[mapName] ?? `${options.baseUrl ?? './callout-grid'}/${mapName}.json`;
   const cacheKey = `${mapName}:${url}`;
   const cached = CACHE.get(cacheKey);
   if (cached) return cached;
@@ -20,7 +20,7 @@ export function loadCalloutGridBrowser(
   const fetcher = options.fetchImpl ?? globalThis.fetch;
   if (!fetcher) return Promise.resolve(null);
   const promise = fetcher(url)
-    .then((response) => response.ok ? response.json() as Promise<CalloutGrid> : null)
+    .then((response) => (response.ok ? (response.json() as Promise<CalloutGrid>) : null))
     .catch(() => null);
   CACHE.set(cacheKey, promise);
   return promise;

@@ -1,25 +1,49 @@
-import { z } from "zod";
-import { evidenceRefSchema } from "@cs2dak/contract";
+import { z } from 'zod';
+import { evidenceRefSchema } from '@cs2dak/contract';
 
 /** Bump when aggregation or role-selection semantics change. */
 export const MAP_ROLE_EVIDENCE_VERSION = 4;
-export const T_RESPONSIBILITY_RESEARCH_PROJECTION_VERSION = "cs2-demo-analysis-kit/t-responsibility-research-projection-1.0";
+export const T_RESPONSIBILITY_RESEARCH_PROJECTION_VERSION =
+  'cs2-demo-analysis-kit/t-responsibility-research-projection-1.0';
 
 /** Supported map-role research/evidence coverage, independent of current Active Duty. Unknown maps are deliberately not generalized. */
 export const supportedMapNameSchema = z.enum([
-  "de_ancient", "de_anubis", "de_dust2", "de_inferno", "de_mirage", "de_nuke", "de_overpass"
+  'de_ancient',
+  'de_anubis',
+  'de_dust2',
+  'de_inferno',
+  'de_mirage',
+  'de_nuke',
+  'de_overpass',
 ]);
-export const mapRoleStatusSchema = z.enum(["ready", "mixed", "insufficient", "unknown"]);
-export const inferredMapRoleSchema = z.enum(["awper", "anchor", "opener", "closer"]);
-export const declaredRoleSchema = z.enum(["igl", "awper", "anchor", "opener", "closer"]);
-export const weaponDutySchema = z.enum(["primary_awper", "secondary_awper", "situational_awper", "rifler"]);
+export const mapRoleStatusSchema = z.enum(['ready', 'mixed', 'insufficient', 'unknown']);
+export const inferredMapRoleSchema = z.enum(['awper', 'anchor', 'opener', 'closer']);
+export const declaredRoleSchema = z.enum(['igl', 'awper', 'anchor', 'opener', 'closer']);
+export const weaponDutySchema = z.enum([
+  'primary_awper',
+  'secondary_awper',
+  'situational_awper',
+  'rifler',
+]);
 export const teamResponsibilitySchema = z.enum([
-  "pack", "extremity", "late_joining", "stable_default",
-  "anchor_tendency", "component_mobile", "independent_mobile", "stable_position",
-  "mixed", "unknown",
+  'pack',
+  'extremity',
+  'late_joining',
+  'stable_default',
+  'anchor_tendency',
+  'component_mobile',
+  'independent_mobile',
+  'stable_position',
+  'mixed',
+  'unknown',
 ]);
-export const roleModifierSchema = z.enum(["utility_supportive", "positionally_stable", "spatially_isolated", "component_mobile"]);
-export const tResponsibilityResearchCandidateSchema = z.enum(["pack", "lurker", "flexible"]);
+export const roleModifierSchema = z.enum([
+  'utility_supportive',
+  'positionally_stable',
+  'spatially_isolated',
+  'component_mobile',
+]);
+export const tResponsibilityResearchCandidateSchema = z.enum(['pack', 'lurker', 'flexible']);
 
 export const tResponsibilityResearchFeaturesSchema = z.object({
   dominantGroupStability: z.number().min(0).max(1).nullable(),
@@ -40,36 +64,52 @@ export const tResponsibilityResearchFeaturesSchema = z.object({
 });
 
 /** Product-neutral declaration scope. Storage ids, namespaces and timestamps intentionally do not belong here. */
-const declarationScopeSchema = z.object({
-  playerKey: z.string().min(1),
-  source: z.enum(["user", "self_report", "organizer", "event_package", "trusted_metadata"]),
-  mapName: supportedMapNameSchema.optional(),
-  teamKey: z.string().min(1).optional(),
-  teamScope: z.discriminatedUnion("kind", [
-    z.object({ kind: z.literal("entity"), key: z.string().min(1) }).strict(),
-    z.object({ kind: z.literal("observation"), matchId: z.string().min(1), slot: z.enum(["teamA", "teamB"]) }).strict(),
-  ]).optional(),
-  validFrom: z.string().datetime().optional(),
-  validTo: z.string().datetime().optional(),
-  provenance: z.string().min(1),
-}).strict();
+const declarationScopeSchema = z
+  .object({
+    playerKey: z.string().min(1),
+    source: z.enum(['user', 'self_report', 'organizer', 'event_package', 'trusted_metadata']),
+    mapName: supportedMapNameSchema.optional(),
+    teamKey: z.string().min(1).optional(),
+    teamScope: z
+      .discriminatedUnion('kind', [
+        z.object({ kind: z.literal('entity'), key: z.string().min(1) }).strict(),
+        z
+          .object({
+            kind: z.literal('observation'),
+            matchId: z.string().min(1),
+            slot: z.enum(['teamA', 'teamB']),
+          })
+          .strict(),
+      ])
+      .optional(),
+    validFrom: z.string().datetime().optional(),
+    validTo: z.string().datetime().optional(),
+    provenance: z.string().min(1),
+  })
+  .strict();
 
 /** A declared tactical role. priority belongs only to this kind of declaration. */
 export const mainRoleDeclarationSchema = declarationScopeSchema.extend({
-  kind: z.literal("main_role"),
+  kind: z.literal('main_role'),
   role: declaredRoleSchema,
-  priority: z.enum(["primary", "secondary"]),
+  priority: z.enum(['primary', 'secondary']),
 });
 
 /** A declared weapon duty. It is deliberately independent from tactical-role priority. */
 export const weaponDutyDeclarationSchema = declarationScopeSchema.extend({
-  kind: z.literal("weapon_duty"),
+  kind: z.literal('weapon_duty'),
   weaponDuty: weaponDutySchema,
 });
 
-export const roleDeclarationSchema = z.discriminatedUnion("kind", [mainRoleDeclarationSchema, weaponDutyDeclarationSchema]).superRefine((value, context) => {
-  if (value.validFrom != null && value.validTo != null && value.validFrom > value.validTo) context.addIssue({ code: z.ZodIssueCode.custom, message: "validFrom must not be after validTo" });
-});
+export const roleDeclarationSchema = z
+  .discriminatedUnion('kind', [mainRoleDeclarationSchema, weaponDutyDeclarationSchema])
+  .superRefine((value, context) => {
+    if (value.validFrom != null && value.validTo != null && value.validFrom > value.validTo)
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'validFrom must not be after validTo',
+      });
+  });
 
 export const roleEvidenceLocatorSchema = z.object({
   matchId: z.string().min(1),
@@ -83,10 +123,10 @@ export const roleEvidenceLocatorSchema = z.object({
  */
 export const tResponsibilityResearchProjectionSchema = z.object({
   version: z.literal(T_RESPONSIBILITY_RESEARCH_PROJECTION_VERSION),
-  modelId: z.literal("cologne-major-2026/parsimonious-v1-full-fit"),
+  modelId: z.literal('cologne-major-2026/parsimonious-v1-full-fit'),
   playerKey: z.string().min(1),
   teamKey: z.string().min(1),
-  side: z.literal("t"),
+  side: z.literal('t'),
   status: mapRoleStatusSchema,
   candidate: tResponsibilityResearchCandidateSchema.nullable(),
   packScore: z.number().min(0).max(1).nullable(),
@@ -134,7 +174,7 @@ export const playerMapRoleEvidenceSchema = z.object({
   playerKey: z.string().min(1),
   teamKey: z.string().min(1),
   mapName: supportedMapNameSchema,
-  side: z.enum(["t", "ct"]),
+  side: z.enum(['t', 'ct']),
   status: mapRoleStatusSchema,
   confidence: z.number().min(0).max(1),
   sample: z.object({
@@ -179,11 +219,17 @@ export const teamMapResponsibilityEvidenceSchema = z.object({
   version: z.literal(MAP_ROLE_EVIDENCE_VERSION),
   teamKey: z.string().min(1),
   mapName: supportedMapNameSchema,
-  side: z.enum(["t", "ct"]),
+  side: z.enum(['t', 'ct']),
   status: mapRoleStatusSchema,
   confidence: z.number().min(0).max(1),
   players: z.array(playerMapRoleEvidenceSchema),
-  positionOverlap: z.array(z.object({ positionGroupId: z.string().min(1), playerKeys: z.array(z.string().min(1)).min(2), share: z.number().min(0).max(1) })),
+  positionOverlap: z.array(
+    z.object({
+      positionGroupId: z.string().min(1),
+      playerKeys: z.array(z.string().min(1)).min(2),
+      share: z.number().min(0).max(1),
+    }),
+  ),
   positionConcentration: z.number().min(0).max(1).nullable(),
   unstableCoverage: z.boolean(),
   representativeRounds: z.array(roleEvidenceLocatorSchema).max(5),
@@ -192,7 +238,7 @@ export const teamMapResponsibilityEvidenceSchema = z.object({
 });
 
 export const playerMapRoleProfileSchema = z.object({
-  version: z.literal("cs2-demo-analysis-kit/player-map-role-profile-5.0"),
+  version: z.literal('cs2-demo-analysis-kit/player-map-role-profile-5.0'),
   playerKey: z.string().min(1),
   teamKey: z.string().min(1),
   declaredRoles: z.array(mainRoleDeclarationSchema),
@@ -200,36 +246,49 @@ export const playerMapRoleProfileSchema = z.object({
   inferredPrimaryRole: inferredMapRoleSchema.nullable(),
   runnerUpRole: inferredMapRoleSchema.nullable(),
   separationMargin: z.number().min(0).max(1).nullable(),
-  roleEvidenceScores: z.object({ awper: z.number().min(0).max(1), anchor: z.number().min(0).max(1), opener: z.number().min(0).max(1), closer: z.number().min(0).max(1) }),
-  headlineRole: z.union([inferredMapRoleSchema, z.literal("IGL"), z.literal("IGL / AWPer")]).nullable(),
+  roleEvidenceScores: z.object({
+    awper: z.number().min(0).max(1),
+    anchor: z.number().min(0).max(1),
+    opener: z.number().min(0).max(1),
+    closer: z.number().min(0).max(1),
+  }),
+  headlineRole: z
+    .union([inferredMapRoleSchema, z.literal('IGL'), z.literal('IGL / AWPer')])
+    .nullable(),
   status: mapRoleStatusSchema,
   confidence: z.number().min(0).max(1),
   weaponDuty: weaponDutySchema.nullable(),
-  positionGroupDisplay: z.array(z.object({
-    mapName: supportedMapNameSchema,
-    side: z.enum(["t", "ct"]),
-    positionGroupId: z.string().min(1),
-    displayName: z.string().min(1),
-    officialName: z.string().nullable(),
-    resolved: z.boolean(),
-  })),
-  roleAlignments: z.array(z.object({
-    declaration: mainRoleDeclarationSchema,
-    declaredPrimary: declaredRoleSchema.nullable(),
-    declaredSecondary: z.array(declaredRoleSchema),
-    inferredPrimary: inferredMapRoleSchema.nullable(),
-    overall: z.enum(["aligned", "partially_aligned", "different_observation", "not_comparable"]),
-    tResponsibility: teamResponsibilitySchema,
-    ctResponsibility: teamResponsibilitySchema,
-    disagreementReasons: z.array(z.string()),
-    sampleLimitations: z.array(z.string()),
-  })),
-  weaponDutyAlignments: z.array(z.object({
-    declaration: weaponDutyDeclarationSchema,
-    observedWeaponDuty: weaponDutySchema.nullable(),
-    overall: z.enum(["aligned", "different_observation", "not_comparable"]),
-    sampleLimitations: z.array(z.string()),
-  })),
+  positionGroupDisplay: z.array(
+    z.object({
+      mapName: supportedMapNameSchema,
+      side: z.enum(['t', 'ct']),
+      positionGroupId: z.string().min(1),
+      displayName: z.string().min(1),
+      officialName: z.string().nullable(),
+      resolved: z.boolean(),
+    }),
+  ),
+  roleAlignments: z.array(
+    z.object({
+      declaration: mainRoleDeclarationSchema,
+      declaredPrimary: declaredRoleSchema.nullable(),
+      declaredSecondary: z.array(declaredRoleSchema),
+      inferredPrimary: inferredMapRoleSchema.nullable(),
+      overall: z.enum(['aligned', 'partially_aligned', 'different_observation', 'not_comparable']),
+      tResponsibility: teamResponsibilitySchema,
+      ctResponsibility: teamResponsibilitySchema,
+      disagreementReasons: z.array(z.string()),
+      sampleLimitations: z.array(z.string()),
+    }),
+  ),
+  weaponDutyAlignments: z.array(
+    z.object({
+      declaration: weaponDutyDeclarationSchema,
+      observedWeaponDuty: weaponDutySchema.nullable(),
+      overall: z.enum(['aligned', 'different_observation', 'not_comparable']),
+      sampleLimitations: z.array(z.string()),
+    }),
+  ),
   perMapEvidence: z.array(playerMapRoleEvidenceSchema),
   evidence: z.array(evidenceRefSchema),
   basis: z.array(z.string()),
@@ -237,22 +296,30 @@ export const playerMapRoleProfileSchema = z.object({
 });
 
 export const teamMapRoleMatrixSchema = z.object({
-  version: z.literal("cs2-demo-analysis-kit/team-map-role-matrix-4.0"),
+  version: z.literal('cs2-demo-analysis-kit/team-map-role-matrix-4.0'),
   teamKey: z.string().min(1),
   mapName: supportedMapNameSchema,
-  side: z.enum(["t", "ct"]),
+  side: z.enum(['t', 'ct']),
   status: mapRoleStatusSchema,
   confidence: z.number().min(0).max(1),
-  players: z.array(z.object({
-    playerKey: z.string().min(1),
-    primaryPositionGroups: z.array(mapPositionGroupEvidenceSchema.extend({ displayName: z.string().min(1), officialName: z.string().nullable(), resolved: z.boolean() })),
-    responsibility: teamResponsibilitySchema,
-    modifiers: z.array(roleModifierSchema),
-    sampleRounds: z.number().int().nonnegative(),
-    confidence: z.number().min(0).max(1),
-    weaponDuty: weaponDutySchema.nullable(),
-    evidence: z.array(evidenceRefSchema),
-  })),
+  players: z.array(
+    z.object({
+      playerKey: z.string().min(1),
+      primaryPositionGroups: z.array(
+        mapPositionGroupEvidenceSchema.extend({
+          displayName: z.string().min(1),
+          officialName: z.string().nullable(),
+          resolved: z.boolean(),
+        }),
+      ),
+      responsibility: teamResponsibilitySchema,
+      modifiers: z.array(roleModifierSchema),
+      sampleRounds: z.number().int().nonnegative(),
+      confidence: z.number().min(0).max(1),
+      weaponDuty: weaponDutySchema.nullable(),
+      evidence: z.array(evidenceRefSchema),
+    }),
+  ),
   positionOverlap: teamMapResponsibilityEvidenceSchema.shape.positionOverlap,
   positionConcentration: z.number().min(0).max(1).nullable(),
   unstableCoverage: z.boolean(),
@@ -261,16 +328,24 @@ export const teamMapRoleMatrixSchema = z.object({
   limitations: z.array(z.string()),
 });
 
-const countBreakdownSchema = z.object({ key: z.string().min(1), rounds: z.number().int().nonnegative() });
+const countBreakdownSchema = z.object({
+  key: z.string().min(1),
+  rounds: z.number().int().nonnegative(),
+});
 export const doubleAwpAnalysisSchema = z.object({
-  version: z.literal("cs2-demo-analysis-kit/double-awp-analysis-2.0"),
+  version: z.literal('cs2-demo-analysis-kit/double-awp-analysis-2.0'),
   teamKey: z.string().min(1),
-  side: z.enum(["t", "ct"]),
+  side: z.enum(['t', 'ct']),
   status: mapRoleStatusSchema,
   qualifiedRoundCount: z.number().int().nonnegative(),
   doubleAwpRoundCount: z.number().int().nonnegative(),
   eligibleRoundShare: z.number().min(0).max(1).nullable(),
-  combinations: z.array(z.object({ playerKeys: z.array(z.string().min(1)).min(2), rounds: z.number().int().positive() })),
+  combinations: z.array(
+    z.object({
+      playerKeys: z.array(z.string().min(1)).min(2),
+      rounds: z.number().int().positive(),
+    }),
+  ),
   mapDistribution: z.array(countBreakdownSchema),
   scorePhaseDistribution: z.array(countBreakdownSchema),
   economyDistribution: z.array(countBreakdownSchema),
@@ -291,13 +366,34 @@ export const doubleAwpAnalysisSchema = z.object({
 
 export const playerMapPoolRowSchema = z.object({
   mapName: supportedMapNameSchema,
-  matchCount: z.number().int().nonnegative(), roundCount: z.number().int().nonnegative(), wins: z.number().int().nonnegative(), losses: z.number().int().nonnegative(), winRate: z.number().min(0).max(1).nullable(),
-  rr: z.number().nonnegative().nullable(), adr: z.number().nonnegative().nullable(), kast: z.number().min(0).max(100).nullable(),
-  openingKills: z.number().int().nonnegative(), openingDeaths: z.number().int().nonnegative(),
-  mainWeapon: z.string().nullable(), globalWeaponDuty: weaponDutySchema.nullable(), mapSideAwpUsage: z.array(z.object({ side: z.enum(["t", "ct"]), duty: weaponDutySchema, qualifiedRounds: z.number().int().nonnegative(), activeSeconds: z.number().nonnegative().nullable() })),
-  tPositionGroup: z.string().nullable(), ctPositionGroup: z.string().nullable(), tResponsibility: teamResponsibilitySchema, ctResponsibility: teamResponsibilitySchema,
+  matchCount: z.number().int().nonnegative(),
+  roundCount: z.number().int().nonnegative(),
+  wins: z.number().int().nonnegative(),
+  losses: z.number().int().nonnegative(),
+  winRate: z.number().min(0).max(1).nullable(),
+  rr: z.number().nonnegative().nullable(),
+  adr: z.number().nonnegative().nullable(),
+  kast: z.number().min(0).max(100).nullable(),
+  openingKills: z.number().int().nonnegative(),
+  openingDeaths: z.number().int().nonnegative(),
+  mainWeapon: z.string().nullable(),
+  globalWeaponDuty: weaponDutySchema.nullable(),
+  mapSideAwpUsage: z.array(
+    z.object({
+      side: z.enum(['t', 'ct']),
+      duty: weaponDutySchema,
+      qualifiedRounds: z.number().int().nonnegative(),
+      activeSeconds: z.number().nonnegative().nullable(),
+    }),
+  ),
+  tPositionGroup: z.string().nullable(),
+  ctPositionGroup: z.string().nullable(),
+  tResponsibility: teamResponsibilitySchema,
+  ctResponsibility: teamResponsibilitySchema,
   roleMatchCount: z.number().int().nonnegative(),
-  sampleQuality: z.number().min(0).max(1), confidence: z.number().min(0).max(1), evidence: z.array(evidenceRefSchema),
+  sampleQuality: z.number().min(0).max(1),
+  confidence: z.number().min(0).max(1),
+  evidence: z.array(evidenceRefSchema),
 });
 
 export type SupportedMapName = z.infer<typeof supportedMapNameSchema>;
@@ -307,9 +403,13 @@ export type DeclaredRole = z.infer<typeof declaredRoleSchema>;
 export type WeaponDuty = z.infer<typeof weaponDutySchema>;
 export type TeamResponsibility = z.infer<typeof teamResponsibilitySchema>;
 export type RoleModifier = z.infer<typeof roleModifierSchema>;
-export type TResponsibilityResearchCandidate = z.infer<typeof tResponsibilityResearchCandidateSchema>;
+export type TResponsibilityResearchCandidate = z.infer<
+  typeof tResponsibilityResearchCandidateSchema
+>;
 export type TResponsibilityResearchFeatures = z.infer<typeof tResponsibilityResearchFeaturesSchema>;
-export type TResponsibilityResearchProjection = z.infer<typeof tResponsibilityResearchProjectionSchema>;
+export type TResponsibilityResearchProjection = z.infer<
+  typeof tResponsibilityResearchProjectionSchema
+>;
 export type RoleDeclaration = z.infer<typeof roleDeclarationSchema>;
 export type MainRoleDeclaration = z.infer<typeof mainRoleDeclarationSchema>;
 export type WeaponDutyDeclaration = z.infer<typeof weaponDutyDeclarationSchema>;

@@ -1,12 +1,12 @@
-import type { EvidenceRef } from "./models/evidence-view.js";
+import type { EvidenceRef } from './models/evidence-view.js';
 
-export type FindingOrigin = "system" | "user";
+export type FindingOrigin = 'system' | 'user';
 
 /** 产品中立的、可交给证据查看器或行动面的系统结论。 */
 export interface AnalysisFinding {
   /** capability 内稳定的 key，不承担跨产品持久化 identity。 */
   key: string;
-  capability: "mistake-review" | "duel" | "utility" | "tactical";
+  capability: 'mistake-review' | 'duel' | 'utility' | 'tactical';
   producerVersion: string;
   origin: FindingOrigin;
   title: string;

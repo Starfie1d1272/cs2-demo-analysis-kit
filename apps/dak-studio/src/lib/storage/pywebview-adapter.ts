@@ -1,10 +1,20 @@
-import type { BlobStore, RecordStore, AtomicStorageAdapter, RecordRef, RecordSnapshot, RecordMutation } from "./types";
+import type {
+  BlobStore,
+  RecordStore,
+  AtomicStorageAdapter,
+  RecordRef,
+  RecordSnapshot,
+  RecordMutation,
+} from './types';
 
 interface PywebviewStorageApi {
   storage_demo_commit_begin?(keys: string[]): Promise<string>;
   storage_demo_commit_end?(token: string): Promise<void>;
   storage_records_read?(refs: RecordRef[]): Promise<RecordSnapshot[]>;
-  storage_records_compare_and_write?(expected: RecordSnapshot[], writes: RecordMutation[]): Promise<boolean>;
+  storage_records_compare_and_write?(
+    expected: RecordSnapshot[],
+    writes: RecordMutation[],
+  ): Promise<boolean>;
   storage_record_get(namespace: string, key: string): Promise<unknown>;
   storage_record_get_all(namespace: string): Promise<unknown[]>;
   storage_record_entries(namespace: string): Promise<Array<[string, unknown]>>;
@@ -20,14 +30,15 @@ interface PywebviewStorageApi {
 }
 
 export function getPywebviewStorageApi(): PywebviewStorageApi | null {
-  const api = typeof window === "undefined"
-    ? undefined
-    : ((window as any).pywebview?.api as Partial<PywebviewStorageApi> | undefined);
+  const api =
+    typeof window === 'undefined'
+      ? undefined
+      : ((window as any).pywebview?.api as Partial<PywebviewStorageApi> | undefined);
   if (!api?.storage_record_get || !api.storage_blob_get) return null;
   return api as PywebviewStorageApi;
 }
 
-import { bytesToBase64, base64ToBytes } from "./base64";
+import { bytesToBase64, base64ToBytes } from './base64';
 
 /**
  * pywebview native 后端。待桌面验证：当前 CI/沙箱没有真实桌面壳，
@@ -39,11 +50,13 @@ export function createPywebviewAdapter(api: PywebviewStorageApi): AtomicStorageA
 
   return {
     readRecords: (refs) => {
-      if (!api.storage_records_read || !api.storage_records_compare_and_write) return Promise.reject(new Error("桌面程序版本过旧，请更新并重启后再使用身份资料"));
+      if (!api.storage_records_read || !api.storage_records_compare_and_write)
+        return Promise.reject(new Error('桌面程序版本过旧，请更新并重启后再使用身份资料'));
       return api.storage_records_read(refs);
     },
     compareAndWriteRecords: (expected, writes) => {
-      if (!api.storage_records_read || !api.storage_records_compare_and_write) return Promise.reject(new Error("桌面程序版本过旧，请更新并重启后再使用身份资料"));
+      if (!api.storage_records_read || !api.storage_records_compare_and_write)
+        return Promise.reject(new Error('桌面程序版本过旧，请更新并重启后再使用身份资料'));
       return api.storage_records_compare_and_write(expected, writes);
     },
     records(namespace): RecordStore {
@@ -53,7 +66,7 @@ export function createPywebviewAdapter(api: PywebviewStorageApi): AtomicStorageA
           async get<T>(key: string) {
             const value = await api.storage_record_get(namespace, key);
             // Python None crosses the bridge as null; RecordStore absence is undefined.
-            return value == null ? undefined : value as T;
+            return value == null ? undefined : (value as T);
           },
           async getAll<T>() {
             return (await api.storage_record_get_all(namespace)) as T[];
@@ -86,6 +99,6 @@ export function createPywebviewAdapter(api: PywebviewStorageApi): AtomicStorageA
         blobStores.set(namespace, store);
       }
       return store;
-    }
+    },
   };
 }

@@ -1,6 +1,6 @@
-export type TournamentTeamSlot = "teamA" | "teamB";
-export type TournamentEconomyType = "pistol" | "eco" | "semi" | "force" | "full";
-export type TournamentManAdvantage = "5v4" | "4v5" | "5v3" | "3v5";
+export type TournamentTeamSlot = 'teamA' | 'teamB';
+export type TournamentEconomyType = 'pistol' | 'eco' | 'semi' | 'force' | 'full';
+export type TournamentManAdvantage = '5v4' | '4v5' | '5v3' | '3v5';
 
 export interface WinLossCount {
   opportunities: number;
@@ -115,9 +115,11 @@ export interface TournamentAnalytics {
     ecoSemiUpset: RateCount;
     manAdvantage: Record<TournamentManAdvantage, RateCount>;
   }>;
-  economyMatrix: Array<TournamentEconomyMatrixCount & {
-    lowWinRate: number | null;
-  }>;
+  economyMatrix: Array<
+    TournamentEconomyMatrixCount & {
+      lowWinRate: number | null;
+    }
+  >;
   weapons: Array<{
     weapon: string;
     kills: number;
@@ -128,10 +130,10 @@ export interface TournamentAnalytics {
 }
 
 /** Side carried by a frozen player-round fact. */
-export type TournamentSide = "t" | "ct";
+export type TournamentSide = 't' | 'ct';
 
 /** Opening-duel state carried by a frozen player-round fact. */
-export type TournamentOpeningDuel = "none" | "won" | "lost";
+export type TournamentOpeningDuel = 'none' | 'won' | 'lost';
 
 export type TournamentClutchOpponentCount = 1 | 2 | 3 | 4 | 5;
 
@@ -198,7 +200,7 @@ export interface TournamentPerformancePlayerRoundFact {
 
 export interface TournamentPerformanceObjectiveFact {
   roundSeq: number;
-  type: "planted" | "defused";
+  type: 'planted' | 'defused';
   playerEntityKey: string | null;
   teamEntityKey: string | null;
   side: TournamentSide | null;
@@ -289,7 +291,7 @@ export interface TournamentPerformanceTradeSummary {
   tradedDeathsPerDeath: TournamentRateSample;
 }
 
-export type TournamentClutchSplitKey = "1" | "2" | "3" | "4" | "5";
+export type TournamentClutchSplitKey = '1' | '2' | '3' | '4' | '5';
 export type TournamentClutchSplits = Record<TournamentClutchSplitKey, TournamentRateSample>;
 
 export interface TournamentPerformanceClutchSummary {

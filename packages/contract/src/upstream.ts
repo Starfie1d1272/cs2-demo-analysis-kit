@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from 'zod';
 import {
   sideSchema,
   teamKeySchema,
@@ -26,7 +26,7 @@ import {
   duelWindowSchema,
   duelPlayerTrackSchema,
   duelAnchorSchema,
-} from "cs2-demo-format";
+} from 'cs2-demo-format';
 
 export {
   SCHEMAS_BY_KEY,
@@ -79,7 +79,7 @@ export {
   teamKeySchema,
   teamSummarySchema,
   vec3Schema,
-} from "cs2-demo-format";
+} from 'cs2-demo-format';
 
 export type Side = z.infer<typeof sideSchema>;
 export type TeamKey = z.infer<typeof teamKeySchema>;

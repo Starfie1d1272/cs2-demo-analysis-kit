@@ -1,12 +1,12 @@
-import ancientRoutes from "../map-routes/de_ancient.json" with { type: "json" };
-import anubisRoutes from "../map-routes/de_anubis.json" with { type: "json" };
-import dust2Routes from "../map-routes/de_dust2.json" with { type: "json" };
-import infernoRoutes from "../map-routes/de_inferno.json" with { type: "json" };
-import mirageRoutes from "../map-routes/de_mirage.json" with { type: "json" };
-import nukeRoutes from "../map-routes/de_nuke.json" with { type: "json" };
-import overpassRoutes from "../map-routes/de_overpass.json" with { type: "json" };
-import type { MapRoutes } from "@cs2dak/maps";
-import type { SpatialAssetMap } from "@cs2dak/maps";
+import ancientRoutes from '../map-routes/de_ancient.json' with { type: 'json' };
+import anubisRoutes from '../map-routes/de_anubis.json' with { type: 'json' };
+import dust2Routes from '../map-routes/de_dust2.json' with { type: 'json' };
+import infernoRoutes from '../map-routes/de_inferno.json' with { type: 'json' };
+import mirageRoutes from '../map-routes/de_mirage.json' with { type: 'json' };
+import nukeRoutes from '../map-routes/de_nuke.json' with { type: 'json' };
+import overpassRoutes from '../map-routes/de_overpass.json' with { type: 'json' };
+import type { MapRoutes } from '@cs2dak/maps';
+import type { SpatialAssetMap } from '@cs2dak/maps';
 
 export const MAP_ROUTE_ASSETS: Record<SpatialAssetMap, MapRoutes> = {
   de_ancient: ancientRoutes as MapRoutes,

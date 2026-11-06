@@ -5,7 +5,7 @@
 export function bytesToBase64(buf: ArrayBuffer): string {
   const bytes = new Uint8Array(buf);
   const CHUNK = 0x8000;
-  let binary = "";
+  let binary = '';
   for (let i = 0; i < bytes.length; i += CHUNK) {
     binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
   }

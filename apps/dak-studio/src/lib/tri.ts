@@ -1,8 +1,8 @@
-import { type TriangleBvh } from "@cs2dak/maps";
-import { reportDiagnostic } from "./worker-diagnostics";
-import { buildTriBvh, fetchTriBuffer, isValidTriBuffer, triDiagnostic } from "./tri-loading";
-import { touchLimitedCache } from "./idb";
-import { getStorage } from "./storage";
+import { type TriangleBvh } from '@cs2dak/maps';
+import { reportDiagnostic } from './worker-diagnostics';
+import { buildTriBvh, fetchTriBuffer, isValidTriBuffer, triDiagnostic } from './tri-loading';
+import { touchLimitedCache } from './idb';
+import { getStorage } from './storage';
 
 /**
  * 浏览器端 .tri 加载器（maps 的 tri-assets 是 Node-only，Studio 走 fetch）。
@@ -16,18 +16,31 @@ import { getStorage } from "./storage";
 const BVH_CACHE_LIMIT = 4;
 const bvhCache = new Map<string, Promise<TriangleBvh | null>>();
 
-const triStore = getStorage().blobs("tri");
+const triStore = getStorage().blobs('tri');
 
 async function readTriBuffer(mapName: string): Promise<ArrayBuffer | null> {
   try {
     const buffer = await triStore.get(mapName);
     if (buffer && !isValidTriBuffer(buffer)) {
-      triDiagnostic(reportDiagnostic, mapName, "TRI_INVALID", "cache_read", "Cached optional tri asset has an invalid byte length");
+      triDiagnostic(
+        reportDiagnostic,
+        mapName,
+        'TRI_INVALID',
+        'cache_read',
+        'Cached optional tri asset has an invalid byte length',
+      );
       return null;
     }
     return buffer ?? null;
   } catch (error) {
-    triDiagnostic(reportDiagnostic, mapName, "TRI_READ_FAILED", "cache_read", "Optional tri cache could not be read; trying the asset source", error);
+    triDiagnostic(
+      reportDiagnostic,
+      mapName,
+      'TRI_READ_FAILED',
+      'cache_read',
+      'Optional tri cache could not be read; trying the asset source',
+      error,
+    );
     return null;
   }
 }
@@ -38,7 +51,14 @@ async function writeTriBuffer(mapName: string, buffer: ArrayBuffer): Promise<boo
     await triStore.put(mapName, buffer);
     return true;
   } catch (error) {
-    triDiagnostic(reportDiagnostic, mapName, "TRI_CACHE_WRITE_FAILED", "cache_write", "Optional tri cache could not be written", error);
+    triDiagnostic(
+      reportDiagnostic,
+      mapName,
+      'TRI_CACHE_WRITE_FAILED',
+      'cache_write',
+      'Optional tri cache could not be written',
+      error,
+    );
     return false;
   }
 }
@@ -48,7 +68,14 @@ export async function listInstalledTris(): Promise<string[]> {
   try {
     return (await triStore.keys()).sort();
   } catch (error) {
-    triDiagnostic(reportDiagnostic, "tri", "TRI_READ_FAILED", "cache_list", "Optional tri cache could not be listed", error);
+    triDiagnostic(
+      reportDiagnostic,
+      'tri',
+      'TRI_READ_FAILED',
+      'cache_list',
+      'Optional tri cache could not be listed',
+      error,
+    );
     return [];
   }
 }
@@ -60,10 +87,16 @@ export async function listInstalledTris(): Promise<string[]> {
  */
 export async function installTriBuffer(mapName: string, buffer: ArrayBuffer): Promise<boolean> {
   if (!isValidTriBuffer(buffer)) {
-    triDiagnostic(reportDiagnostic, mapName, "TRI_INVALID", "install", "Optional tri asset has an invalid byte length");
+    triDiagnostic(
+      reportDiagnostic,
+      mapName,
+      'TRI_INVALID',
+      'install',
+      'Optional tri asset has an invalid byte length',
+    );
     return false;
   }
-  if (!await writeTriBuffer(mapName, buffer)) return false;
+  if (!(await writeTriBuffer(mapName, buffer))) return false;
   bvhCache.delete(mapName);
   return true;
 }
@@ -74,12 +107,19 @@ export function loadMapTri(mapName: string): Promise<TriangleBvh | null> {
   const promise = (async () => {
     try {
       const persisted = await readTriBuffer(mapName);
-      const buffer = persisted ?? await fetchTriBuffer(mapName, "./tris/", reportDiagnostic);
+      const buffer = persisted ?? (await fetchTriBuffer(mapName, './tris/', reportDiagnostic));
       if (!buffer) return null;
       if (!persisted) void writeTriBuffer(mapName, buffer.slice(0));
       return buildTriBvh(buffer, mapName, reportDiagnostic);
     } catch (error) {
-      triDiagnostic(reportDiagnostic, mapName, "TRI_READ_FAILED", "load", "Optional tri asset could not be loaded", error);
+      triDiagnostic(
+        reportDiagnostic,
+        mapName,
+        'TRI_READ_FAILED',
+        'load',
+        'Optional tri asset could not be loaded',
+        error,
+      );
       return null;
     }
   })();
@@ -87,9 +127,13 @@ export function loadMapTri(mapName: string): Promise<TriangleBvh | null> {
 }
 
 /** 预载多张地图的 BVH，返回同步 lookup（给 presentation 的 visibilityFor 用）。 */
-export async function loadTriLookup(mapNames: Iterable<string>): Promise<(mapName: string) => TriangleBvh | null> {
+export async function loadTriLookup(
+  mapNames: Iterable<string>,
+): Promise<(mapName: string) => TriangleBvh | null> {
   const unique = [...new Set(mapNames)];
-  const loaded = await Promise.all(unique.map(async (name) => [name, await loadMapTri(name)] as const));
+  const loaded = await Promise.all(
+    unique.map(async (name) => [name, await loadMapTri(name)] as const),
+  );
   const byMap = new Map(loaded);
   return (mapName) => byMap.get(mapName) ?? null;
 }

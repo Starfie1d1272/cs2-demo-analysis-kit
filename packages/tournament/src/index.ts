@@ -1,5 +1,5 @@
-export { buildTournamentAnalytics } from "./aggregate.js";
-export { buildTournamentPerformanceAnalytics } from "./performance.js";
+export { buildTournamentAnalytics } from './aggregate.js';
+export { buildTournamentPerformanceAnalytics } from './performance.js';
 export type {
   RateCount,
   TournamentAnalytics,
@@ -42,4 +42,4 @@ export type {
   TournamentRateSample,
   TournamentSideSlices,
   TournamentSide,
-} from "./types.js";
+} from './types.js';

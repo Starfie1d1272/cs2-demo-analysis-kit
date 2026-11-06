@@ -7,7 +7,7 @@
  *
  * 核心是纯函数 calloutAt()/calloutNear()，无平台依赖。
  */
-import type { Vec3 } from "./nav.js";
+import type { Vec3 } from './nav.js';
 
 // ── 类型 ──
 
@@ -22,11 +22,7 @@ export interface CalloutGridMeta {
   minSamples: number;
 }
 
-export type CalloutGridCell = [
-  vocabularyIndex: number,
-  confidence: number,
-  samples: number,
-];
+export type CalloutGridCell = [vocabularyIndex: number, confidence: number, samples: number];
 
 export interface CalloutGrid extends CalloutGridMeta {
   /**
@@ -42,7 +38,7 @@ export interface CalloutAtResult {
   callout: string;
   confidence: number;
   samples: number;
-  source: "exact";
+  source: 'exact';
   distance: 0;
   offset: [number, number, number];
 }
@@ -51,7 +47,7 @@ export interface CalloutNearResult {
   callout: string;
   confidence: number;
   samples: number;
-  source: "exact" | "nearby";
+  source: 'exact' | 'nearby';
   distance: number;
   offset: [number, number, number];
 }
@@ -76,7 +72,7 @@ function cellAt(grid: CalloutGrid, gx: number, gy: number, gz: number): CalloutN
     callout,
     confidence: cell[1],
     samples: cell[2],
-    source: "exact",
+    source: 'exact',
     distance: 0,
     offset: [0, 0, 0],
   };
@@ -89,18 +85,15 @@ function cellAt(grid: CalloutGrid, gx: number, gy: number, gz: number): CalloutN
  * @param grid   通过 loadCalloutGrid() 或 fetch() 获取的网格对象
  * @param point  世界坐标（v3 replay position 同系）
  */
-export function calloutAt(
-  grid: CalloutGrid,
-  point: Vec3,
-): CalloutAtResult | null {
+export function calloutAt(grid: CalloutGrid, point: Vec3): CalloutAtResult | null {
   const result = cellAt(
     grid,
     gridCoord(point.x, grid.gridSize),
     gridCoord(point.y, grid.gridSize),
     gridCoord(point.z, grid.gridSize),
   );
-  return result && result.source === "exact"
-    ? { ...result, source: "exact", distance: 0, offset: [0, 0, 0] }
+  return result && result.source === 'exact'
+    ? { ...result, source: 'exact', distance: 0, offset: [0, 0, 0] }
     : null;
 }
 
@@ -141,7 +134,7 @@ export function calloutNear(
         if (!cell) continue;
         candidates.push({
           ...cell,
-          source: "nearby",
+          source: 'nearby',
           distance: Math.hypot(ox, oy, oz),
           offset: [ox, oy, oz],
         });
@@ -152,11 +145,13 @@ export function calloutNear(
   candidates.sort((a, b) => {
     const zPrefA = zPreference(a.offset[2]);
     const zPrefB = zPreference(b.offset[2]);
-    return zPrefA - zPrefB ||
+    return (
+      zPrefA - zPrefB ||
       a.distance - b.distance ||
       b.confidence - a.confidence ||
       b.samples - a.samples ||
-      a.callout.localeCompare(b.callout);
+      a.callout.localeCompare(b.callout)
+    );
   });
   return candidates[0] ?? null;
 }

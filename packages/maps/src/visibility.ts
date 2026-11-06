@@ -1,6 +1,6 @@
-import type { Vec3 } from "./nav.js";
+import type { Vec3 } from './nav.js';
 
-export type { Vec3 } from "./nav.js";
+export type { Vec3 } from './nav.js';
 
 export interface Triangle {
   a: Vec3;
@@ -50,7 +50,7 @@ interface CentroidTriangle {
 }
 
 export function buildTriangleBvh(triangles: Triangle[]): TriangleBvh {
-  if (triangles.length === 0) throw new Error("Cannot build a BVH without triangles");
+  if (triangles.length === 0) throw new Error('Cannot build a BVH without triangles');
   // 质心只算一次（旧实现在每层 sort 比较器里重算并 new Vec3，百万三角形下产生
   // 数千万次冗余计算与分配）。建树拓扑、分裂点与叶子内容完全不变。
   const items = triangles.map((tri) => ({ tri, c: triangleCentroid(tri) }));
@@ -138,8 +138,12 @@ function segmentHitsNode(node: TriangleBvh, start: Vec3, end: Vec3): boolean {
 function segmentHitsBounds(start: Vec3, end: Vec3, bounds: Bounds): boolean {
   let minT = 0;
   let maxT = 1;
-  const sx = start.x, sy = start.y, sz = start.z;
-  const dx = end.x - sx, dy = end.y - sy, dz = end.z - sz;
+  const sx = start.x,
+    sy = start.y,
+    sz = start.z;
+  const dx = end.x - sx,
+    dy = end.y - sy,
+    dz = end.z - sz;
   if (Math.abs(dx) < EPSILON) {
     if (sx < bounds.min.x || sx > bounds.max.x) return false;
   } else {
@@ -189,7 +193,9 @@ function segmentHitsBounds(start: Vec3, end: Vec3, bounds: Bounds): boolean {
 }
 
 function segmentHitsTriangle(start: Vec3, end: Vec3, triangle: Triangle): boolean {
-  const dirX = end.x - start.x, dirY = end.y - start.y, dirZ = end.z - start.z;
+  const dirX = end.x - start.x,
+    dirY = end.y - start.y,
+    dirZ = end.z - start.z;
   const edge1X = triangle.b.x - triangle.a.x;
   const edge1Y = triangle.b.y - triangle.a.y;
   const edge1Z = triangle.b.z - triangle.a.z;
@@ -225,7 +231,11 @@ function largestAxis(bounds: Bounds): keyof Vec3 {
     y: bounds.max.y - bounds.min.y,
     z: bounds.max.z - bounds.min.z,
   };
-  return extents.x >= extents.y && extents.x >= extents.z ? "x" : extents.y >= extents.z ? "y" : "z";
+  return extents.x >= extents.y && extents.x >= extents.z
+    ? 'x'
+    : extents.y >= extents.z
+      ? 'y'
+      : 'z';
 }
 
 function triangleCentroid(triangle: Triangle): Vec3 {

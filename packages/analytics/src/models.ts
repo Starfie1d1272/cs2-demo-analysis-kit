@@ -1,10 +1,18 @@
-import { z } from "zod";
-import { indicatorRatingResultSchema, rrIndicatorsSchema } from "@cs2dak/rating";
-import { teamKeySchema, playerWeaponHighlightFactsSchema, playerRoundFactSchema, timelineEventSchema, economyPointSchema, heatmapPointSchema, qaReportSchema } from "@cs2dak/contract";
+import { z } from 'zod';
+import { indicatorRatingResultSchema, rrIndicatorsSchema } from '@cs2dak/rating';
+import {
+  teamKeySchema,
+  playerWeaponHighlightFactsSchema,
+  playerRoundFactSchema,
+  timelineEventSchema,
+  economyPointSchema,
+  heatmapPointSchema,
+  qaReportSchema,
+} from '@cs2dak/contract';
 
 export const playerIndicatorRowSchema = indicatorRatingResultSchema.extend({
   name: z.string(),
-  teamKey: teamKeySchema
+  teamKey: teamKeySchema,
 });
 
 export const playerScoreboardRowSchema = z.object({
@@ -32,12 +40,12 @@ export const playerScoreboardRowSchema = z.object({
   bombDefuseCount: z.number().int().nonnegative().nullable(),
   confidence: z.number().min(0).max(1),
   fieldAvailability: z.object({
-    playerStats: z.enum(["available", "missing"]),
-    economy: z.enum(["available", "missing"]),
-    rounds: z.enum(["available", "missing"]),
-    richKills: z.enum(["available", "partial", "missing"]),
-    damages: z.enum(["available", "missing"]),
-    bombs: z.enum(["available", "missing"])
+    playerStats: z.enum(['available', 'missing']),
+    economy: z.enum(['available', 'missing']),
+    rounds: z.enum(['available', 'missing']),
+    richKills: z.enum(['available', 'partial', 'missing']),
+    damages: z.enum(['available', 'missing']),
+    bombs: z.enum(['available', 'missing']),
   }),
   // rrBase（clamp 前的基础分）：被碾压方 KAST/KPR 低、死亡惩罚大时可为负，
   // 不能强制非负，否则一边倒的真实比赛整场导入失败。最终 rr 才被 clamp 到非负。
@@ -57,7 +65,7 @@ export const playerScoreboardRowSchema = z.object({
     mapControl: z.number(),
     clutch: z.number(),
     objective: z.number(),
-    utility: z.number()
+    utility: z.number(),
   }),
   /**
    * Combat context 分桶的可用性。
@@ -65,32 +73,32 @@ export const playerScoreboardRowSchema = z.object({
    * "missing" = 数据源缺失（parser 未产出），乘子已降级为 1.0，前端应显示"未启用"。
    */
   accountContextStatus: z.object({
-    buyDelta: z.enum(["available", "missing"]),
-    manState: z.enum(["available", "missing"])
-  })
+    buyDelta: z.enum(['available', 'missing']),
+    manState: z.enum(['available', 'missing']),
+  }),
 });
 
 export const analysisProvenanceSchema = z.object({
   analysisVersion: z.string(),
-  sourceSchemaVersion: z.literal("cs2-demo-format/3.0"),
+  sourceSchemaVersion: z.literal('cs2-demo-format/3.0'),
   sourceDemoHash: z.string().nullable(),
   exporter: z.object({ name: z.string(), version: z.string() }),
   parser: z.object({ name: z.string(), version: z.string() }),
   ratingVersions: z.object({
     rr: z.string().nullable(),
-    valueAccounts: z.string().nullable()
-  })
+    valueAccounts: z.string().nullable(),
+  }),
 });
 
 export const analysisBundleSchema = z.object({
-  version: z.literal("cs2-demo-analysis-kit/1.0"),
-  sourceSchemaVersion: z.literal("cs2-demo-format/3.0"),
+  version: z.literal('cs2-demo-analysis-kit/1.0'),
+  sourceSchemaVersion: z.literal('cs2-demo-format/3.0'),
   provenance: analysisProvenanceSchema,
   mapName: z.string(),
   tickrate: z.number().int().positive(),
   teams: z.object({
     teamA: z.object({ name: z.string(), score: z.number().int().nonnegative() }),
-    teamB: z.object({ name: z.string(), score: z.number().int().nonnegative() })
+    teamB: z.object({ name: z.string(), score: z.number().int().nonnegative() }),
   }),
   scoreboard: z.array(playerScoreboardRowSchema),
   playerWeaponHighlights: z.array(playerWeaponHighlightFactsSchema),
@@ -99,7 +107,7 @@ export const analysisBundleSchema = z.object({
   timeline: z.array(timelineEventSchema),
   economy: z.array(economyPointSchema),
   heatmap: z.array(heatmapPointSchema),
-  qa: qaReportSchema
+  qa: qaReportSchema,
 });
 
 export type PlayerIndicatorRow = z.infer<typeof playerIndicatorRowSchema>;

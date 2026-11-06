@@ -42,7 +42,9 @@ def launch_demo(path: Path, tick: int | None = None) -> dict:
 
     warning = None
     if tick is not None:
-        warning = f"已启动 demo；当前平台未接入自动控制台注入，可在控制台辅助输入 demo_gototick {tick}"
+        warning = (
+            f"已启动 demo；当前平台未接入自动控制台注入，可在控制台辅助输入 demo_gototick {tick}"
+        )
     return {"ok": True, "warning": warning}
 
 
@@ -66,17 +68,22 @@ def _launch_windows_direct(demo: Path, tick: int | None) -> dict | None:
     try:
         shutil.copy2(demo, dest)
         cfg.write_text(
-            "\n".join((
-                "con_enable 1",
-                'bind "F10" "toggleconsole"',
-                f'playdemo "{dest.name}"',
-            )) + "\n",
+            "\n".join(
+                (
+                    "con_enable 1",
+                    'bind "F10" "toggleconsole"',
+                    f'playdemo "{dest.name}"',
+                )
+            )
+            + "\n",
             encoding="ascii",
         )
         env = os.environ.copy()
         env["SteamAppId"] = "730"
         env["SteamGameId"] = "730"
-        creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | getattr(subprocess, "DETACHED_PROCESS", 0)
+        creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | getattr(
+            subprocess, "DETACHED_PROCESS", 0
+        )
         subprocess.Popen(  # noqa: S603
             [str(cs2), "-console", "-novid", "-insecure", "+exec", stem],
             cwd=str(game_root),
@@ -120,11 +127,32 @@ def _game_root_from_cs2_exe(cs2: Path) -> Path | None:
 def _find_cs2_exe() -> Path | None:
     candidates: list[Path] = []
     for library in _steam_library_paths():
-        candidates.append(library / "steamapps" / "common" / "Counter-Strike Global Offensive" / "game" / "bin" / "win64" / "cs2.exe")
+        candidates.append(
+            library
+            / "steamapps"
+            / "common"
+            / "Counter-Strike Global Offensive"
+            / "game"
+            / "bin"
+            / "win64"
+            / "cs2.exe"
+        )
     for drive in "CDEFGHI":
-        candidates.append(Path(f"{drive}:/Program Files (x86)/Steam/steamapps/common/Counter-Strike Global Offensive/game/bin/win64/cs2.exe"))
-        candidates.append(Path(f"{drive}:/SteamLibrary/steamapps/common/Counter-Strike Global Offensive/game/bin/win64/cs2.exe"))
-        candidates.append(Path(f"{drive}:/steam/steamapps/common/Counter-Strike Global Offensive/game/bin/win64/cs2.exe"))
+        candidates.append(
+            Path(
+                f"{drive}:/Program Files (x86)/Steam/steamapps/common/Counter-Strike Global Offensive/game/bin/win64/cs2.exe"
+            )
+        )
+        candidates.append(
+            Path(
+                f"{drive}:/SteamLibrary/steamapps/common/Counter-Strike Global Offensive/game/bin/win64/cs2.exe"
+            )
+        )
+        candidates.append(
+            Path(
+                f"{drive}:/steam/steamapps/common/Counter-Strike Global Offensive/game/bin/win64/cs2.exe"
+            )
+        )
     seen: set[Path] = set()
     for path in candidates:
         normalized = Path(os.path.normcase(str(path)))
@@ -176,7 +204,9 @@ def _schedule_windows_tick_injection(tick: int) -> None:
     def run() -> None:
         for delay in (8.0, 6.0, 6.0, 8.0, 10.0, 12.0):
             time.sleep(delay)
-            if _inject_windows_console_sequence(["demo_pause", f"demo_gototick {int(tick)}", "demo_resume"]):
+            if _inject_windows_console_sequence(
+                ["demo_pause", f"demo_gototick {int(tick)}", "demo_resume"]
+            ):
                 return
 
     threading.Thread(target=run, name="dak-cs2-demo-seek", daemon=True).start()

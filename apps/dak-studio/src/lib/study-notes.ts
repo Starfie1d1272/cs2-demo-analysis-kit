@@ -1,26 +1,98 @@
-import type { AtomicStorageAdapter } from "./storage/types";
-import { commitMaterialRevision, materialBaseline } from "./material-revision";
-import { getStorage } from "./storage";
-import { isValidSavedEvidence, type SavedEvidenceRef } from "./saved-evidence";
+import type { AtomicStorageAdapter } from './storage/types';
+import { commitMaterialRevision, materialBaseline } from './material-revision';
+import { getStorage } from './storage';
+import { isValidSavedEvidence, type SavedEvidenceRef } from './saved-evidence';
 
-export interface StudyNote { schemaVersion: 1; id: string; title: string; body: string; purpose: "review" | "practice"; playerKey: string | null; evidence: SavedEvidenceRef[]; createdAt: number; updatedAt: number }
-export type StudyNoteDraft = Pick<StudyNote, "title" | "body" | "purpose" | "playerKey" | "evidence">;
-export type CreateStudyNoteInput = Omit<StudyNoteDraft, "purpose"> & { purpose?: StudyNoteDraft["purpose"] };
+export interface StudyNote {
+  schemaVersion: 1;
+  id: string;
+  title: string;
+  body: string;
+  purpose: 'review' | 'practice';
+  playerKey: string | null;
+  evidence: SavedEvidenceRef[];
+  createdAt: number;
+  updatedAt: number;
+}
+export type StudyNoteDraft = Pick<
+  StudyNote,
+  'title' | 'body' | 'purpose' | 'playerKey' | 'evidence'
+>;
+export type CreateStudyNoteInput = Omit<StudyNoteDraft, 'purpose'> & {
+  purpose?: StudyNoteDraft['purpose'];
+};
 
 function valid(value: unknown): value is StudyNote {
-  if (!value || typeof value !== "object") return false;
+  if (!value || typeof value !== 'object') return false;
   const v = value as Partial<StudyNote>;
-  return v.schemaVersion === 1 && typeof v.id === "string" && typeof v.title === "string" && !!v.title.trim() && typeof v.body === "string" && (v.purpose === "review" || v.purpose === "practice") && (v.playerKey === null || typeof v.playerKey === "string") && Array.isArray(v.evidence) && v.evidence.every(isValidSavedEvidence) && typeof v.createdAt === "number" && Number.isFinite(v.createdAt) && typeof v.updatedAt === "number" && Number.isFinite(v.updatedAt);
+  return (
+    v.schemaVersion === 1 &&
+    typeof v.id === 'string' &&
+    typeof v.title === 'string' &&
+    !!v.title.trim() &&
+    typeof v.body === 'string' &&
+    (v.purpose === 'review' || v.purpose === 'practice') &&
+    (v.playerKey === null || typeof v.playerKey === 'string') &&
+    Array.isArray(v.evidence) &&
+    v.evidence.every(isValidSavedEvidence) &&
+    typeof v.createdAt === 'number' &&
+    Number.isFinite(v.createdAt) &&
+    typeof v.updatedAt === 'number' &&
+    Number.isFinite(v.updatedAt)
+  );
 }
 export function createStudyNotesStore(storage: AtomicStorageAdapter) {
-  const namespace = "study-notes";
+  const namespace = 'study-notes';
   const records = storage.records(namespace);
   return {
-    async list(): Promise<{ notes: StudyNote[]; unreadable: number }> { const all = await records.getAll<unknown>(); const notes = all.filter(valid); return { notes, unreadable: all.length - notes.length }; },
-    async get(id: string): Promise<StudyNote | null> { const value = await records.get<unknown>(id); if (value === undefined) return null; if (!valid(value)) throw new Error("笔记记录无法读取"); return value; },
-    async create(draft: CreateStudyNoteInput): Promise<StudyNote> { const title = draft.title.trim(); if (!title) throw new Error("标题不能为空"); const now = Date.now(); const note: StudyNote = { ...structuredClone(draft), title, purpose: draft.purpose ?? "review", schemaVersion: 1, id: crypto.randomUUID(), createdAt: now, updatedAt: now }; await records.put(note.id, note); return note; },
-    async update(id: string, draft: StudyNoteDraft, revision: string): Promise<StudyNote> { const old = materialBaseline(revision, id, valid); const title = draft.title.trim(); if (!title) throw new Error("标题不能为空"); const note: StudyNote = { ...old, ...structuredClone(draft), title, updatedAt: Date.now() }; await commitMaterialRevision(storage, namespace, id, old, { namespace, key: id, kind: "put", value: note }); return note; },
-    async remove(id: string, revision: string): Promise<void> { const old = materialBaseline(revision, id, valid); await commitMaterialRevision(storage, namespace, id, old, { namespace, key: id, kind: "delete" }); },
+    async list(): Promise<{ notes: StudyNote[]; unreadable: number }> {
+      const all = await records.getAll<unknown>();
+      const notes = all.filter(valid);
+      return { notes, unreadable: all.length - notes.length };
+    },
+    async get(id: string): Promise<StudyNote | null> {
+      const value = await records.get<unknown>(id);
+      if (value === undefined) return null;
+      if (!valid(value)) throw new Error('笔记记录无法读取');
+      return value;
+    },
+    async create(draft: CreateStudyNoteInput): Promise<StudyNote> {
+      const title = draft.title.trim();
+      if (!title) throw new Error('标题不能为空');
+      const now = Date.now();
+      const note: StudyNote = {
+        ...structuredClone(draft),
+        title,
+        purpose: draft.purpose ?? 'review',
+        schemaVersion: 1,
+        id: crypto.randomUUID(),
+        createdAt: now,
+        updatedAt: now,
+      };
+      await records.put(note.id, note);
+      return note;
+    },
+    async update(id: string, draft: StudyNoteDraft, revision: string): Promise<StudyNote> {
+      const old = materialBaseline(revision, id, valid);
+      const title = draft.title.trim();
+      if (!title) throw new Error('标题不能为空');
+      const note: StudyNote = { ...old, ...structuredClone(draft), title, updatedAt: Date.now() };
+      await commitMaterialRevision(storage, namespace, id, old, {
+        namespace,
+        key: id,
+        kind: 'put',
+        value: note,
+      });
+      return note;
+    },
+    async remove(id: string, revision: string): Promise<void> {
+      const old = materialBaseline(revision, id, valid);
+      await commitMaterialRevision(storage, namespace, id, old, {
+        namespace,
+        key: id,
+        kind: 'delete',
+      });
+    },
   };
 }
 const store = createStudyNotesStore(getStorage());

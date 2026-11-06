@@ -1,13 +1,21 @@
-import type { EvidenceRef } from "./evidence-view.js";
-import type { Side } from "./primitives.js";
+import type { EvidenceRef } from './evidence-view.js';
+import type { Side } from './primitives.js';
 
-export type MapRoleStatusView = "ready" | "mixed" | "insufficient" | "unknown";
-export type WeaponDutyView = "primary_awper" | "secondary_awper" | "situational_awper" | "rifler";
+export type MapRoleStatusView = 'ready' | 'mixed' | 'insufficient' | 'unknown';
+export type WeaponDutyView = 'primary_awper' | 'secondary_awper' | 'situational_awper' | 'rifler';
 export type TeamResponsibilityView =
-  | "pack" | "extremity" | "late_joining" | "stable_default"
-  | "anchor_tendency" | "component_mobile" | "independent_mobile" | "stable_position"
-  | "mixed" | "unknown";
-export type RoleModifierView = "utility_supportive" | "positionally_stable" | "spatially_isolated" | "component_mobile";
+  | 'pack'
+  | 'extremity'
+  | 'late_joining'
+  | 'stable_default'
+  | 'anchor_tendency'
+  | 'component_mobile'
+  | 'independent_mobile'
+  | 'stable_position'
+  | 'mixed'
+  | 'unknown';
+export type RoleModifierView =
+  'utility_supportive' | 'positionally_stable' | 'spatially_isolated' | 'component_mobile';
 
 /** Fields rendered by the profile panel, independent of the evidence calculation model. */
 export interface PlayerMapRoleProfileView {
@@ -39,7 +47,11 @@ export interface PlayerMapRoleProfileView {
     confidence: number;
     representativeRounds: Array<{ matchId: string; roundNumber: number }>;
   }>;
-  roleAlignments: Array<{ tResponsibility: TeamResponsibilityView; ctResponsibility: TeamResponsibilityView; sampleLimitations: string[] }>;
+  roleAlignments: Array<{
+    tResponsibility: TeamResponsibilityView;
+    ctResponsibility: TeamResponsibilityView;
+    sampleLimitations: string[];
+  }>;
   weaponDutyAlignments: Array<{
     declaration: { weaponDuty: WeaponDutyView };
     observedWeaponDuty: WeaponDutyView | null;
@@ -58,7 +70,11 @@ export interface TeamMapRoleMatrixView {
   positionOverlap: readonly unknown[];
   players: Array<{
     playerKey: string;
-    primaryPositionGroups: Array<{ displayName: string; officialName: string | null; share: number }>;
+    primaryPositionGroups: Array<{
+      displayName: string;
+      officialName: string | null;
+      share: number;
+    }>;
     responsibility: TeamResponsibilityView;
     modifiers: RoleModifierView[];
     weaponDuty: WeaponDutyView | null;

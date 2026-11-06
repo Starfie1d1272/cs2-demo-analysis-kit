@@ -26,12 +26,12 @@
  * 推迟到权重 ramp 阶段三——职业样本到位、有校准数据后，再连同 sightlineDenial 一起重设计。
  * 见 rr-model.md §3.4 / §3.6。
  */
-import type { DemoPackage } from "@cs2dak/contract";
-import type { TriangleBvh, Vec3, ZoneRole } from "@cs2dak/maps";
-import { staticLineOfSight, zoneAt } from "@cs2dak/maps";
-import { type SpatialAssets, type AnnotatedSample, annotatePositions } from "./annotate.js";
-import { inferRoundPhases, phaseAtTick } from "./phase.js";
-import { isOfficialScoringPhase, type RoundPhaseModel } from "./types.js";
+import type { DemoPackage } from '@cs2dak/contract';
+import type { TriangleBvh, Vec3, ZoneRole } from '@cs2dak/maps';
+import { staticLineOfSight, zoneAt } from '@cs2dak/maps';
+import { type SpatialAssets, type AnnotatedSample, annotatePositions } from './annotate.js';
+import { inferRoundPhases, phaseAtTick } from './phase.js';
+import { isOfficialScoringPhase, type RoundPhaseModel } from './types.js';
 import {
   areasWithinRadius,
   buildNavIndex,
@@ -41,9 +41,9 @@ import {
   smokeDetourCost,
   type NavIndex,
   SMOKE_RADIUS,
-} from "./utility-geometry.js";
+} from './utility-geometry.js';
 
-export type GrenadeType = "smoke" | "molotov" | "incendiary" | "flash" | "he" | "decoy" | "unknown";
+export type GrenadeType = 'smoke' | 'molotov' | 'incendiary' | 'flash' | 'he' | 'decoy' | 'unknown';
 
 export interface UtilityWindow {
   grenadeId: string;
@@ -56,7 +56,7 @@ export interface UtilityWindow {
   effectPosition: Vec3;
   zoneId: string | null;
   zoneRole: ZoneRole | null;
-  zoneBombsite: "a" | "b" | null;
+  zoneBombsite: 'a' | 'b' | null;
 }
 
 export interface OfficialUtilitySpatial {
@@ -70,7 +70,7 @@ export interface OfficialUtilitySpatial {
 
 const DISPLACE_BEFORE_SECONDS = 2; // 火前回看
 const DISPLACE_AFTER_SECONDS = 4; // 火后回看（1Hz 采样放宽）
-const FIRE_TYPES: ReadonlySet<GrenadeType> = new Set(["molotov", "incendiary"]);
+const FIRE_TYPES: ReadonlySet<GrenadeType> = new Set(['molotov', 'incendiary']);
 const FIRE_BURN_SECONDS = 7; // 火焰缺 destroyTick 时兜底
 const SMOKE_DURATION_SECONDS = 18;
 const DETOUR_FULL_UNITS = 700; // nav 绕路 ≥ 此值 → 隔离系数 1.0
@@ -79,16 +79,23 @@ const SIGHTLINE_PER_ENEMY = 0.5; // 每条被封枪线的重要性
 function effectiveDurationSeconds(w: UtilityWindow, tickrate: number): number {
   if (w.destroyTick > w.effectTick) return (w.destroyTick - w.effectTick) / tickrate;
   if (FIRE_TYPES.has(w.type)) return FIRE_BURN_SECONDS;
-  if (w.type === "smoke") return SMOKE_DURATION_SECONDS;
+  if (w.type === 'smoke') return SMOKE_DURATION_SECONDS;
   return 0;
 }
 
 function roleWeight(role: ZoneRole | null): number {
   switch (role) {
-    case "site": return 1.0;
-    case "lane": case "connector": case "mid": return 0.8;
-    case "approach": case "backsite": return 0.6;
-    default: return 0;
+    case 'site':
+      return 1.0;
+    case 'lane':
+    case 'connector':
+    case 'mid':
+      return 0.8;
+    case 'approach':
+    case 'backsite':
+      return 0.6;
+    default:
+      return 0;
   }
 }
 
@@ -96,14 +103,17 @@ export function buildUtilityWindows(pkg: DemoPackage, assets: SpatialAssets): Ut
   const out: UtilityWindow[] = [];
   for (const g of pkg.grenades ?? []) {
     const effectPosition = toVec3((g as { effectPosition?: Partial<Vec3> }).effectPosition);
-    const zone = assets.zones ? zoneAt(assets.zones, effectPosition.x, effectPosition.y, effectPosition.z) : null;
+    const zone = assets.zones
+      ? zoneAt(assets.zones, effectPosition.x, effectPosition.y, effectPosition.z)
+      : null;
     out.push({
-      grenadeId: String((g as { grenadeId?: unknown }).grenadeId ?? ""),
+      grenadeId: String((g as { grenadeId?: unknown }).grenadeId ?? ''),
       roundNumber: g.roundNumber,
       type: normalizeType((g as { grenade?: string }).grenade),
       throwerSteamId64: (g as { throwerSteamId64?: string | null }).throwerSteamId64 ?? null,
       throwerTeamKey: (g as { throwerTeamKey?: string | null }).throwerTeamKey ?? null,
-      effectTick: (g as { effectTick?: number }).effectTick ?? (g as { throwTick?: number }).throwTick ?? 0,
+      effectTick:
+        (g as { effectTick?: number }).effectTick ?? (g as { throwTick?: number }).throwTick ?? 0,
       destroyTick: (g as { destroyTick?: number }).destroyTick ?? 0,
       effectPosition,
       zoneId: zone?.id ?? null,
@@ -115,7 +125,7 @@ export function buildUtilityWindows(pkg: DemoPackage, assets: SpatialAssets): Ut
 }
 
 interface SiteArea {
-  bombsite: "a" | "b" | null;
+  bombsite: 'a' | 'b' | null;
   areaId: number;
   point: Vec3; // nav 质心（含 z），供 LOS/绕路使用
 }
@@ -161,7 +171,7 @@ export function buildOfficialUtilitySpatial(
     const enemies = enemySamplesAt(roundTracks, teamByPlayer, w.throwerTeamKey, w.effectTick);
     const hasTeammate = teammatePresent(roundTracks, teamByPlayer, w.throwerTeamKey, w.effectTick);
 
-    if (w.type === "smoke") {
+    if (w.type === 'smoke') {
       const objective = nearestSite(siteAreas, w.effectPosition, navIndex);
       // ① 隔离：nav 绕路代价（拓扑敏感 — 开阔图恒 0，已知模型缺陷，见文件头冻结说明，勿当 bug 修）
       if (navIndex && objective && enemies.length > 0) {
@@ -170,7 +180,8 @@ export function buildOfficialUtilitySpatial(
         if (enemyArea != null) {
           const detour = smokeDetourCost(navIndex, enemyArea, objective.areaId, blocked);
           const isoFactor = Math.min(1, detour / DETOUR_FULL_UNITS);
-          if (isoFactor > 0) acc.actualSmokeIsolationSeconds += durationSeconds * isoFactor * weight;
+          if (isoFactor > 0)
+            acc.actualSmokeIsolationSeconds += durationSeconds * isoFactor * weight;
         }
       }
       // ② 视线封锁：tri-BVH 判定烟切断 enemy→site 的静态可见枪线
@@ -178,31 +189,35 @@ export function buildOfficialUtilitySpatial(
         let deniedEnemies = 0;
         for (const e of enemies) {
           if (!staticLineOfSight(bvh, e.pos, objective.point)) continue; // 静态本就不可见 → 烟无功
-          if (segmentSphereIntersects(e.pos, objective.point, w.effectPosition, SMOKE_RADIUS)) deniedEnemies += 1;
+          if (segmentSphereIntersects(e.pos, objective.point, w.effectPosition, SMOKE_RADIUS))
+            deniedEnemies += 1;
         }
         if (deniedEnemies > 0) {
           acc.actualSmokeSightlineDenialSeconds =
-            (acc.actualSmokeSightlineDenialSeconds ?? 0) + durationSeconds * Math.min(1, deniedEnemies * SIGHTLINE_PER_ENEMY) * weight;
+            (acc.actualSmokeSightlineDenialSeconds ?? 0) +
+            durationSeconds * Math.min(1, deniedEnemies * SIGHTLINE_PER_ENEMY) * weight;
         }
       }
     } else if (FIRE_TYPES.has(w.type)) {
       // ③ 路径延迟：火落要道且敌人在场
       if (enemies.length > 0) acc.actualIncendiaryPathDelaySeconds += durationSeconds * weight;
       // ④ 逼退：敌人火前在区、火后离开或掉血（放宽 1Hz 采样窗口）
-      acc.actualIncendiaryDisplacementEvents += displacementCount(roundTracks, teamByPlayer, w, tickrate) * weight;
+      acc.actualIncendiaryDisplacementEvents +=
+        displacementCount(roundTracks, teamByPlayer, w, tickrate) * weight;
     }
   }
 
   // ⑤ 掩护穿越：队友穿越时被烟挡住敌方原本可见枪线（独立 pass，需 bvh）
   if (bvh) {
     for (const w of windows) {
-      if (w.type !== "smoke" || !w.throwerSteamId64 || !w.zoneId) continue;
+      if (w.type !== 'smoke' || !w.throwerSteamId64 || !w.zoneId) continue;
       const phase = phaseModels.get(w.roundNumber);
       if (phase && !isOfficialScoringPhase(phaseAtTick(phase, w.effectTick))) continue;
       if (roleWeight(w.zoneRole) <= 0) continue;
       const acc = getOrInit(out, w.throwerSteamId64, true);
       acc.actualSmokeProtectedCrossings =
-        (acc.actualSmokeProtectedCrossings ?? 0) + protectedCrossings(tracks.get(w.roundNumber), teamByPlayer, w, bvh, tickrate);
+        (acc.actualSmokeProtectedCrossings ?? 0) +
+        protectedCrossings(tracks.get(w.roundNumber), teamByPlayer, w, bvh, tickrate);
     }
   }
 
@@ -215,7 +230,7 @@ export function buildOfficialUtilitySpatial(
 function computeSiteAreas(assets: SpatialAssets, navIndex: NavIndex): SiteArea[] {
   const out: SiteArea[] = [];
   for (const z of assets.zones?.zones ?? []) {
-    if (z.role !== "site") continue;
+    if (z.role !== 'site') continue;
     const c = polygonCentroid(z);
     // objective 选点启发式：site 质心 z=0 → 最近 nav 区。dust2 上该点常被墙挡，使 ② 视线封锁偏低。
     // 已知缺陷（见文件头冻结说明），vision-based 重构时一并改。
@@ -233,9 +248,13 @@ function nearestSite(sites: SiteArea[], from: Vec3, navIndex: NavIndex | null): 
   let best: SiteArea | null = null;
   let bestD = Infinity;
   for (const s of sites) {
-    const dx = s.point.x - from.x, dy = s.point.y - from.y;
+    const dx = s.point.x - from.x,
+      dy = s.point.y - from.y;
     const d = dx * dx + dy * dy;
-    if (d < bestD) { bestD = d; best = s; }
+    if (d < bestD) {
+      bestD = d;
+      best = s;
+    }
   }
   return best;
 }
@@ -244,12 +263,23 @@ function buildTracks(samples: AnnotatedSample[]): Map<number, Map<string, Sample
   const out = new Map<number, Map<string, Sample[]>>();
   for (const s of samples) {
     let byPlayer = out.get(s.roundNumber);
-    if (!byPlayer) { byPlayer = new Map(); out.set(s.roundNumber, byPlayer); }
+    if (!byPlayer) {
+      byPlayer = new Map();
+      out.set(s.roundNumber, byPlayer);
+    }
     const arr = byPlayer.get(s.steamId64) ?? [];
-    arr.push({ tick: s.tick, pos: s.position, zoneId: s.zoneId, navAreaId: s.navAreaId, health: s.health, alive: s.alive });
+    arr.push({
+      tick: s.tick,
+      pos: s.position,
+      zoneId: s.zoneId,
+      navAreaId: s.navAreaId,
+      health: s.health,
+      alive: s.alive,
+    });
     byPlayer.set(s.steamId64, arr);
   }
-  for (const byPlayer of out.values()) for (const arr of byPlayer.values()) arr.sort((a, b) => a.tick - b.tick);
+  for (const byPlayer of out.values())
+    for (const arr of byPlayer.values()) arr.sort((a, b) => a.tick - b.tick);
   return out;
 }
 
@@ -297,11 +327,16 @@ function displacementCount(
   let count = 0;
   for (const [id, arr] of roundTracks) {
     if (w.throwerTeamKey != null && teamByPlayer.get(id) === w.throwerTeamKey) continue;
-    const inZoneBefore = arr.some((s) => s.tick >= beforeLo && s.tick <= w.effectTick && s.zoneId === w.zoneId);
+    const inZoneBefore = arr.some(
+      (s) => s.tick >= beforeLo && s.tick <= w.effectTick && s.zoneId === w.zoneId,
+    );
     if (!inZoneBefore) continue;
     const hpBefore = lastBefore(arr, w.effectTick)?.health ?? 100;
     const displaced = arr.some(
-      (s) => s.tick > w.effectTick && s.tick <= afterHi && (s.zoneId !== w.zoneId || s.health < hpBefore),
+      (s) =>
+        s.tick > w.effectTick &&
+        s.tick <= afterHi &&
+        (s.zoneId !== w.zoneId || s.health < hpBefore),
     );
     if (displaced) count += 1;
   }
@@ -318,7 +353,8 @@ function protectedCrossings(
 ): number {
   if (!roundTracks) return 0;
   const lo = w.effectTick;
-  const hi = w.destroyTick > w.effectTick ? w.destroyTick : w.effectTick + SMOKE_DURATION_SECONDS * tickrate;
+  const hi =
+    w.destroyTick > w.effectTick ? w.destroyTick : w.effectTick + SMOKE_DURATION_SECONDS * tickrate;
   let count = 0;
   for (const [id, arr] of roundTracks) {
     if (w.throwerTeamKey != null && teamByPlayer.get(id) !== w.throwerTeamKey) continue; // 只看队友
@@ -333,7 +369,10 @@ function protectedCrossings(
       if (teamByPlayer.get(eid) === w.throwerTeamKey) continue;
       const e = sampleAtOrBefore(earr, mid.tick);
       if (!e || !e.alive) continue;
-      if (staticLineOfSight(bvh, e.pos, mid.pos) && segmentSphereIntersects(e.pos, mid.pos, w.effectPosition, SMOKE_RADIUS)) {
+      if (
+        staticLineOfSight(bvh, e.pos, mid.pos) &&
+        segmentSphereIntersects(e.pos, mid.pos, w.effectPosition, SMOKE_RADIUS)
+      ) {
         protectedHere = true;
         break;
       }
@@ -344,15 +383,24 @@ function protectedCrossings(
 }
 
 function clusterCentroid(samples: Sample[]): Vec3 {
-  let x = 0, y = 0, z = 0;
-  for (const s of samples) { x += s.pos.x; y += s.pos.y; z += s.pos.z; }
+  let x = 0,
+    y = 0,
+    z = 0;
+  for (const s of samples) {
+    x += s.pos.x;
+    y += s.pos.y;
+    z += s.pos.z;
+  }
   const n = Math.max(1, samples.length);
   return { x: x / n, y: y / n, z: z / n };
 }
 
 function sampleAtOrBefore(arr: Sample[], tick: number): Sample | null {
   let best: Sample | null = null;
-  for (const s of arr) { if (s.tick > tick) break; best = s; }
+  for (const s of arr) {
+    if (s.tick > tick) break;
+    best = s;
+  }
   return best;
 }
 
@@ -360,7 +408,11 @@ function lastBefore(arr: Sample[], tick: number): Sample | null {
   return sampleAtOrBefore(arr, tick);
 }
 
-function getOrInit(map: Map<string, OfficialUtilitySpatial>, id: string, losAvailable: boolean): OfficialUtilitySpatial {
+function getOrInit(
+  map: Map<string, OfficialUtilitySpatial>,
+  id: string,
+  losAvailable: boolean,
+): OfficialUtilitySpatial {
   let v = map.get(id);
   if (!v) {
     v = {
@@ -379,14 +431,23 @@ function round3InPlace(acc: OfficialUtilitySpatial) {
   acc.actualIncendiaryDisplacementEvents = round3(acc.actualIncendiaryDisplacementEvents);
   acc.actualSmokeIsolationSeconds = round3(acc.actualSmokeIsolationSeconds);
   acc.actualIncendiaryPathDelaySeconds = round3(acc.actualIncendiaryPathDelaySeconds);
-  if (acc.actualSmokeProtectedCrossings != null) acc.actualSmokeProtectedCrossings = round3(acc.actualSmokeProtectedCrossings);
-  if (acc.actualSmokeSightlineDenialSeconds != null) acc.actualSmokeSightlineDenialSeconds = round3(acc.actualSmokeSightlineDenialSeconds);
+  if (acc.actualSmokeProtectedCrossings != null)
+    acc.actualSmokeProtectedCrossings = round3(acc.actualSmokeProtectedCrossings);
+  if (acc.actualSmokeSightlineDenialSeconds != null)
+    acc.actualSmokeSightlineDenialSeconds = round3(acc.actualSmokeSightlineDenialSeconds);
 }
 
 function normalizeType(g: string | undefined): GrenadeType {
   switch (g) {
-    case "smoke": case "molotov": case "incendiary": case "flash": case "he": case "decoy": return g;
-    default: return "unknown";
+    case 'smoke':
+    case 'molotov':
+    case 'incendiary':
+    case 'flash':
+    case 'he':
+    case 'decoy':
+      return g;
+    default:
+      return 'unknown';
   }
 }
 

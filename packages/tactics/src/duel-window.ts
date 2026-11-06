@@ -1,7 +1,7 @@
-import { EYE_HEIGHT, TARGET_HEIGHT } from "@cs2dak/maps";
-import type { DemoPackage, DuelWindow, PackageGrenade } from "@cs2dak/contract";
-import { decodeDelta } from "@cs2dak/contract";
-import { staticLineOfSight, type TriangleBvh, type Vec3 } from "@cs2dak/maps";
+import { EYE_HEIGHT, TARGET_HEIGHT } from '@cs2dak/maps';
+import type { DemoPackage, DuelWindow, PackageGrenade } from '@cs2dak/contract';
+import { decodeDelta } from '@cs2dak/contract';
+import { staticLineOfSight, type TriangleBvh, type Vec3 } from '@cs2dak/maps';
 
 /**
  * duels.json 满 tick 窗口的可见性原语。
@@ -20,7 +20,7 @@ export const VIEW_CONE_HALF_DEGREES = 40;
 /** CS2 烟雾半径约 144 游戏单位，用于射线-球遮挡判定。 */
 export const SMOKE_RADIUS = 144;
 
-const SMOKE_TYPES = new Set(["smoke", "smokegrenade"]);
+const SMOKE_TYPES = new Set(['smoke', 'smokegrenade']);
 
 export interface DecodedTrack {
   playerIndex: number;
@@ -43,7 +43,11 @@ export interface DuelWindowView {
 
 const viewCache = new WeakMap<DuelWindow, DuelWindowView>();
 
-function decodeTrack(track: DuelWindow["players"][number], coordScale: number, angleScale: number): DecodedTrack {
+function decodeTrack(
+  track: DuelWindow['players'][number],
+  coordScale: number,
+  angleScale: number,
+): DecodedTrack {
   const scale = (arr: number[], by: number) => arr.map((value) => value / by);
   return {
     playerIndex: track.playerIndex,
@@ -53,7 +57,7 @@ function decodeTrack(track: DuelWindow["players"][number], coordScale: number, a
     yaw: scale(decodeDelta(track.yaw), angleScale),
     pitch: scale(decodeDelta(track.pitch), angleScale),
     hp: [...track.hp],
-    flash: [...track.flash]
+    flash: [...track.flash],
   };
 }
 
@@ -64,26 +68,34 @@ export function decodeDuelWindow(pkg: DemoPackage, window: DuelWindow): DuelWind
   const coordScale = pkg.duels?.meta.coordScale ?? 1;
   const angleScale = pkg.duels?.meta.angleScale ?? 10;
   const tracks = new Map<number, DecodedTrack>();
-  for (const track of window.players) tracks.set(track.playerIndex, decodeTrack(track, coordScale, angleScale));
+  for (const track of window.players)
+    tracks.set(track.playerIndex, decodeTrack(track, coordScale, angleScale));
   const view: DuelWindowView = {
     window,
     startTick: window.startTick,
     tickStep: window.tickStep,
     frameCount: window.frameCount,
-    tracks
+    tracks,
   };
   viewCache.set(window, view);
   return view;
 }
 
 /** 找到覆盖 (round, tick) 的 duel 窗口；窗口同回合内已合并，故至多一个。 */
-export function findWindowCovering(pkg: DemoPackage, roundNumber: number, tick: number): DuelWindow | null {
+export function findWindowCovering(
+  pkg: DemoPackage,
+  roundNumber: number,
+  tick: number,
+): DuelWindow | null {
   if (!pkg.duels) return null;
-  return pkg.duels.windows.find((window) =>
-    window.roundNumber === roundNumber &&
-    window.startTick <= tick &&
-    window.startTick + window.tickStep * Math.max(0, window.frameCount - 1) >= tick
-  ) ?? null;
+  return (
+    pkg.duels.windows.find(
+      (window) =>
+        window.roundNumber === roundNumber &&
+        window.startTick <= tick &&
+        window.startTick + window.tickStep * Math.max(0, window.frameCount - 1) >= tick,
+    ) ?? null
+  );
 }
 
 /** tick → 最近帧索引（夹在 [0, frameCount-1]）。 */
@@ -114,7 +126,12 @@ function dot(a: Vec3, b: Vec3): number {
 }
 
 /** 准星视线方向与目标方向的三维夹角（度）。yaw+pitch 都参与。null = 重合/无法定义。 */
-export function aimErrorDegrees(yawDeg: number, pitchDeg: number, eye: Vec3, target: Vec3): number | null {
+export function aimErrorDegrees(
+  yawDeg: number,
+  pitchDeg: number,
+  eye: Vec3,
+  target: Vec3,
+): number | null {
   const aim = forwardVector(yawDeg, pitchDeg);
   const toTarget = normalize({ x: target.x - eye.x, y: target.y - eye.y, z: target.z - eye.z });
   if (!toTarget) return null;
@@ -138,12 +155,19 @@ function pointToSegmentDistance(point: Vec3, a: Vec3, b: Vec3): number {
 }
 
 /** 在 tick 时刻，是否有生效中的烟雾遮挡 from→to 视线。 */
-export function smokeBlocksRay(grenades: PackageGrenade[] | undefined, roundNumber: number, tick: number, from: Vec3, to: Vec3): boolean {
+export function smokeBlocksRay(
+  grenades: PackageGrenade[] | undefined,
+  roundNumber: number,
+  tick: number,
+  from: Vec3,
+  to: Vec3,
+): boolean {
   if (!grenades || grenades.length === 0) return false;
   for (const grenade of grenades) {
     if (grenade.roundNumber !== roundNumber) continue;
     if (!SMOKE_TYPES.has(grenade.grenade)) continue;
-    const active = grenade.effectTick <= tick && (grenade.destroyTick == null || tick <= grenade.destroyTick);
+    const active =
+      grenade.effectTick <= tick && (grenade.destroyTick == null || tick <= grenade.destroyTick);
     if (!active) continue;
     if (pointToSegmentDistance(grenade.effectPosition, from, to) <= SMOKE_RADIUS) return true;
   }
@@ -165,16 +189,25 @@ export function isVisibleAt(
   view: DuelWindowView,
   attackerIndex: number,
   victimIndex: number,
-  frame: number
+  frame: number,
 ): boolean {
   const attacker = view.tracks.get(attackerIndex);
   const victim = view.tracks.get(victimIndex);
   if (!attacker || !victim) return false;
   if ((attacker.hp[frame] ?? 0) <= 0 || (victim.hp[frame] ?? 0) <= 0) return false;
   if ((attacker.flash[frame] ?? 0) > 0) return false;
-  const eye: Vec3 = { x: attacker.x[frame] ?? 0, y: attacker.y[frame] ?? 0, z: (attacker.z[frame] ?? 0) + EYE_HEIGHT };
-  const target: Vec3 = { x: victim.x[frame] ?? 0, y: victim.y[frame] ?? 0, z: (victim.z[frame] ?? 0) + TARGET_HEIGHT };
-  if (!insideViewCone(attacker.yaw[frame] ?? 0, attacker.pitch[frame] ?? 0, eye, target)) return false;
+  const eye: Vec3 = {
+    x: attacker.x[frame] ?? 0,
+    y: attacker.y[frame] ?? 0,
+    z: (attacker.z[frame] ?? 0) + EYE_HEIGHT,
+  };
+  const target: Vec3 = {
+    x: victim.x[frame] ?? 0,
+    y: victim.y[frame] ?? 0,
+    z: (victim.z[frame] ?? 0) + TARGET_HEIGHT,
+  };
+  if (!insideViewCone(attacker.yaw[frame] ?? 0, attacker.pitch[frame] ?? 0, eye, target))
+    return false;
   if (ctx.visibility && !staticLineOfSight(ctx.visibility, eye, target)) return false;
   const tick = tickAtFrame(view, frame);
   if (smokeBlocksRay(ctx.pkg.grenades, view.window.roundNumber, tick, eye, target)) return false;
@@ -191,7 +224,7 @@ export function visibleOnsetFrame(
   view: DuelWindowView,
   attackerIndex: number,
   victimIndex: number,
-  fromFrame: number
+  fromFrame: number,
 ): number | null {
   if (!isVisibleAt(ctx, view, attackerIndex, victimIndex, fromFrame)) return null;
   let onset = fromFrame;

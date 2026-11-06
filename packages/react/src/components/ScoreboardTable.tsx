@@ -1,4 +1,4 @@
-import type { ScoreboardTableRow, TeamKey } from "@cs2dak/presentation";
+import type { ScoreboardTableRow, TeamKey } from '@cs2dak/presentation';
 
 export interface ScoreboardTableProps {
   rows: ScoreboardTableRow[];
@@ -11,7 +11,7 @@ export interface ScoreboardTableProps {
 }
 
 function teamColor(teamKey: TeamKey): string {
-  return teamKey === "teamA" ? "var(--dak-accent)" : "var(--dak-accent-b)";
+  return teamKey === 'teamA' ? 'var(--dak-accent)' : 'var(--dak-accent-b)';
 }
 
 export function ScoreboardTable({ rows, onPlayerClick }: ScoreboardTableProps) {
@@ -38,12 +38,12 @@ export function ScoreboardTable({ rows, onPlayerClick }: ScoreboardTableProps) {
         {rows.map((row) => (
           <tr
             key={row.steamId64}
-            className={onPlayerClick ? "dak-row-clickable" : undefined}
+            className={onPlayerClick ? 'dak-row-clickable' : undefined}
             onClick={onPlayerClick ? () => onPlayerClick(row.steamId64) : undefined}
             onKeyDown={
               onPlayerClick
                 ? (e) => {
-                    if (e.key === "Enter" || e.key === " ") {
+                    if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
                       onPlayerClick(row.steamId64);
                     }
@@ -51,7 +51,7 @@ export function ScoreboardTable({ rows, onPlayerClick }: ScoreboardTableProps) {
                 : undefined
             }
             tabIndex={onPlayerClick ? 0 : undefined}
-            role={onPlayerClick ? "button" : undefined}
+            role={onPlayerClick ? 'button' : undefined}
             aria-label={onPlayerClick ? `查看 ${row.name} 详情` : undefined}
           >
             <td>
@@ -60,8 +60,10 @@ export function ScoreboardTable({ rows, onPlayerClick }: ScoreboardTableProps) {
                 <span>{row.name}</span>
               </span>
             </td>
-            <td className="dak-mono dak-rr">{row.accountRR == null ? "—" : row.accountRR.toFixed(3)}</td>
-            <td className="dak-mono dak-rr">{row.rr == null ? "—" : row.rr.toFixed(2)}</td>
+            <td className="dak-mono dak-rr">
+              {row.accountRR == null ? '—' : row.accountRR.toFixed(3)}
+            </td>
+            <td className="dak-mono dak-rr">{row.rr == null ? '—' : row.rr.toFixed(2)}</td>
             <td className="dak-mono">{row.kills}</td>
             <td className="dak-mono">{row.deaths}</td>
             <td className="dak-mono">{row.assists}</td>

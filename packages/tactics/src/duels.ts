@@ -1,9 +1,22 @@
-import type { DemoPackage, DuelWindow, PackageDamage, PackageKill, PackageShots, ReplayPlayerTrack, Vec3 } from "@cs2dak/contract";
-import type { TriangleBvh } from "@cs2dak/maps";
-import { decodeDelta } from "@cs2dak/contract";
-import { decodeDuelWindow, frameIndexForTick, isVisibleAt, type VisibilityContext } from "./duel-window.js";
-import { createResolverFromPackage, type PlayerResolver } from "@cs2dak/core";
-import { activePhaseDamages, killWeaponName, normalizeWeapon, round } from "@cs2dak/core";
+import type {
+  DemoPackage,
+  DuelWindow,
+  PackageDamage,
+  PackageKill,
+  PackageShots,
+  ReplayPlayerTrack,
+  Vec3,
+} from '@cs2dak/contract';
+import type { TriangleBvh } from '@cs2dak/maps';
+import { decodeDelta } from '@cs2dak/contract';
+import {
+  decodeDuelWindow,
+  frameIndexForTick,
+  isVisibleAt,
+  type VisibilityContext,
+} from './duel-window.js';
+import { createResolverFromPackage, type PlayerResolver } from '@cs2dak/core';
+import { activePhaseDamages, killWeaponName, normalizeWeapon, round } from '@cs2dak/core';
 
 const ENGAGEMENT_GAP_SECONDS = 1.5;
 const CONTESTED_WINDOW_SECONDS = 1.5;
@@ -13,8 +26,8 @@ const SUPPRESSED_ANGLE_DEGREES = 60;
 const BURST_GAP_SECONDS = 0.25;
 const RUNNING_SPEED_THRESHOLD = 120;
 
-export type DuelClassification = "contested_duel" | "suppressed_kill" | "caught_off_guard";
-export type DuelHpBucket = "full_hp" | "low_hp";
+export type DuelClassification = 'contested_duel' | 'suppressed_kill' | 'caught_off_guard';
+export type DuelHpBucket = 'full_hp' | 'low_hp';
 
 export interface DuelEvidenceTicks {
   engagementStartTick: number;
@@ -67,7 +80,7 @@ export interface TtkDistribution {
 }
 
 export interface DuelSignals {
-  version: "cs2-demo-analysis-kit/duel-signals-0.1";
+  version: 'cs2-demo-analysis-kit/duel-signals-0.1';
   tickrate: number;
   records: DuelRecord[];
   ttk: {
@@ -94,7 +107,12 @@ interface Engagement {
   roundNumber: number;
   startTick: number;
   endTick: number;
-  events: Array<{ tick: number; attackerIndex: number | null; victimIndex: number | null; kind: "shot" | "damage" | "kill" }>;
+  events: Array<{
+    tick: number;
+    attackerIndex: number | null;
+    victimIndex: number | null;
+    kind: 'shot' | 'damage' | 'kill';
+  }>;
 }
 
 function tickrateOf(pkg: DemoPackage): number {
@@ -106,7 +124,7 @@ function ticks(seconds: number, tickrate: number): number {
 }
 
 function msBetween(startTick: number, endTick: number, tickrate: number): number {
-  return Math.max(0, round((endTick - startTick) / tickrate * 1000, 1));
+  return Math.max(0, round(((endTick - startTick) / tickrate) * 1000, 1));
 }
 
 function pct(sorted: number[], percentile: number): number | null {
@@ -126,10 +144,12 @@ function distribution(values: number[]): TtkDistribution {
     { minMs: 250, maxMs: 500, count: 0 },
     { minMs: 500, maxMs: 1000, count: 0 },
     { minMs: 1000, maxMs: 2000, count: 0 },
-    { minMs: 2000, maxMs: Number.POSITIVE_INFINITY, count: 0 }
+    { minMs: 2000, maxMs: Number.POSITIVE_INFINITY, count: 0 },
   ];
   for (const value of sorted) {
-    const bucket = buckets.find((row) => value >= row.minMs && value < row.maxMs) ?? buckets[buckets.length - 1]!;
+    const bucket =
+      buckets.find((row) => value >= row.minMs && value < row.maxMs) ??
+      buckets[buckets.length - 1]!;
     bucket.count += 1;
   }
   return {
@@ -137,7 +157,7 @@ function distribution(values: number[]): TtkDistribution {
     median: pct(sorted, 0.5),
     p25: pct(sorted, 0.25),
     p75: pct(sorted, 0.75),
-    histogram: buckets
+    histogram: buckets,
   };
 }
 
@@ -152,16 +172,21 @@ function flattenShots(shots: PackageShots | undefined): FlatShot[] {
         roundNumber: track.roundNumber,
         playerIndex: track.playerIndex,
         tick: trackTicks[i]!,
-        weapon: normalizeWeapon(weaponIdx >= 0 ? (shots.weaponDict[weaponIdx] ?? "") : ""),
+        weapon: normalizeWeapon(weaponIdx >= 0 ? (shots.weaponDict[weaponIdx] ?? '') : ''),
         vx: track.vx[i] ?? 0,
-        vy: track.vy[i] ?? 0
+        vy: track.vy[i] ?? 0,
       });
     }
   }
   return rows.sort((a, b) => a.roundNumber - b.roundNumber || a.tick - b.tick);
 }
 
-function buildEngagements(damages: PackageDamage[], pkg: DemoPackage, shots: FlatShot[], tickrate: number): Engagement[] {
+function buildEngagements(
+  damages: PackageDamage[],
+  pkg: DemoPackage,
+  shots: FlatShot[],
+  tickrate: number,
+): Engagement[] {
   const maxGap = ticks(ENGAGEMENT_GAP_SECONDS, tickrate);
   const events = [
     ...shots.map((shot) => ({
@@ -169,34 +194,38 @@ function buildEngagements(damages: PackageDamage[], pkg: DemoPackage, shots: Fla
       tick: shot.tick,
       attackerIndex: shot.playerIndex,
       victimIndex: null,
-      kind: "shot" as const
+      kind: 'shot' as const,
     })),
     ...damages.map((damage) => ({
       roundNumber: damage.roundNumber,
       tick: damage.tick,
       attackerIndex: damage.attackerIndex,
       victimIndex: damage.victimIndex,
-      kind: "damage" as const
+      kind: 'damage' as const,
     })),
     ...pkg.kills.map((kill) => ({
       roundNumber: kill.roundNumber,
       tick: kill.tick,
       attackerIndex: kill.killerIndex,
       victimIndex: kill.victimIndex,
-      kind: "kill" as const
-    }))
+      kind: 'kill' as const,
+    })),
   ].sort((a, b) => a.roundNumber - b.roundNumber || a.tick - b.tick);
 
   const out: Engagement[] = [];
   for (const event of events) {
     const current = out[out.length - 1];
-    if (!current || current.roundNumber !== event.roundNumber || event.tick - current.endTick > maxGap) {
+    if (
+      !current ||
+      current.roundNumber !== event.roundNumber ||
+      event.tick - current.endTick > maxGap
+    ) {
       out.push({
         id: `${event.roundNumber}:${event.tick}:${out.length}`,
         roundNumber: event.roundNumber,
         startTick: event.tick,
         endTick: event.tick,
-        events: [event]
+        events: [event],
       });
     } else {
       current.endTick = Math.max(current.endTick, event.tick);
@@ -207,13 +236,20 @@ function buildEngagements(damages: PackageDamage[], pkg: DemoPackage, shots: Fla
 }
 
 function engagementForKill(engagements: Engagement[], kill: PackageKill): Engagement {
-  return engagements.find((row) => row.roundNumber === kill.roundNumber && row.startTick <= kill.tick && row.endTick >= kill.tick) ?? {
-    id: `${kill.roundNumber}:${kill.tick}:fallback`,
-    roundNumber: kill.roundNumber,
-    startTick: kill.tick,
-    endTick: kill.tick,
-    events: []
-  };
+  return (
+    engagements.find(
+      (row) =>
+        row.roundNumber === kill.roundNumber &&
+        row.startTick <= kill.tick &&
+        row.endTick >= kill.tick,
+    ) ?? {
+      id: `${kill.roundNumber}:${kill.tick}:fallback`,
+      roundNumber: kill.roundNumber,
+      startTick: kill.tick,
+      endTick: kill.tick,
+      events: [],
+    }
+  );
 }
 
 function pairId(roundNumber: number, a: number, b: number): string {
@@ -223,14 +259,17 @@ function pairId(roundNumber: number, a: number, b: number): string {
 }
 
 function yawTo(target: Vec3, from: Vec3): number {
-  return Math.atan2(target.y - from.y, target.x - from.x) * 180 / Math.PI;
+  return (Math.atan2(target.y - from.y, target.x - from.x) * 180) / Math.PI;
 }
 
 function angleDiff(a: number, b: number): number {
   return Math.abs(((a - b + 540) % 360) - 180);
 }
 
-function replayTrackAtKill(pkg: DemoPackage, kill: PackageKill): { track: ReplayPlayerTrack; frameIndex: number } | null {
+function replayTrackAtKill(
+  pkg: DemoPackage,
+  kill: PackageKill,
+): { track: ReplayPlayerTrack; frameIndex: number } | null {
   const replayRound = pkg.replay?.rounds.find((round) => round.roundNumber === kill.roundNumber);
   if (!replayRound) return null;
   const track = replayRound.players.find((player) => player.playerIndex === kill.victimIndex);
@@ -240,44 +279,63 @@ function replayTrackAtKill(pkg: DemoPackage, kill: PackageKill): { track: Replay
 }
 
 function duelWindowForKill(pkg: DemoPackage, kill: PackageKill): DuelWindow | null {
-  return pkg.duels?.windows.find((window) =>
-    window.roundNumber === kill.roundNumber &&
-    window.anchors.some((anchor) => anchor.tick === kill.tick || Math.abs(anchor.tick - kill.tick) <= 2)
-  ) ?? null;
+  return (
+    pkg.duels?.windows.find(
+      (window) =>
+        window.roundNumber === kill.roundNumber &&
+        window.anchors.some(
+          (anchor) => anchor.tick === kill.tick || Math.abs(anchor.tick - kill.tick) <= 2,
+        ),
+    ) ?? null
+  );
 }
 
-function victimFrameInDuelWindow(pkg: DemoPackage, kill: PackageKill): { position: Vec3; yaw: number; moving: boolean } | null {
+function victimFrameInDuelWindow(
+  pkg: DemoPackage,
+  kill: PackageKill,
+): { position: Vec3; yaw: number; moving: boolean } | null {
   const window = duelWindowForKill(pkg, kill);
   if (!window) return null;
   const track = window.players.find((player) => player.playerIndex === kill.victimIndex);
   if (!track) return null;
-  const index = Math.max(0, Math.min(window.frameCount - 1, Math.round((kill.tick - window.startTick) / window.tickStep)));
+  const index = Math.max(
+    0,
+    Math.min(window.frameCount - 1, Math.round((kill.tick - window.startTick) / window.tickStep)),
+  );
   const x = decodeDelta(track.x);
   const y = decodeDelta(track.y);
   const z = decodeDelta(track.z);
   const yaw = decodeDelta(track.yaw);
   const prevIndex = Math.max(0, index - 1);
   const dt = Math.max(1, index - prevIndex);
-  const distance = Math.hypot((x[index] ?? 0) - (x[prevIndex] ?? 0), (y[index] ?? 0) - (y[prevIndex] ?? 0));
+  const distance = Math.hypot(
+    (x[index] ?? 0) - (x[prevIndex] ?? 0),
+    (y[index] ?? 0) - (y[prevIndex] ?? 0),
+  );
   const tickrate = pkg.duels?.meta.sampleRate ?? tickrateOf(pkg);
   return {
     position: {
       x: (x[index] ?? kill.victimPosition.x) / (pkg.duels?.meta.coordScale ?? 1),
       y: (y[index] ?? kill.victimPosition.y) / (pkg.duels?.meta.coordScale ?? 1),
-      z: (z[index] ?? kill.victimPosition.z) / (pkg.duels?.meta.coordScale ?? 1)
+      z: (z[index] ?? kill.victimPosition.z) / (pkg.duels?.meta.coordScale ?? 1),
     },
     yaw: (yaw[index] ?? 0) / (pkg.duels?.meta.angleScale ?? 10),
-    moving: distance / dt * tickrate > RUNNING_SPEED_THRESHOLD
+    moving: (distance / dt) * tickrate > RUNNING_SPEED_THRESHOLD,
   };
 }
 
-function victimFacingState(pkg: DemoPackage, kill: PackageKill): { faced: boolean | null; moving: boolean } {
+function victimFacingState(
+  pkg: DemoPackage,
+  kill: PackageKill,
+): { faced: boolean | null; moving: boolean } {
   if (!kill.killerPosition) return { faced: null, moving: false };
   const fromDuel = victimFrameInDuelWindow(pkg, kill);
   if (fromDuel) {
     return {
-      faced: angleDiff(fromDuel.yaw, yawTo(kill.killerPosition, fromDuel.position)) <= SUPPRESSED_ANGLE_DEGREES,
-      moving: fromDuel.moving
+      faced:
+        angleDiff(fromDuel.yaw, yawTo(kill.killerPosition, fromDuel.position)) <=
+        SUPPRESSED_ANGLE_DEGREES,
+      moving: fromDuel.moving,
     };
   }
   const replay = replayTrackAtKill(pkg, kill);
@@ -292,25 +350,32 @@ function victimFacingState(pkg: DemoPackage, kill: PackageKill): { faced: boolea
   const position = {
     x: (xAbs[replay.frameIndex] ?? kill.victimPosition.x) / coordScale,
     y: (yAbs[replay.frameIndex] ?? kill.victimPosition.y) / coordScale,
-    z: (zAbs[replay.frameIndex] ?? kill.victimPosition.z) / coordScale
+    z: (zAbs[replay.frameIndex] ?? kill.victimPosition.z) / coordScale,
   };
-  const distance = Math.hypot(
-    (xAbs[replay.frameIndex] ?? 0) - (xAbs[prevIndex] ?? 0),
-    (yAbs[replay.frameIndex] ?? 0) - (yAbs[prevIndex] ?? 0)
-  ) / coordScale;
+  const distance =
+    Math.hypot(
+      (xAbs[replay.frameIndex] ?? 0) - (xAbs[prevIndex] ?? 0),
+      (yAbs[replay.frameIndex] ?? 0) - (yAbs[prevIndex] ?? 0),
+    ) / coordScale;
   const moving = distance * (pkg.replay?.meta.sampleRate ?? 8) > RUNNING_SPEED_THRESHOLD;
   const yaw = (yawAbs[replay.frameIndex] ?? 0) / angleScale;
-  return { faced: angleDiff(yaw, yawTo(kill.killerPosition, position)) <= SUPPRESSED_ANGLE_DEGREES, moving };
+  return {
+    faced: angleDiff(yaw, yawTo(kill.killerPosition, position)) <= SUPPRESSED_ANGLE_DEGREES,
+    moving,
+  };
 }
 
 function victimResponseTick(shots: FlatShot[], kill: PackageKill, tickrate: number): number | null {
   if (kill.killerIndex === null) return null;
   const window = ticks(CONTESTED_WINDOW_SECONDS, tickrate);
-  return shots.find((shot) =>
-    shot.roundNumber === kill.roundNumber &&
-    shot.playerIndex === kill.victimIndex &&
-    Math.abs(shot.tick - kill.tick) <= window
-  )?.tick ?? null;
+  return (
+    shots.find(
+      (shot) =>
+        shot.roundNumber === kill.roundNumber &&
+        shot.playerIndex === kill.victimIndex &&
+        Math.abs(shot.tick - kill.tick) <= window,
+    )?.tick ?? null
+  );
 }
 
 function burstForKill(shots: FlatShot[], kill: PackageKill, tickrate: number): FlatShot[] {
@@ -318,11 +383,12 @@ function burstForKill(shots: FlatShot[], kill: PackageKill, tickrate: number): F
   const maxGap = ticks(BURST_GAP_SECONDS, tickrate);
   const targetWeapon = normalizeWeapon(killWeaponName(kill));
   const prior = shots
-    .filter((shot) =>
-      shot.roundNumber === kill.roundNumber &&
-      shot.playerIndex === kill.killerIndex &&
-      shot.tick <= kill.tick &&
-      (!targetWeapon || shot.weapon === targetWeapon)
+    .filter(
+      (shot) =>
+        shot.roundNumber === kill.roundNumber &&
+        shot.playerIndex === kill.killerIndex &&
+        shot.tick <= kill.tick &&
+        (!targetWeapon || shot.weapon === targetWeapon),
     )
     .sort((a, b) => a.tick - b.tick);
   const bursts: FlatShot[][] = [];
@@ -336,11 +402,12 @@ function burstForKill(shots: FlatShot[], kill: PackageKill, tickrate: number): F
 
 function victimHealthBefore(damages: PackageDamage[], kill: PackageKill): number {
   const direct = damages
-    .filter((row) =>
-      row.roundNumber === kill.roundNumber &&
-      row.victimIndex === kill.victimIndex &&
-      row.tick <= kill.tick &&
-      (kill.killerIndex === null || row.attackerIndex === kill.killerIndex)
+    .filter(
+      (row) =>
+        row.roundNumber === kill.roundNumber &&
+        row.victimIndex === kill.victimIndex &&
+        row.tick <= kill.tick &&
+        (kill.killerIndex === null || row.attackerIndex === kill.killerIndex),
     )
     .sort((a, b) => a.tick - b.tick)[0];
   return direct?.victimHealthBefore ?? 100;
@@ -349,26 +416,40 @@ function victimHealthBefore(damages: PackageDamage[], kill: PackageKill): number
 function killerHealthBefore(damages: PackageDamage[], kill: PackageKill): number | null {
   if (kill.killerIndex === null) return null;
   const prior = damages
-    .filter((row) => row.roundNumber === kill.roundNumber && row.victimIndex === kill.killerIndex && row.tick <= kill.tick)
+    .filter(
+      (row) =>
+        row.roundNumber === kill.roundNumber &&
+        row.victimIndex === kill.killerIndex &&
+        row.tick <= kill.tick,
+    )
     .sort((a, b) => b.tick - a.tick)[0];
   return prior ? Math.max(0, prior.victimHealthBefore - prior.healthDamage) : 100;
 }
 
-function hasThirdPartyImpact(damages: PackageDamage[], pkg: DemoPackage, kill: PackageKill, engagement: Engagement): boolean {
+function hasThirdPartyImpact(
+  damages: PackageDamage[],
+  pkg: DemoPackage,
+  kill: PackageKill,
+  engagement: Engagement,
+): boolean {
   if (kill.killerIndex === null) return true;
   const pairedWindow = ticks(DUEL_PAIR_WINDOW_SECONDS, tickrateOf(pkg));
-  return damages.some((damage) =>
-    damage.roundNumber === kill.roundNumber &&
-    damage.victimIndex === kill.victimIndex &&
-    damage.attackerIndex !== null &&
-    damage.attackerIndex !== kill.killerIndex &&
-    Math.abs(damage.tick - kill.tick) <= pairedWindow &&
-    damage.tick >= engagement.startTick &&
-    damage.tick <= engagement.endTick
+  return damages.some(
+    (damage) =>
+      damage.roundNumber === kill.roundNumber &&
+      damage.victimIndex === kill.victimIndex &&
+      damage.attackerIndex !== null &&
+      damage.attackerIndex !== kill.killerIndex &&
+      Math.abs(damage.tick - kill.tick) <= pairedWindow &&
+      damage.tick >= engagement.startTick &&
+      damage.tick <= engagement.endTick,
   );
 }
 
-function isEnemyKill(resolver: PlayerResolver, kill: PackageKill): kill is PackageKill & { killerIndex: number } {
+function isEnemyKill(
+  resolver: PlayerResolver,
+  kill: PackageKill,
+): kill is PackageKill & { killerIndex: number } {
   if (kill.killerIndex === null || kill.killerIndex === kill.victimIndex) return false;
   const killer = resolver.byIndexOrNull(kill.killerIndex);
   const victim = resolver.byIndexOrNull(kill.victimIndex);
@@ -395,36 +476,47 @@ function classifyDuel(
   shots: FlatShot[],
   engagement: Engagement,
   killerFirstShotTick: number | null,
-  fallback: DuelClassification
+  fallback: DuelClassification,
 ): DuelClassification {
   if (!window) return fallback;
   const view = decodeDuelWindow(ctx.pkg, window);
-  const victimDamagedKiller = damages.some((damage) =>
-    damage.roundNumber === kill.roundNumber &&
-    damage.attackerIndex === kill.victimIndex &&
-    damage.victimIndex === kill.killerIndex &&
-    damage.tick >= engagement.startTick &&
-    damage.tick <= kill.tick
+  const victimDamagedKiller = damages.some(
+    (damage) =>
+      damage.roundNumber === kill.roundNumber &&
+      damage.attackerIndex === kill.victimIndex &&
+      damage.victimIndex === kill.killerIndex &&
+      damage.tick >= engagement.startTick &&
+      damage.tick <= kill.tick,
   );
-  if (victimDamagedKiller) return "contested_duel";
+  if (victimDamagedKiller) return 'contested_duel';
   const contestStart = killerFirstShotTick ?? engagement.startTick;
-  const victimShots = shots.filter((shot) =>
-    shot.roundNumber === kill.roundNumber && shot.playerIndex === kill.victimIndex && shot.tick >= contestStart && shot.tick <= kill.tick
+  const victimShots = shots.filter(
+    (shot) =>
+      shot.roundNumber === kill.roundNumber &&
+      shot.playerIndex === kill.victimIndex &&
+      shot.tick >= contestStart &&
+      shot.tick <= kill.tick,
   );
   for (const shot of victimShots) {
-    if (isVisibleAt(ctx, view, kill.victimIndex, kill.killerIndex, frameIndexForTick(view, shot.tick))) return "contested_duel";
+    if (
+      isVisibleAt(ctx, view, kill.victimIndex, kill.killerIndex, frameIndexForTick(view, shot.tick))
+    )
+      return 'contested_duel';
   }
   const killFrame = frameIndexForTick(view, kill.tick);
   for (let frame = 0; frame <= killFrame; frame++) {
-    if (isVisibleAt(ctx, view, kill.victimIndex, kill.killerIndex, frame)) return "suppressed_kill";
+    if (isVisibleAt(ctx, view, kill.victimIndex, kill.killerIndex, frame)) return 'suppressed_kill';
   }
-  return "caught_off_guard";
+  return 'caught_off_guard';
 }
 
 /** buildDuelsSignals 默认路径按 pkg 实例记忆化；传入 visibility 时结果依赖 BVH，跳过全局缓存。 */
 const duelSignalsCache = new WeakMap<DemoPackage, DuelSignals>();
 
-export function buildDuelsSignals(input: DemoPackage, options: DuelSignalsOptions = {}): DuelSignals {
+export function buildDuelsSignals(
+  input: DemoPackage,
+  options: DuelSignalsOptions = {},
+): DuelSignals {
   const cacheable = options.visibility == null;
   const cached = cacheable ? duelSignalsCache.get(input) : undefined;
   if (cached) return cached;
@@ -446,18 +538,29 @@ export function buildDuelsSignals(input: DemoPackage, options: DuelSignalsOption
       const burst = burstForKill(shots, kill, tickrate);
       const window = duelWindowForKill(pkg, kill);
       // 有 duels 满 tick 窗口时用「受害者 → 击杀者」可见性时间线判定；否则回退到还手/朝向启发式。
-      const fallbackClass: DuelClassification = responseTick != null
-        ? "contested_duel"
-        : facing.faced === true && !facing.moving
-          ? "suppressed_kill"
-          : "caught_off_guard";
-      const classification = classifyDuel(ctx, damages, kill, window, shots, engagement, burst[0]?.tick ?? null, fallbackClass);
+      const fallbackClass: DuelClassification =
+        responseTick != null
+          ? 'contested_duel'
+          : facing.faced === true && !facing.moving
+            ? 'suppressed_kill'
+            : 'caught_off_guard';
+      const classification = classifyDuel(
+        ctx,
+        damages,
+        kill,
+        window,
+        shots,
+        engagement,
+        burst[0]?.tick ?? null,
+        fallbackClass,
+      );
       const hp = victimHealthBefore(damages, kill);
-      const hpBucket: DuelHpBucket = hp >= FULL_HEALTH_HP ? "full_hp" : "low_hp";
+      const hpBucket: DuelHpBucket = hp >= FULL_HEALTH_HP ? 'full_hp' : 'low_hp';
       const thirdParty = hasThirdPartyImpact(damages, pkg, kill, engagement);
-      const ttkMs = hpBucket === "full_hp" && !thirdParty && burst.length > 0
-        ? msBetween(burst[0]!.tick, kill.tick, tickrate)
-        : null;
+      const ttkMs =
+        hpBucket === 'full_hp' && !thirdParty && burst.length > 0
+          ? msBetween(burst[0]!.tick, kill.tick, tickrate)
+          : null;
       return {
         id: `${kill.roundNumber}-${kill.tick}-${kill.killerIndex}-${kill.victimIndex}-${index}`,
         roundNumber: kill.roundNumber,
@@ -478,7 +581,7 @@ export function buildDuelsSignals(input: DemoPackage, options: DuelSignalsOption
         penetratedObjects: kill.penetratedObjects ?? 0,
         classification,
         hpBucket,
-        fullHealth: hpBucket === "full_hp",
+        fullHealth: hpBucket === 'full_hp',
         victimHealthBefore: hp,
         killerHealthBefore: killerHealthBefore(damages, kill),
         ttkMs,
@@ -494,29 +597,42 @@ export function buildDuelsSignals(input: DemoPackage, options: DuelSignalsOption
           victimResponseTick: responseTick,
           killTick: kill.tick,
           windowStartTick: window?.startTick,
-          windowEndTick: window ? window.startTick + window.tickStep * Math.max(0, window.frameCount - 1) : undefined
-        }
+          windowEndTick: window
+            ? window.startTick + window.tickStep * Math.max(0, window.frameCount - 1)
+            : undefined,
+        },
       };
     })
     .sort((a, b) => a.roundNumber - b.roundNumber || a.tick - b.tick);
 
   const fullHpTtk = records
-    .filter((record) => record.hpBucket === "full_hp" && isCleanDuelRecord(record) && record.ttkMs != null)
+    .filter(
+      (record) =>
+        record.hpBucket === 'full_hp' && isCleanDuelRecord(record) && record.ttkMs != null,
+    )
     .map((record) => record.ttkMs!);
   const weaponKeys = [...new Set(records.map((record) => normalizeWeapon(record.weapon)))].sort();
   const signals: DuelSignals = {
-    version: "cs2-demo-analysis-kit/duel-signals-0.1",
+    version: 'cs2-demo-analysis-kit/duel-signals-0.1',
     tickrate,
     records,
     ttk: {
       allFullHp: distribution(fullHpTtk),
       byWeapon: weaponKeys.map((weapon) => ({
         weapon,
-        distribution: distribution(records
-          .filter((record) => normalizeWeapon(record.weapon) === weapon && record.hpBucket === "full_hp" && isCleanDuelRecord(record) && record.ttkMs != null)
-          .map((record) => record.ttkMs!))
-      }))
-    }
+        distribution: distribution(
+          records
+            .filter(
+              (record) =>
+                normalizeWeapon(record.weapon) === weapon &&
+                record.hpBucket === 'full_hp' &&
+                isCleanDuelRecord(record) &&
+                record.ttkMs != null,
+            )
+            .map((record) => record.ttkMs!),
+        ),
+      })),
+    },
   };
   if (cacheable) duelSignalsCache.set(input, signals);
   return signals;
@@ -526,7 +642,10 @@ export function deriveDuels(pkg: DemoPackage, options: DuelSignalsOptions = {}):
   return buildDuelsSignals(pkg, options).records;
 }
 
-export function deriveOpeningDuels(pkg: DemoPackage, options: DuelSignalsOptions = {}): DuelRecord[] {
+export function deriveOpeningDuels(
+  pkg: DemoPackage,
+  options: DuelSignalsOptions = {},
+): DuelRecord[] {
   const seen = new Set<number>();
   const rows: DuelRecord[] = [];
   for (const duel of deriveDuels(pkg, options)) {

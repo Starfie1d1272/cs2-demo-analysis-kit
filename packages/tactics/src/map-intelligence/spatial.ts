@@ -1,6 +1,12 @@
-import { FLAG_ALIVE, type TeamKey } from "@cs2dak/contract";
-import { findNavPath, type CalloutGrid, type CompactNav, type Vec3 } from "@cs2dak/maps";
-import { replayCalloutAt, replayPointAt, replayTickAt, type ReplayRoundContext, type ReplayRoundTrack } from "../tactics/replay-round-context.js";
+import { FLAG_ALIVE, type TeamKey } from '@cs2dak/contract';
+import { findNavPath, type CalloutGrid, type CompactNav, type Vec3 } from '@cs2dak/maps';
+import {
+  replayCalloutAt,
+  replayPointAt,
+  replayTickAt,
+  type ReplayRoundContext,
+  type ReplayRoundTrack,
+} from '../tactics/replay-round-context.js';
 
 export interface SpatialPlayerSample {
   playerIndex: number;
@@ -13,7 +19,7 @@ export interface SpatialPlayerSample {
 export interface TeamSpatialFrame {
   tick: number;
   teamKey: TeamKey;
-  side: "t" | "ct";
+  side: 't' | 'ct';
   players: SpatialPlayerSample[];
   components: number[][];
 }
@@ -44,9 +50,17 @@ function navConnected(nav: CompactNav, first: number, second: number): boolean {
   return connected;
 }
 
-function areConnected(first: SpatialPlayerSample, second: SpatialPlayerSample, nav: CompactNav | null): boolean {
+function areConnected(
+  first: SpatialPlayerSample,
+  second: SpatialPlayerSample,
+  nav: CompactNav | null,
+): boolean {
   const straight = distance(first.point, second.point);
-  if (straight > COMPONENT_DISTANCE && !(first.callout && first.callout === second.callout && straight <= SAME_CALLOUT_DISTANCE)) return false;
+  if (
+    straight > COMPONENT_DISTANCE &&
+    !(first.callout && first.callout === second.callout && straight <= SAME_CALLOUT_DISTANCE)
+  )
+    return false;
   if (!nav || first.navAreaId == null || second.navAreaId == null) return true;
   return navConnected(nav, first.navAreaId, second.navAreaId);
 }
@@ -83,10 +97,12 @@ export function buildRoundSpatialFrames(
   for (let frameIndex = 0; frameIndex < context.frameCount; frameIndex += 1) {
     const tick = replayTickAt(context, frameIndex);
     if (tick < context.round.freezeEndTick || tick > context.round.endTick) continue;
-    for (const side of ["t", "ct"] as const) {
-      const teamKey: TeamKey = context.round.teamASide === side ? "teamA" : "teamB";
+    for (const side of ['t', 'ct'] as const) {
+      const teamKey: TeamKey = context.round.teamASide === side ? 'teamA' : 'teamB';
       const players = context.tracks
-        .filter((track) => track.side === side && ((track.flags[frameIndex] ?? 0) & FLAG_ALIVE) !== 0)
+        .filter(
+          (track) => track.side === side && ((track.flags[frameIndex] ?? 0) & FLAG_ALIVE) !== 0,
+        )
         .map((track) => {
           const point = replayPointAt(track, frameIndex);
           if (!finitePoint(point)) return null;
@@ -97,8 +113,10 @@ export function buildRoundSpatialFrames(
             callout: replayCalloutAt(context, track, frameIndex, grid),
             navAreaId: navAreaAt(point),
           };
-        }).filter((player): player is SpatialPlayerSample => player != null);
-      if (players.length > 0) frames.push({ tick, teamKey, side, players, components: components(players, nav) });
+        })
+        .filter((player): player is SpatialPlayerSample => player != null);
+      if (players.length > 0)
+        frames.push({ tick, teamKey, side, players, components: components(players, nav) });
     }
   }
   return frames;

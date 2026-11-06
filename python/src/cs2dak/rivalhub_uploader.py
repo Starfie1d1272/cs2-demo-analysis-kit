@@ -1,4 +1,5 @@
 """RivalHub Demo Uploader: native files, ephemeral export, HTTP and OS credentials."""
+
 from __future__ import annotations
 
 import base64
@@ -54,12 +55,18 @@ def normalize_origin(value: str) -> str:
 def credential(origin: str, value: str | None = None) -> str | bool | None:
     account = hashlib.sha256(origin.encode()).hexdigest()
     if sys.platform == "win32":
-        return (_windows_credential_get(SERVICE, account) if value is None
-                else _windows_credential_set(SERVICE, account, value))
+        return (
+            _windows_credential_get(SERVICE, account)
+            if value is None
+            else _windows_credential_set(SERVICE, account, value)
+        )
     if sys.platform != "darwin":
         raise RuntimeError("当前系统不支持安全凭据存储，请使用 Windows 或 macOS")
-    return (_macos_credential_get(SERVICE, account) if value is None
-            else _macos_credential_set(SERVICE, account, value))
+    return (
+        _macos_credential_get(SERVICE, account)
+        if value is None
+        else _macos_credential_set(SERVICE, account, value)
+    )
 
 
 def delete_credential(origin: str) -> bool:
@@ -99,7 +106,12 @@ class UploaderApi:
                 data = json.loads(self._metadata.read_text()) if self._metadata.exists() else {}
                 rollback = self._connection_rollback
                 # A late cancel may only undo the credential written by this attempt.
-                if data.get("pairingId") != cancel_pairing_id or data.get("baseUrl") != origin or not rollback or rollback[0] != cancel_pairing_id:
+                if (
+                    data.get("pairingId") != cancel_pairing_id
+                    or data.get("baseUrl") != origin
+                    or not rollback
+                    or rollback[0] != cancel_pairing_id
+                ):
                     return True
                 self._restore_connection(origin, rollback)
                 self._connection_rollback = None
@@ -121,7 +133,12 @@ class UploaderApi:
         elif not delete_credential(origin):
             raise RuntimeError("CREDENTIAL_ROLLBACK：无法清除本次授权")
         previous_origin = normalize_origin(previous["baseUrl"]) if previous else ""
-        if previous_origin and previous_origin != origin and previous_token and not credential(previous_origin, previous_token):
+        if (
+            previous_origin
+            and previous_origin != origin
+            and previous_token
+            and not credential(previous_origin, previous_token)
+        ):
             raise RuntimeError("CREDENTIAL_ROLLBACK：无法恢复原网站授权")
         current = json.loads(self._metadata.read_text()) if self._metadata.exists() else None
         if current != previous:
@@ -137,13 +154,25 @@ class UploaderApi:
         previous_data = json.loads(self._metadata.read_text()) if self._metadata.exists() else None
         previous_origin = normalize_origin(previous_data["baseUrl"]) if previous_data else None
         previous_token = credential(previous_origin) if previous_origin else None
-        replaced_token = previous_token if previous_origin == self._origin else credential(self._origin) if self._origin else None
+        replaced_token = (
+            previous_token
+            if previous_origin == self._origin
+            else credential(self._origin)
+            if self._origin
+            else None
+        )
         if not self._origin or not token or not credential(self._origin, token):
-            raise RuntimeError("CREDENTIAL_SAVE：系统安全存储拒绝保存授权，请检查钥匙串或凭据管理器")
+            raise RuntimeError(
+                "CREDENTIAL_SAVE：系统安全存储拒绝保存授权，请检查钥匙串或凭据管理器"
+            )
         origin = self._origin
         rollback = (pairing_id, previous_data, previous_token, replaced_token)
         try:
-            if previous_origin and previous_origin != origin and not delete_credential(previous_origin):
+            if (
+                previous_origin
+                and previous_origin != origin
+                and not delete_credential(previous_origin)
+            ):
                 raise RuntimeError("CREDENTIAL_REPLACE：无法清除旧网站授权，请检查系统安全存储")
             data = {"baseUrl": origin, "pairingId": pairing_id}
             staging = self._metadata.with_suffix(".tmp")
@@ -155,7 +184,9 @@ class UploaderApi:
                 self._restore_connection(origin, rollback)
             except Exception as rollback_error:  # noqa: BLE001 - report rollback failure alongside primary.
                 log_failure(log, rollback_error, "connection.rollback")
-                raise RuntimeError("CREDENTIAL_ROLLBACK：保存授权失败，且原授权恢复未完成；请检查系统安全存储并重新授权") from primary
+                raise RuntimeError(
+                    "CREDENTIAL_ROLLBACK：保存授权失败，且原授权恢复未完成；请检查系统安全存储并重新授权"
+                ) from primary
             raise
         self._connection_rollback = rollback
         log.info("connection saved host=%s", urllib.parse.urlsplit(self._origin).hostname)
@@ -170,9 +201,13 @@ class UploaderApi:
         return True
 
     def request(self, path: str, method: str, body=None, key: str | None = None) -> dict:
-        allowed = {("/pairing/start", "POST"), ("/pairing/poll", "POST"),
-                   ("/events", "GET"), ("/events?seriesDisposition=1", "GET"),
-                   ("/evidence", "POST")}
+        allowed = {
+            ("/pairing/start", "POST"),
+            ("/pairing/poll", "POST"),
+            ("/events", "GET"),
+            ("/events?seriesDisposition=1", "GET"),
+            ("/evidence", "POST"),
+        }
         if (path, method) not in allowed or not self._origin:
             raise ValueError("不支持的请求")
         origin = self._origin
@@ -180,7 +215,10 @@ class UploaderApi:
         if path in {"/events", "/events?seriesDisposition=1", "/evidence"}:
             token = credential(origin)
             if not token:
-                return {"status": 401, "body": {"error": {"message": "授权不存在，请重新连接 RivalHub"}}}
+                return {
+                    "status": 401,
+                    "body": {"error": {"message": "授权不存在，请重新连接 RivalHub"}},
+                }
             headers["Authorization"] = f"Bearer {token}"
         if key:
             headers["Idempotency-Key"] = key
@@ -198,39 +236,67 @@ class UploaderApi:
             except (ValueError, OSError, http.client.HTTPException) as exc:
                 failure = log_failure(log, exc, "http.response")
                 failure.update(code="INVALID_RESPONSE", status=status, requestId=request_id)
-                return {"status": status, "requestId": request_id,
-                        "body": {"error": {"code": "INVALID_RESPONSE",
-                                           "message": f"网站响应无效 HTTP {status}：{failure['message']}"}},
-                        "diagnostic": safe_metadata(failure)}
+                return {
+                    "status": status,
+                    "requestId": request_id,
+                    "body": {
+                        "error": {
+                            "code": "INVALID_RESPONSE",
+                            "message": f"网站响应无效 HTTP {status}：{failure['message']}",
+                        }
+                    },
+                    "diagnostic": safe_metadata(failure),
+                }
             if not request_id and isinstance(data, dict):
                 candidate = data.get("requestId")
                 if not isinstance(candidate, str) and isinstance(data.get("error"), dict):
                     candidate = data["error"].get("requestId")
                 if isinstance(candidate, str):
                     request_id = sanitize_text(candidate, 160)
-            log.info("http method=%s path=%s status=%s requestId=%s", method, path, status, request_id)
+            log.info(
+                "http method=%s path=%s status=%s requestId=%s", method, path, status, request_id
+            )
             result = {"status": status, "body": data}
             if request_id:
                 result["requestId"] = request_id
             return result
 
         try:
-            response = self._transport.request(origin, path, method, headers,
-                                               json.dumps(body).encode() if body is not None else None)
+            response = self._transport.request(
+                origin,
+                path,
+                method,
+                headers,
+                json.dumps(body).encode() if body is not None else None,
+            )
             return response_data(response, response.status)
-        except (OSError, ValueError, http.client.HTTPException, urllib3.exceptions.HTTPError) as exc:
+        except (
+            OSError,
+            ValueError,
+            http.client.HTTPException,
+            urllib3.exceptions.HTTPError,
+        ) as exc:
             failure = log_failure(log, exc, "http.request")
             failure.update(code="NETWORK", status=status, requestId=request_id)
-            return {"status": status, "requestId": request_id,
-                    "body": {"error": {"code": "NETWORK", "message":
-                             f"NETWORK：无法连接网站，请检查网络和网站地址后重试；{failure['message']}"}},
-                    "diagnostic": safe_metadata(failure)}
+            return {
+                "status": status,
+                "requestId": request_id,
+                "body": {
+                    "error": {
+                        "code": "NETWORK",
+                        "message": f"NETWORK：无法连接网站，请检查网络和网站地址后重试；{failure['message']}",
+                    }
+                },
+                "diagnostic": safe_metadata(failure),
+            }
 
     def select_demos(self) -> list[dict]:
         import webview
+
         try:
-            paths = self._window.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=True,
-                                                   file_types=("CS2 Demo (*.dem)",))
+            paths = self._window.create_file_dialog(
+                webview.FileDialog.OPEN, allow_multiple=True, file_types=("CS2 Demo (*.dem)",)
+            )
         except Exception as error:  # native dialog boundary
             log_failure(log, error, "selection.dialog")
             raise RuntimeError("FILE_DIALOG_FAILED：无法打开 Demo 选择器，请重试") from error
@@ -241,7 +307,9 @@ class UploaderApi:
         for ordinal, value in enumerate(paths, 1):
             path = Path(value)
             if path.suffix.lower() != ".dem":
-                log.info("selection code=FILE_EXTENSION_REJECTED stage=selection.filter item=%d", ordinal)
+                log.info(
+                    "selection code=FILE_EXTENSION_REJECTED stage=selection.filter item=%d", ordinal
+                )
                 continue
             try:
                 regular = stat.S_ISREG(path.stat().st_mode)
@@ -252,15 +320,23 @@ class UploaderApi:
                 log_failure(log, error, "selection.read")
                 continue
             if not regular:
-                log.info("selection code=FILE_TYPE_REJECTED stage=selection.filter item=%d", ordinal)
+                log.info(
+                    "selection code=FILE_TYPE_REJECTED stage=selection.filter item=%d", ordinal
+                )
                 continue
             key = uuid.uuid4().hex[:12]
             self._files[key] = path
             log.info("demo=%s selected file=%s", key, json.dumps(path.name, ensure_ascii=False))
             result.append({"id": key, "name": path.name})
         if not result:
-            raise RuntimeError("FILE_SELECTION_REJECTED：所选文件均无法使用，请选择存在且可读取的 .dem 文件")
-        log.info("selection stage=selection.filter accepted=%d rejected=%d", len(result), len(paths) - len(result))
+            raise RuntimeError(
+                "FILE_SELECTION_REJECTED：所选文件均无法使用，请选择存在且可读取的 .dem 文件"
+            )
+        log.info(
+            "selection stage=selection.filter accepted=%d rejected=%d",
+            len(result),
+            len(paths) - len(result),
+        )
         return result
 
     def hash_demo(self, key: str) -> str:
@@ -302,8 +378,11 @@ class UploaderApi:
                 raise
             failure = log_failure(log, exc, "export:" + self._jobs[key].get("stage", "parse"))
             failure.update(code="PARSE_FAILED", fileId=key)
-            self._jobs[key].update(state="error", error=f"PARSE_FAILED：{failure['message']}",
-                                   diagnostic=safe_metadata(failure))
+            self._jobs[key].update(
+                state="error",
+                error=f"PARSE_FAILED：{failure['message']}",
+                diagnostic=safe_metadata(failure),
+            )
 
     def export_status(self, key: str) -> dict:
         return dict(self._jobs[key])
@@ -326,22 +405,33 @@ class UploaderApi:
     def record(self, key: str, phase: str, code: str = "", diagnostic=None) -> bool:
         # Only controlled identifiers; never accept arbitrary response bodies or tokens into logs.
         import re
+
         if not all(re.fullmatch(r"[A-Za-z0-9_-]{0,64}", value) for value in (key, phase, code)):
             return False
-        log.info("demo=%s phase=%s code=%s diagnostic=%s", key, phase, code,
-                 json.dumps(safe_metadata(diagnostic), ensure_ascii=False))
+        log.info(
+            "demo=%s phase=%s code=%s diagnostic=%s",
+            key,
+            phase,
+            code,
+            json.dumps(safe_metadata(diagnostic), ensure_ascii=False),
+        )
         return True
 
     def report_ui_error(self, message: str, stack: str = "", diagnostic=None) -> bool:
-        log.error("ui startup error message=%s stack=%s diagnostic=%s",
-                  json.dumps(sanitize_text(message, 1000)), json.dumps(sanitize_text(stack, 4000)),
-                  json.dumps(safe_metadata(diagnostic), ensure_ascii=False))
+        log.error(
+            "ui startup error message=%s stack=%s diagnostic=%s",
+            json.dumps(sanitize_text(message, 1000)),
+            json.dumps(sanitize_text(stack, 4000)),
+            json.dumps(safe_metadata(diagnostic), ensure_ascii=False),
+        )
         return True
 
     def export_logs(self) -> bool:
         import webview
-        target = self._window.create_file_dialog(webview.FileDialog.SAVE,
-                                               save_filename="rivalhub-uploader.log")
+
+        target = self._window.create_file_dialog(
+            webview.FileDialog.SAVE, save_filename="rivalhub-uploader.log"
+        )
         if not target:
             return False
         destination = target if isinstance(target, str) else target[0]
@@ -393,15 +483,25 @@ def main():
 
         stage = "startup.frontend"
         api = UploaderApi(userdata)
-        web = (Path(sys._MEIPASS) if getattr(sys, "frozen", False) else Path(__file__).parent)
+        web = Path(sys._MEIPASS) if getattr(sys, "frozen", False) else Path(__file__).parent
         page = web / "rivalhub_uploader_web" / "index.html"
         if not page.is_file():
-            raise RuntimeError("前端文件缺失，请重运行官方安装器；开发环境先运行 scripts/package-uploader.sh")
-        api._window = webview.create_window("RivalHub Demo Uploader", str(page), js_api=api,
-                                           width=1080, height=800, min_size=(820, 640))
+            raise RuntimeError(
+                "前端文件缺失，请重运行官方安装器；开发环境先运行 scripts/package-uploader.sh"
+            )
+        api._window = webview.create_window(
+            "RivalHub Demo Uploader",
+            str(page),
+            js_api=api,
+            width=1080,
+            height=800,
+            min_size=(820, 640),
+        )
         api._window.events.loaded += lambda: log.info("webview loaded")
         stage = "startup.webview-start"
-        webview.start(private_mode=True, **({"gui": "edgechromium"} if sys.platform == "win32" else {}))
+        webview.start(
+            private_mode=True, **({"gui": "edgechromium"} if sys.platform == "win32" else {})
+        )
     except Exception as exc:
         failure = log_failure(log, exc, stage)
         detail = failure.get("guidance", failure["message"])

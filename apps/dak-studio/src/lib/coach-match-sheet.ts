@@ -1,7 +1,7 @@
-import type { AtomicStorageAdapter } from "./storage/types";
-import { commitMaterialRevision, materialBaseline } from "./material-revision";
-import { getStorage } from "./storage";
-import type { SheetMaterialRef } from "./material-ref";
+import type { AtomicStorageAdapter } from './storage/types';
+import { commitMaterialRevision, materialBaseline } from './material-revision';
+import { getStorage } from './storage';
+import type { SheetMaterialRef } from './material-ref';
 
 export interface CoachMatchSheet {
   schemaVersion: 1;
@@ -20,35 +20,22 @@ export interface CoachMatchSheet {
 }
 export type CoachMatchSheetDraft = Pick<
   CoachMatchSheet,
-  "title" | "mapName" | "opponentLabel" | "sections"
+  'title' | 'mapName' | 'opponentLabel' | 'sections'
 >;
 export const emptyMatchSheet = (): CoachMatchSheetDraft => ({
-  title: "",
+  title: '',
   mapName: null,
-  opponentLabel: "",
-  sections: [{ id: crypto.randomUUID(), heading: "重点", notes: "", refs: [] }],
+  opponentLabel: '',
+  sections: [{ id: crypto.randomUUID(), heading: '重点', notes: '', refs: [] }],
 });
 
-const kinds = [
-  "study-note",
-  "training-focus",
-  "practice-lineup",
-  "playbook",
-  "assignment-set",
-];
-const object = (x: unknown): x is Record<string, unknown> =>
-  !!x && typeof x === "object";
-const string = (x: unknown): x is string => typeof x === "string";
+const kinds = ['study-note', 'training-focus', 'practice-lineup', 'playbook', 'assignment-set'];
+const object = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object';
+const string = (x: unknown): x is string => typeof x === 'string';
 function validRef(x: unknown): x is SheetMaterialRef {
-  return (
-    object(x) &&
-    string(x.kind) &&
-    kinds.includes(x.kind) &&
-    string(x.id) &&
-    !!x.id
-  );
+  return object(x) && string(x.kind) && kinds.includes(x.kind) && string(x.id) && !!x.id;
 }
-function validSection(x: unknown): x is CoachMatchSheet["sections"][number] {
+function validSection(x: unknown): x is CoachMatchSheet['sections'][number] {
   if (
     !object(x) ||
     !string(x.id) ||
@@ -59,10 +46,7 @@ function validSection(x: unknown): x is CoachMatchSheet["sections"][number] {
     !x.refs.every(validRef)
   )
     return false;
-  return (
-    new Set(x.refs.map((ref) => JSON.stringify([ref.kind, ref.id]))).size ===
-    x.refs.length
-  );
+  return new Set(x.refs.map((ref) => JSON.stringify([ref.kind, ref.id]))).size === x.refs.length;
 }
 function valid(x: unknown, key: string): x is CoachMatchSheet {
   if (
@@ -76,18 +60,16 @@ function valid(x: unknown, key: string): x is CoachMatchSheet {
     !string(x.opponentLabel) ||
     !Array.isArray(x.sections) ||
     !x.sections.every(validSection) ||
-    typeof x.createdAt !== "number" ||
+    typeof x.createdAt !== 'number' ||
     !Number.isFinite(x.createdAt) ||
-    typeof x.updatedAt !== "number" ||
+    typeof x.updatedAt !== 'number' ||
     !Number.isFinite(x.updatedAt)
   )
     return false;
-  return (
-    new Set(x.sections.map((section) => section.id)).size === x.sections.length
-  );
+  return new Set(x.sections.map((section) => section.id)).size === x.sections.length;
 }
 export function createCoachMatchSheetStore(storage: AtomicStorageAdapter) {
-  const namespace = "coach-match-sheets";
+  const namespace = 'coach-match-sheets';
   const records = storage.records(namespace);
   return {
     async list() {
@@ -103,7 +85,7 @@ export function createCoachMatchSheetStore(storage: AtomicStorageAdapter) {
     async get(id: string) {
       const item = await records.get<unknown>(id);
       if (item === undefined) return null;
-      if (!valid(item, id)) throw new Error("比赛单无法读取");
+      if (!valid(item, id)) throw new Error('比赛单无法读取');
       return item;
     },
     async create(draft: CoachMatchSheetDraft) {
@@ -116,25 +98,38 @@ export function createCoachMatchSheetStore(storage: AtomicStorageAdapter) {
         createdAt: now,
         updatedAt: now,
       };
-      if (!valid(item, item.id)) throw new Error("请填写标题并检查引用");
+      if (!valid(item, item.id)) throw new Error('请填写标题并检查引用');
       await records.put(item.id, item);
       return item;
     },
     async update(id: string, draft: CoachMatchSheetDraft, revision: string) {
-      const old = materialBaseline(revision, id, (value): value is CoachMatchSheet => valid(value, id));
+      const old = materialBaseline(revision, id, (value): value is CoachMatchSheet =>
+        valid(value, id),
+      );
       const item = {
         ...old,
         ...structuredClone(draft),
         title: draft.title.trim(),
         updatedAt: Date.now(),
       };
-      if (!valid(item, id)) throw new Error("请填写标题并检查引用");
-      await commitMaterialRevision(storage, namespace, id, old, { namespace, key: id, kind: "put", value: item });
+      if (!valid(item, id)) throw new Error('请填写标题并检查引用');
+      await commitMaterialRevision(storage, namespace, id, old, {
+        namespace,
+        key: id,
+        kind: 'put',
+        value: item,
+      });
       return item;
     },
     async remove(id: string, revision: string) {
-      const old = materialBaseline(revision, id, (value): value is CoachMatchSheet => valid(value, id));
-      await commitMaterialRevision(storage, namespace, id, old, { namespace, key: id, kind: "delete" });
+      const old = materialBaseline(revision, id, (value): value is CoachMatchSheet =>
+        valid(value, id),
+      );
+      await commitMaterialRevision(storage, namespace, id, old, {
+        namespace,
+        key: id,
+        kind: 'delete',
+      });
     },
   };
 }

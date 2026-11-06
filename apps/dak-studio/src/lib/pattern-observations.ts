@@ -1,12 +1,27 @@
-import { TACTICAL_FACT_VERSION, type TacticalCluster, type TacticalRoundFact } from "@cs2dak/tactics";
-import { displayTeamName } from "./team-identity";
+import {
+  TACTICAL_FACT_VERSION,
+  type TacticalCluster,
+  type TacticalRoundFact,
+} from '@cs2dak/tactics';
+import { displayTeamName } from './team-identity';
 
 export function patternFingerprint(cluster: TacticalCluster): string {
-  return [cluster.mapName, cluster.side, cluster.teamIdentity, cluster.economyEntry, cluster.openingSignature].join(":");
+  return [
+    cluster.mapName,
+    cluster.side,
+    cluster.teamIdentity,
+    cluster.economyEntry,
+    cluster.openingSignature,
+  ].join(':');
 }
 
-function normalizeTeamName(name: string | null | undefined, teamRenames: Record<string, string>): string {
-  return displayTeamName(name ?? "", teamRenames).trim().toLowerCase();
+function normalizeTeamName(
+  name: string | null | undefined,
+  teamRenames: Record<string, string>,
+): string {
+  return displayTeamName(name ?? '', teamRenames)
+    .trim()
+    .toLowerCase();
 }
 
 /**
@@ -25,24 +40,34 @@ export function filterBySubjectTeam(
 
 /** 验证 site entry 子字段包含扩展口径（trajectory / entryChokeId / routeFamilyId）。 */
 function hasExtendedEntryFields(entry: object): boolean {
-  return Array.isArray((entry as Record<string, unknown>).trajectory) && "entryChokeId" in entry && "routeFamilyId" in entry;
+  return (
+    Array.isArray((entry as Record<string, unknown>).trajectory) &&
+    'entryChokeId' in entry &&
+    'routeFamilyId' in entry
+  );
 }
 
 export function isCurrentTacticalRoundFact(row: TacticalRoundFact): boolean {
   // 口径版本不符（旧 facts 无 analysisVersion / 缺 c4Route 等新字段）→ 需重建。
   if (row.analysisVersion !== TACTICAL_FACT_VERSION) return false;
-  if (!row.openingPattern || typeof row.openingPattern.coarseSignature !== "string") return false;
-  if (typeof row.openingPattern.detailedSignature !== "string" || !Array.isArray(row.openingPattern.evidence)) return false;
+  if (!row.openingPattern || typeof row.openingPattern.coarseSignature !== 'string') return false;
+  if (
+    typeof row.openingPattern.detailedSignature !== 'string' ||
+    !Array.isArray(row.openingPattern.evidence)
+  )
+    return false;
   if (!Array.isArray(row.openingPressure)) return false;
   if (!row.siteEntries?.a || !row.siteEntries.b) return false;
-  if (typeof row.opponentEconomy !== "string") return false;
-  if (![...row.siteEntries.a.order, ...row.siteEntries.b.order].every(hasExtendedEntryFields)) return false;
+  if (typeof row.opponentEconomy !== 'string') return false;
+  if (![...row.siteEntries.a.order, ...row.siteEntries.b.order].every(hasExtendedEntryFields))
+    return false;
   if (!Array.isArray(row.grenades) || !Array.isArray(row.grenadeOccurrenceIds)) return false;
-  if (typeof row.teamName !== "string" || typeof row.opponentName !== "string") return false;
-  return row.openingPressure.every((event) =>
-    event &&
-    typeof event.callout === "string" &&
-    typeof event.calloutLabel === "string" &&
-    (event.kind === "forward" || event.kind === "deep")
+  if (typeof row.teamName !== 'string' || typeof row.opponentName !== 'string') return false;
+  return row.openingPressure.every(
+    (event) =>
+      event &&
+      typeof event.callout === 'string' &&
+      typeof event.calloutLabel === 'string' &&
+      (event.kind === 'forward' || event.kind === 'deep'),
   );
 }

@@ -10,12 +10,23 @@
  *   - 单队场 = 该队所有贡献相加（该队 CT 回合看哪、T 回合站哪）
  * denom 按 side 分（每回合恰一个 CT 一个 T 队），归一化 = 计数 / 对应 side denom。
  */
-import type { DemoPackage, PackageGrenade } from "@cs2dak/contract";
-import type { RadarField, RadarFieldBase } from "./models/radar-field.js";
-import { RADAR_FIELD_SCHEMA_VERSION, RADAR_FIELD_MAX_SEC, RADAR_FIELD_BASES } from "./models/radar-field.js";
-import { decodeDelta } from "@cs2dak/contract";
-import { type RadarFieldGridIndex, type Vec3, type TriangleBvh, staticLineOfSight, radarFieldCellAt, MAP_CALIBRATION_VERSION } from "@cs2dak/maps";
-import { EYE_HEIGHT, TARGET_HEIGHT } from "@cs2dak/maps";
+import type { DemoPackage, PackageGrenade } from '@cs2dak/contract';
+import type { RadarField, RadarFieldBase } from './models/radar-field.js';
+import {
+  RADAR_FIELD_SCHEMA_VERSION,
+  RADAR_FIELD_MAX_SEC,
+  RADAR_FIELD_BASES,
+} from './models/radar-field.js';
+import { decodeDelta } from '@cs2dak/contract';
+import {
+  type RadarFieldGridIndex,
+  type Vec3,
+  type TriangleBvh,
+  staticLineOfSight,
+  radarFieldCellAt,
+  MAP_CALIBRATION_VERSION,
+} from '@cs2dak/maps';
+import { EYE_HEIGHT, TARGET_HEIGHT } from '@cs2dak/maps';
 
 /** 算法参数指纹；锥角/采样率/格大小/眼高/MAX_DIST 任一变更即 +1，使旧缓存场失效。 */
 export const RADAR_FIELD_VERSION = 3;
@@ -30,8 +41,8 @@ const SCREEN_4X3_TAN_V = Math.tan((36.87 * Math.PI) / 180);
 const SMOKE_RADIUS = 144;
 const SOUND_RADIUS = 800;
 const SOUND_RADIUS_SQ = SOUND_RADIUS * SOUND_RADIUS;
-const GUN_ECONOMY = new Set(["full", "conversion"]);
-const SMOKE_TYPES = new Set(["smoke", "smokegrenade"]);
+const GUN_ECONOMY = new Set(['full', 'conversion']);
+const SMOKE_TYPES = new Set(['smoke', 'smokegrenade']);
 const EMPTY_SMOKES: SmokeGrenade[] = [];
 
 const FIELD_BASES = RADAR_FIELD_BASES;
@@ -79,7 +90,12 @@ function makeFields(maxSec: number, nCells: number): Record<RadarFieldBase, Int3
   return fields;
 }
 
-function makeContribution(team: string, matchId: string, maxSec: number, nCells: number): Contribution {
+function makeContribution(
+  team: string,
+  matchId: string,
+  maxSec: number,
+  nCells: number,
+): Contribution {
   return {
     team,
     matchId,
@@ -90,7 +106,19 @@ function makeContribution(team: string, matchId: string, maxSec: number, nCells:
   };
 }
 
-function decodeTrack(t: { x: number[]; y: number[]; z: number[]; yaw: number[]; pitch: number[]; hp: number[]; flash: number[] }, coordScale: number, angleScale: number): Track {
+function decodeTrack(
+  t: {
+    x: number[];
+    y: number[];
+    z: number[];
+    yaw: number[];
+    pitch: number[];
+    hp: number[];
+    flash: number[];
+  },
+  coordScale: number,
+  angleScale: number,
+): Track {
   const coords = (arr: number[]) => decodeDelta(arr).map((v) => v * coordScale);
   const angles = (arr: number[]) => decodeDelta(arr).map((v) => v / angleScale);
   return {
@@ -134,7 +162,10 @@ function activeViewersAt(viewers: Track[], i: number): ActiveViewer[] {
 function activeSmokesAt(smokes: SmokeGrenade[], tick: number): SmokeGrenade[] {
   let out: SmokeGrenade[] | null = null;
   for (const grenade of smokes) {
-    if (grenade.effectTick <= tick && (grenade.destroyTick == null || tick <= grenade.destroyTick)) {
+    if (
+      grenade.effectTick <= tick &&
+      (grenade.destroyTick == null || tick <= grenade.destroyTick)
+    ) {
       (out ??= []).push(grenade);
     }
   }
@@ -142,11 +173,18 @@ function activeSmokesAt(smokes: SmokeGrenade[], tick: number): SmokeGrenade[] {
 }
 
 function pointToSegmentDistance(point: Vec3, a: Vec3, b: Vec3): number {
-  const abx = b.x - a.x, aby = b.y - a.y, abz = b.z - a.z;
-  const apx = point.x - a.x, apy = point.y - a.y, apz = point.z - a.z;
+  const abx = b.x - a.x,
+    aby = b.y - a.y,
+    abz = b.z - a.z;
+  const apx = point.x - a.x,
+    apy = point.y - a.y,
+    apz = point.z - a.z;
   const denom = abx * abx + aby * aby + abz * abz;
-  const t = denom < 1e-6 ? 0 : Math.max(0, Math.min(1, (apx * abx + apy * aby + apz * abz) / denom));
-  const cx = a.x + abx * t, cy = a.y + aby * t, cz = a.z + abz * t;
+  const t =
+    denom < 1e-6 ? 0 : Math.max(0, Math.min(1, (apx * abx + apy * aby + apz * abz) / denom));
+  const cx = a.x + abx * t,
+    cy = a.y + aby * t,
+    cz = a.z + abz * t;
   return Math.hypot(point.x - cx, point.y - cy, point.z - cz);
 }
 
@@ -163,15 +201,18 @@ export interface BuildMatchRadarFieldOptions {
   /** 静态墙体 BVH；缺失时跳过 LOS（triAvailability=none，只保留锥+烟）。 */
   bvh?: TriangleBvh | null;
   /** gun = 长枪局（双方 full/conversion）；all = 全部回合。默认 gun。 */
-  economy?: "gun" | "all";
+  economy?: 'gun' | 'all';
 }
 
 /**
  * 算一场的雷达场贡献，返回 [teamA, teamB] 两份（各为独立 RadarField，scope.kind=team）。
  * 无 replay 时返回 []。studio 缓存这两份并跨场聚合。
  */
-export function buildMatchRadarField(pkg: DemoPackage, options: BuildMatchRadarFieldOptions): RadarField[] {
-  const { matchId, grid, bvh = null, economy = "gun" } = options;
+export function buildMatchRadarField(
+  pkg: DemoPackage,
+  options: BuildMatchRadarFieldOptions,
+): RadarField[] {
+  const { matchId, grid, bvh = null, economy = 'gun' } = options;
   const replay = pkg.replay;
   if (!replay || replay.rounds.length === 0) return [];
 
@@ -207,14 +248,23 @@ export function buildMatchRadarField(pkg: DemoPackage, options: BuildMatchRadarF
     bucket.push(grenade as SmokeGrenade);
     smokesByRound.set(grenade.roundNumber, bucket);
   }
-  const teamNameByKey = { teamA: pkg.match.teamA.name ?? "Team A", teamB: pkg.match.teamB.name ?? "Team B" } as const;
+  const teamNameByKey = {
+    teamA: pkg.match.teamA.name ?? 'Team A',
+    teamB: pkg.match.teamB.name ?? 'Team B',
+  } as const;
 
-  const contributions: Record<"teamA" | "teamB", Contribution> = {
+  const contributions: Record<'teamA' | 'teamB', Contribution> = {
     teamA: makeContribution(teamNameByKey.teamA, matchId, maxSec, nCells),
     teamB: makeContribution(teamNameByKey.teamB, matchId, maxSec, nCells),
   };
 
-  const markVision = (viewers: Track[], i: number, screenOut: Int32Array, aimOut: Int32Array, activeSmokes: SmokeGrenade[]) => {
+  const markVision = (
+    viewers: Track[],
+    i: number,
+    screenOut: Int32Array,
+    aimOut: Int32Array,
+    activeSmokes: SmokeGrenade[],
+  ) => {
     const activeViewers = activeViewersAt(viewers, i);
     if (activeViewers.length === 0) return;
     for (let g = 0; g < nCells; g++) {
@@ -259,7 +309,8 @@ export function buildMatchRadarField(pkg: DemoPackage, options: BuildMatchRadarF
       for (let j = 0; j < alive; j++) {
         const lx = soundAliveX[j]!;
         const ly = soundAliveY[j]!;
-        const dx = x - lx, dy = y - ly;
+        const dx = x - lx,
+          dy = y - ly;
         if (dx * dx + dy * dy <= SOUND_RADIUS_SQ) {
           out[g]! += 1;
           break;
@@ -283,10 +334,14 @@ export function buildMatchRadarField(pkg: DemoPackage, options: BuildMatchRadarF
   for (const rr of replay.rounds) {
     const meta = roundMeta.get(rr.roundNumber);
     if (!meta) continue;
-    if (economy === "gun" && !(GUN_ECONOMY.has(meta.teamAEconomy) && GUN_ECONOMY.has(meta.teamBEconomy))) continue;
+    if (
+      economy === 'gun' &&
+      !(GUN_ECONOMY.has(meta.teamAEconomy) && GUN_ECONOMY.has(meta.teamBEconomy))
+    )
+      continue;
 
-    const ctKey = meta.teamASide === "ct" ? "teamA" : "teamB";
-    const tKey = ctKey === "teamA" ? "teamB" : "teamA";
+    const ctKey = meta.teamASide === 'ct' ? 'teamA' : 'teamB';
+    const tKey = ctKey === 'teamA' ? 'teamB' : 'teamA';
     const ctContrib = contributions[ctKey];
     const tContrib = contributions[tKey];
     ctContrib.roundCount += 1;
@@ -315,8 +370,8 @@ export function buildMatchRadarField(pkg: DemoPackage, options: BuildMatchRadarF
     }
   }
 
-  const triAvailability = bvh ? "full" : "none";
-  return (["teamA", "teamB"] as const).map((key) => {
+  const triAvailability = bvh ? 'full' : 'none';
+  return (['teamA', 'teamB'] as const).map((key) => {
     const c = contributions[key];
     const field: RadarField = {
       schemaVersion: RADAR_FIELD_SCHEMA_VERSION,
@@ -324,7 +379,7 @@ export function buildMatchRadarField(pkg: DemoPackage, options: BuildMatchRadarF
       mapName: pkg.match.mapName,
       calibrationVersion: MAP_CALIBRATION_VERSION,
       triAvailability,
-      scope: { kind: "team", team: c.team, economy, roundCount: c.roundCount, matchIds: [matchId] },
+      scope: { kind: 'team', team: c.team, economy, roundCount: c.roundCount, matchIds: [matchId] },
       grid: { cellSize: grid.cellSize, cells: grid.cells },
       maxSec,
       denomCt: c.denomCt,
@@ -341,33 +396,56 @@ export interface RadarFieldAccumulator {
   finish(): RadarField | null;
 }
 
-export function createRadarFieldAccumulator(scope: { kind: "league" | "team"; team: string | null }): RadarFieldAccumulator {
+export function createRadarFieldAccumulator(scope: {
+  kind: 'league' | 'team';
+  team: string | null;
+}): RadarFieldAccumulator {
   let result: RadarField | null = null;
   let finished = false;
   const matchIds = new Set<string>();
   const counted = new Set<string>();
   return {
     append(src) {
-      if (finished) throw new Error("Radar field accumulator already finished");
+      if (finished) throw new Error('Radar field accumulator already finished');
       const n = src.grid.cells.length;
-      if (src.denomCt.length !== src.maxSec || src.denomT.length !== src.maxSec ||
-          FIELD_BASES.some(base => src.fields[base].length !== src.maxSec || src.fields[base].some(row => row.length !== n))) {
-        throw new Error("Invalid radar field dimensions");
+      if (
+        src.denomCt.length !== src.maxSec ||
+        src.denomT.length !== src.maxSec ||
+        FIELD_BASES.some(
+          (base) =>
+            src.fields[base].length !== src.maxSec ||
+            src.fields[base].some((row) => row.length !== n),
+        )
+      ) {
+        throw new Error('Invalid radar field dimensions');
       }
-      if (result && (result.schemaVersion !== src.schemaVersion || result.computeVersion !== src.computeVersion ||
-          result.mapName !== src.mapName || result.calibrationVersion !== src.calibrationVersion ||
-          result.maxSec !== src.maxSec || result.scope.economy !== src.scope.economy ||
-          result.grid.cellSize !== src.grid.cellSize || JSON.stringify(result.grid.cells) !== JSON.stringify(src.grid.cells))) {
-        throw new Error("Incompatible radar field metadata");
+      if (
+        result &&
+        (result.schemaVersion !== src.schemaVersion ||
+          result.computeVersion !== src.computeVersion ||
+          result.mapName !== src.mapName ||
+          result.calibrationVersion !== src.calibrationVersion ||
+          result.maxSec !== src.maxSec ||
+          result.scope.economy !== src.scope.economy ||
+          result.grid.cellSize !== src.grid.cellSize ||
+          JSON.stringify(result.grid.cells) !== JSON.stringify(src.grid.cells))
+      ) {
+        throw new Error('Incompatible radar field metadata');
       }
       result ??= {
-        schemaVersion: src.schemaVersion, computeVersion: src.computeVersion, mapName: src.mapName,
-        calibrationVersion: src.calibrationVersion, triAvailability: src.triAvailability,
+        schemaVersion: src.schemaVersion,
+        computeVersion: src.computeVersion,
+        mapName: src.mapName,
+        calibrationVersion: src.calibrationVersion,
+        triAvailability: src.triAvailability,
         scope: { ...scope, economy: src.scope.economy, roundCount: 0, matchIds: [] },
-        grid: src.grid, maxSec: src.maxSec, denomCt: new Int32Array(src.maxSec),
-        denomT: new Int32Array(src.maxSec), fields: makeFields(src.maxSec, n),
+        grid: src.grid,
+        maxSec: src.maxSec,
+        denomCt: new Int32Array(src.maxSec),
+        denomT: new Int32Array(src.maxSec),
+        fields: makeFields(src.maxSec, n),
       };
-      if (src.triAvailability === "none") result.triAvailability = "none";
+      if (src.triAvailability === 'none') result.triAvailability = 'none';
       for (let s = 0; s < src.maxSec; s++) {
         result.denomCt[s]! += src.denomCt[s]!;
         result.denomT[s]! += src.denomT[s]!;
@@ -378,7 +456,10 @@ export function createRadarFieldAccumulator(scope: { kind: "league" | "team"; te
         }
       }
       const mid = src.scope.matchIds[0];
-      if (mid && !counted.has(mid)) { counted.add(mid); result.scope.roundCount += src.scope.roundCount; }
+      if (mid && !counted.has(mid)) {
+        counted.add(mid);
+        result.scope.roundCount += src.scope.roundCount;
+      }
       for (const id of src.scope.matchIds) matchIds.add(id);
     },
     finish() {
@@ -390,7 +471,10 @@ export function createRadarFieldAccumulator(scope: { kind: "league" | "team"; te
 }
 
 /** Aggregate fields using the same streaming owner. */
-export function aggregateRadarFields(fields: RadarField[], scope: { kind: "league" | "team"; team: string | null }): RadarField | null {
+export function aggregateRadarFields(
+  fields: RadarField[],
+  scope: { kind: 'league' | 'team'; team: string | null },
+): RadarField | null {
   const accumulator = createRadarFieldAccumulator(scope);
   for (const field of fields) accumulator.append(field);
   return accumulator.finish();

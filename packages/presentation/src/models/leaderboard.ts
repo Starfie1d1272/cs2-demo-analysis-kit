@@ -1,5 +1,5 @@
-import { z } from "zod";
-import { teamKeySchema } from "./primitives.js";
+import { z } from 'zod';
+import { teamKeySchema } from './primitives.js';
 
 /**
  * 赛季排行榜展示模型。由 @cs2dak/presentation 从 SeasonCohortBundle 派生，
@@ -11,27 +11,27 @@ import { teamKeySchema } from "./primitives.js";
 
 /** 排行榜可展示的指标 key。值统一存原始量纲，缩放与单位由 format 决定。 */
 export const leaderboardMetricKeySchema = z.enum([
-  "maps",
+  'maps',
   // 评分门面
-  "rivalhubRR", // accountRR（绝对刻度 RivalHub RR）
-  "hltvRating", // rrV1（HLTV Rating 2.0 量纲，已被逆向验证）
+  'rivalhubRR', // accountRR（绝对刻度 RivalHub RR）
+  'hltvRating', // rrV1（HLTV Rating 2.0 量纲，已被逆向验证）
   // core
-  "adr",
-  "kd",
-  "kpr",
-  "hsPercent",
+  'adr',
+  'kd',
+  'kpr',
+  'hsPercent',
   // impact（产量家族：每 100 回合 X 次）
-  "firstKillPer100",
-  "multiKillPer100",
-  "clutchPer100",
-  "openingDuelWinRate",
+  'firstKillPer100',
+  'multiKillPer100',
+  'clutchPer100',
+  'openingDuelWinRate',
   // advanced
-  "kast",
-  "utilityDamagePerRound",
-  "awpKillsPerRound",
-  "awpKillRate",
-  "flashAssistPerRound",
-  "tradeKillRate"
+  'kast',
+  'utilityDamagePerRound',
+  'awpKillsPerRound',
+  'awpKillRate',
+  'flashAssistPerRound',
+  'tradeKillRate',
 ]);
 
 /**
@@ -42,30 +42,24 @@ export const leaderboardMetricKeySchema = z.enum([
  * - ratio:   2 位小数（K/D、KPR、每 100 回合产量 FK/MK/C、每回合计数）
  * - percent: 值已是 0–100，1 位小数 + %（HS% / KAST% / Entry% / AWP%）
  */
-export const leaderboardFormatSchema = z.enum([
-  "integer",
-  "rating",
-  "adr",
-  "ratio",
-  "percent"
-]);
+export const leaderboardFormatSchema = z.enum(['integer', 'rating', 'adr', 'ratio', 'percent']);
 
 export const leaderboardColumnSchema = z.object({
   key: leaderboardMetricKeySchema,
   label: z.string(),
   format: leaderboardFormatSchema,
   /** 列说明 / tooltip；无则 null。 */
-  description: z.string().nullable()
+  description: z.string().nullable(),
 });
 
-export const leaderboardViewKeySchema = z.enum(["core", "impact", "advanced"]);
+export const leaderboardViewKeySchema = z.enum(['core', 'impact', 'advanced']);
 
 export const leaderboardViewSchema = z.object({
   key: leaderboardViewKeySchema,
   label: z.string(),
   /** 默认排序列（始终降序）。 */
   defaultSort: leaderboardMetricKeySchema,
-  columns: z.array(leaderboardColumnSchema)
+  columns: z.array(leaderboardColumnSchema),
 });
 
 export const seasonLeaderboardRowSchema = z.object({
@@ -81,12 +75,16 @@ export const seasonLeaderboardRowSchema = z.object({
 });
 
 export const seasonLeaderboardModelSchema = z.object({
-  version: z.literal("cs2-demo-analysis-kit/leaderboard-0.1"),
+  version: z.literal('cs2-demo-analysis-kit/leaderboard-0.1'),
   weightsVersion: z.string(),
   matchCount: z.number().int().nonnegative(),
-  provenance: z.object({ cohortVersion: z.string(), sourceSchemaVersion: z.string(), matches: z.array(z.object({ matchId: z.string(), sourceDemoHash: z.string().nullable() })) }),
+  provenance: z.object({
+    cohortVersion: z.string(),
+    sourceSchemaVersion: z.string(),
+    matches: z.array(z.object({ matchId: z.string(), sourceDemoHash: z.string().nullable() })),
+  }),
   views: z.array(leaderboardViewSchema),
-  rows: z.array(seasonLeaderboardRowSchema)
+  rows: z.array(seasonLeaderboardRowSchema),
 });
 
 export type LeaderboardMetricKey = z.infer<typeof leaderboardMetricKeySchema>;

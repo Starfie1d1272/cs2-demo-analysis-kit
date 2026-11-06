@@ -1,12 +1,12 @@
-import { readFileSync, readdirSync, statSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { loadDemoPackageFromZip } from "../../demo-io/src/index.ts";
-import { FLAG_ALIVE, type DemoPackage } from "../../contract/src/index.ts";
-import { calloutCn } from "../src/callout-names.js";
-import { siteEntryChokeId } from "../src/site-entry-chokes.js";
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { loadDemoPackageFromZip } from '../../demo-io/src/index.ts';
+import { FLAG_ALIVE, type DemoPackage } from '../../contract/src/index.ts';
+import { calloutCn } from '../src/callout-names.js';
+import { siteEntryChokeId } from '../src/site-entry-chokes.js';
 
-type Side = "t" | "ct";
+type Side = 't' | 'ct';
 
 interface Visit {
   place: string;
@@ -59,7 +59,7 @@ export interface ObservedRouteSequence {
 
 export interface SiteEntryTrajectoryFamily {
   id: string;
-  target: "a" | "b";
+  target: 'a' | 'b';
   entryChokeId: string;
   sharedCallouts: string[];
   representativeCallouts: string[];
@@ -93,7 +93,7 @@ interface CliOptions {
 }
 
 export function repoRootFromScriptUrl(scriptUrl: string): string {
-  return resolve(dirname(fileURLToPath(scriptUrl)), "../../..");
+  return resolve(dirname(fileURLToPath(scriptUrl)), '../../..');
 }
 
 const REPO_ROOT = repoRootFromScriptUrl(import.meta.url);
@@ -162,7 +162,7 @@ export function addSequenceTransitions(
         ctCount: 0,
         roundKeys: new Set<string>(),
       };
-      if (side === "t") record.tCount += 1;
+      if (side === 't') record.tCount += 1;
       else record.ctCount += 1;
       record.roundKeys.add(roundKey);
       transitions.set(key, record);
@@ -188,10 +188,10 @@ function edgeTShare(edge: ObservedEdge): number {
 
 function candidateScore(edges: ObservedEdge[]): number {
   if (edges.length === 0) return 0;
-  return edges.reduce(
-    (sum, edge) => sum + Math.log1p(edge.tCount) * (0.5 + edgeTShare(edge)),
-    0,
-  ) / edges.length;
+  return (
+    edges.reduce((sum, edge) => sum + Math.log1p(edge.tCount) * (0.5 + edgeTShare(edge)), 0) /
+    edges.length
+  );
 }
 
 function compareCandidates(a: RouteCandidate, b: RouteCandidate): number {
@@ -201,7 +201,7 @@ function compareCandidates(a: RouteCandidate, b: RouteCandidate): number {
     b.minTShare - a.minTShare ||
     b.score - a.score ||
     a.callouts.length - b.callouts.length ||
-    a.callouts.join("\t").localeCompare(b.callouts.join("\t"))
+    a.callouts.join('\t').localeCompare(b.callouts.join('\t'))
   );
 }
 
@@ -213,24 +213,22 @@ function sharedCallouts(variants: RouteCandidate[]): string[] {
   );
 }
 
-function uniqueSupportCount(
-  variants: RouteCandidate[],
-  key: keyof RouteSupportKeys,
-): number {
+function uniqueSupportCount(variants: RouteCandidate[], key: keyof RouteSupportKeys): number {
   return new Set(variants.flatMap((variant) => variant.supportKeys[key])).size;
 }
 
 export function clusterSiteEntryTrajectories(
   mapName: string,
-  target: "a" | "b",
+  target: 'a' | 'b',
   candidates: RouteCandidate[],
 ): SiteEntryTrajectoryFamily[] {
   const groups: Array<{ entryChokeId: string; variants: RouteCandidate[] }> = [];
   for (const candidate of [...candidates].sort(compareCandidates)) {
     // 未审入口只在离线报告中按观察到的末端分组；不得回写 maps 稳定语义。
-    const observedTerminal = candidate.callouts.at(-2) ?? "unknown";
-    const entryChokeId = siteEntryChokeId(mapName, target, candidate.callouts) ??
-      `observed_${target}_${observedTerminal.replace(/[^a-zA-Z0-9]+/g, "_").toLowerCase()}`;
+    const observedTerminal = candidate.callouts.at(-2) ?? 'unknown';
+    const entryChokeId =
+      siteEntryChokeId(mapName, target, candidate.callouts) ??
+      `observed_${target}_${observedTerminal.replace(/[^a-zA-Z0-9]+/g, '_').toLowerCase()}`;
     const group = groups.find(({ entryChokeId: groupEntry }) => groupEntry === entryChokeId);
     if (group) group.variants.push(candidate);
     else groups.push({ entryChokeId, variants: [candidate] });
@@ -238,7 +236,7 @@ export function clusterSiteEntryTrajectories(
 
   return groups
     .map(({ entryChokeId, variants }) => ({
-      id: "",
+      id: '',
       target,
       entryChokeId,
       sharedCallouts: sharedCallouts(variants),
@@ -247,13 +245,14 @@ export function clusterSiteEntryTrajectories(
         (sum, variant) => sum + variant.playerRoundSupport,
         0,
       ),
-      roundSupport: uniqueSupportCount(variants, "rounds"),
-      demoSupport: uniqueSupportCount(variants, "demos"),
+      roundSupport: uniqueSupportCount(variants, 'rounds'),
+      demoSupport: uniqueSupportCount(variants, 'demos'),
       variants,
     }))
-    .sort((a, b) =>
-      b.totalPlayerRoundSupport - a.totalPlayerRoundSupport ||
-      a.representativeCallouts.join("\t").localeCompare(b.representativeCallouts.join("\t")),
+    .sort(
+      (a, b) =>
+        b.totalPlayerRoundSupport - a.totalPlayerRoundSupport ||
+        a.representativeCallouts.join('\t').localeCompare(b.representativeCallouts.join('\t')),
     )
     .map((corridor) => ({
       ...corridor,
@@ -267,15 +266,18 @@ export function findRouteCandidates(
   options: RouteSearchOptions,
 ): RouteCandidate[] {
   const edgeByKey = new Map(edges.map((edge) => [transitionKey(edge.from, edge.to), edge]));
-  const routeCounts = new Map<string, {
-    callouts: string[];
-    playerRounds: Set<string>;
-    rounds: Set<string>;
-    demos: Set<string>;
-  }>();
+  const routeCounts = new Map<
+    string,
+    {
+      callouts: string[];
+      playerRounds: Set<string>;
+      rounds: Set<string>;
+      demos: Set<string>;
+    }
+  >();
 
   for (const sequence of sequences) {
-    const siteIndex = sequence.callouts.findIndex((callout) => callout.startsWith("Bombsite"));
+    const siteIndex = sequence.callouts.findIndex((callout) => callout.startsWith('Bombsite'));
     if (siteIndex < 0 || sequence.callouts[siteIndex] !== options.target) continue;
     let sourceIndex = -1;
     for (let index = 0; index < siteIndex; index += 1) {
@@ -289,7 +291,7 @@ export function findRouteCandidates(
       else callouts.push(callout);
     }
     if (callouts.length - 1 > options.maxHops) continue;
-    const key = callouts.join("\t");
+    const key = callouts.join('\t');
     const current = routeCounts.get(key) ?? {
       callouts,
       playerRounds: new Set<string>(),
@@ -305,9 +307,9 @@ export function findRouteCandidates(
   const candidates: RouteCandidate[] = [];
   for (const route of routeCounts.values()) {
     if (route.playerRounds.size < options.minRouteSupport) continue;
-    const pathEdges = route.callouts.slice(1).map((to, index) =>
-      edgeByKey.get(transitionKey(route.callouts[index]!, to)),
-    );
+    const pathEdges = route.callouts
+      .slice(1)
+      .map((to, index) => edgeByKey.get(transitionKey(route.callouts[index]!, to)));
     if (pathEdges.some((edge) => !edge || edge.tCount < options.minEdgeCount)) continue;
     const resolved = pathEdges as ObservedEdge[];
     candidates.push({
@@ -331,7 +333,7 @@ export function findRouteCandidates(
 
 function zipFiles(path: string): string[] {
   const stat = statSync(path);
-  if (stat.isFile()) return path.endsWith(".zip") ? [path] : [];
+  if (stat.isFile()) return path.endsWith('.zip') ? [path] : [];
   const out: string[] = [];
   for (const name of readdirSync(path)) out.push(...zipFiles(join(path, name)));
   return out.sort((a, b) => a.localeCompare(b));
@@ -376,7 +378,7 @@ function accumulate(pkg: DemoPackage, demoKey: string, evidence: MapEvidence): v
     for (const track of replayRound.players) {
       const player = pkg.players[track.playerIndex];
       if (!player) continue;
-      const side = player.teamKey === "teamA" ? round.teamASide : round.teamBSide;
+      const side = player.teamKey === 'teamA' ? round.teamASide : round.teamBSide;
       const frames: Array<string | null> = [];
       for (let frame = firstFrame; frame <= lastFrame; frame += 1) {
         const alive = ((track.flags[frame] ?? 0) & FLAG_ALIVE) !== 0;
@@ -390,7 +392,7 @@ function accumulate(pkg: DemoPackage, demoKey: string, evidence: MapEvidence): v
         side,
         `${demoKey}:${round.roundNumber}`,
       );
-      if (side === "t") {
+      if (side === 't') {
         const roundKey = `${demoKey}:${round.roundNumber}`;
         for (const callouts of splitSequence(sequence)) {
           evidence.tSequences.push({
@@ -415,7 +417,7 @@ async function collectEvidence(files: string[]): Promise<Map<string, MapEvidence
     accumulate(pkg, file, evidence);
     byMap.set(pkg.match.mapName, evidence);
   }
-  if (files.length > 0) process.stderr.write("\n");
+  if (files.length > 0) process.stderr.write('\n');
   return byMap;
 }
 
@@ -432,43 +434,46 @@ function renderEdges(mapName: string, edges: ObservedEdge[], limit: number): str
   const rows = [...edges]
     .sort((a, b) => b.total - a.total || b.tCount - a.tCount || a.from.localeCompare(b.from))
     .slice(0, limit);
-  if (rows.length === 0) return ["- 无相邻转换证据"];
+  if (rows.length === 0) return ['- 无相邻转换证据'];
   return [
-    "| from | to | T | CT | T占比 | 涉及回合 |",
-    "|---|---|---:|---:|---:|---:|",
-    ...rows.map((edge) =>
-      `| ${formatCallout(mapName, edge.from)} | ${formatCallout(mapName, edge.to)} | ${edge.tCount} | ${edge.ctCount} | ${formatPercent(edgeTShare(edge))} | ${edge.roundCount} |`,
+    '| from | to | T | CT | T占比 | 涉及回合 |',
+    '|---|---|---:|---:|---:|---:|',
+    ...rows.map(
+      (edge) =>
+        `| ${formatCallout(mapName, edge.from)} | ${formatCallout(mapName, edge.to)} | ${edge.tCount} | ${edge.ctCount} | ${formatPercent(edgeTShare(edge))} | ${edge.roundCount} |`,
     ),
   ];
 }
 
 function renderTrajectoryFamilies(
   mapName: string,
-  site: "a" | "b",
+  site: 'a' | 'b',
   corridors: SiteEntryTrajectoryFamily[],
 ): string[] {
   const title = `### ${site.toUpperCase()} 包 Site-entry Trajectory Families`;
-  if (corridors.length === 0) return [title, "", "- 当前整路径支持阈值下没有进点轨迹 family。"];
+  if (corridors.length === 0) return [title, '', '- 当前整路径支持阈值下没有进点轨迹 family。'];
   const lines = [
     title,
-    "",
-    "| family | entryChokeId | 共同骨架 | variants | player-round | round | demo |",
-    "|---|---|---|---:|---:|---:|---:|",
-    ...corridors.map((corridor) =>
-      `| ${corridor.id} | ${corridor.entryChokeId} | ${corridor.sharedCallouts.map((callout) => formatCallout(mapName, callout)).join(" → ")} | ${corridor.variants.length} | ${corridor.totalPlayerRoundSupport} | ${corridor.roundSupport} | ${corridor.demoSupport} |`,
+    '',
+    '| family | entryChokeId | 共同骨架 | variants | player-round | round | demo |',
+    '|---|---|---|---:|---:|---:|---:|',
+    ...corridors.map(
+      (corridor) =>
+        `| ${corridor.id} | ${corridor.entryChokeId} | ${corridor.sharedCallouts.map((callout) => formatCallout(mapName, callout)).join(' → ')} | ${corridor.variants.length} | ${corridor.totalPlayerRoundSupport} | ${corridor.roundSupport} | ${corridor.demoSupport} |`,
     ),
   ];
   for (const corridor of corridors) {
     lines.push(
-      "",
+      '',
       `#### ${corridor.id}`,
-      "",
-      `共同骨架：${corridor.sharedCallouts.map((callout) => formatCallout(mapName, callout)).join(" → ")}`,
-      "",
-      "| variant | 完整走向 | player-round | round | demo | 瓶颈 T 次数 | 最低 T 占比 |",
-      "|---:|---|---:|---:|---:|---:|---:|",
-      ...corridor.variants.map((variant, index) =>
-        `| ${index + 1} | ${variant.callouts.map((callout) => formatCallout(mapName, callout)).join(" → ")} | ${variant.playerRoundSupport} | ${variant.roundSupport} | ${variant.demoSupport} | ${variant.bottleneckCount} | ${formatPercent(variant.minTShare)} |`,
+      '',
+      `共同骨架：${corridor.sharedCallouts.map((callout) => formatCallout(mapName, callout)).join(' → ')}`,
+      '',
+      '| variant | 完整走向 | player-round | round | demo | 瓶颈 T 次数 | 最低 T 占比 |',
+      '|---:|---|---:|---:|---:|---:|---:|',
+      ...corridor.variants.map(
+        (variant, index) =>
+          `| ${index + 1} | ${variant.callouts.map((callout) => formatCallout(mapName, callout)).join(' → ')} | ${variant.playerRoundSupport} | ${variant.roundSupport} | ${variant.demoSupport} | ${variant.bottleneckCount} | ${formatPercent(variant.minTShare)} |`,
       ),
     );
   }
@@ -491,68 +496,74 @@ function renderTrajectoryFamilyJson(corridors: SiteEntryTrajectoryFamily[]): str
       roundSupport: variant.roundSupport,
       demoSupport: variant.demoSupport,
     })),
-    confidence: "observed-complete-path-cluster",
+    confidence: 'observed-complete-path-cluster',
   }));
-  return ["```json", JSON.stringify(compact, null, 2), "```"];
+  return ['```json', JSON.stringify(compact, null, 2), '```'];
 }
 
 export function renderRouteGraphReport(
   byMap: Map<string, MapEvidence>,
   scannedCount: number,
-  options: Pick<CliOptions, "maxHops" | "minEdgeCount" | "minRouteSupport" | "edgeLimit">,
+  options: Pick<CliOptions, 'maxHops' | 'minEdgeCount' | 'minRouteSupport' | 'edgeLimit'>,
 ): string {
   const lines = [
-    "# Observed Route Graph Review",
-    "",
+    '# Observed Route Graph Review',
+    '',
     `扫描 ZIP：${scannedCount}`,
     `候选限制：maxHops=${options.maxHops}，minEdgeCount=${options.minEdgeCount}，minRouteSupport=${options.minRouteSupport} player-round；不限制候选条数。`,
-    "投影口径：`entryChokeId` 决定 site-entry trajectory family；同一物理入口下的完整观察轨迹保留为 variants。",
-    "统计窗口：每回合 freezeEndTick 至 endTick；只统计存活玩家的 replay place。",
-    "去抖口径：连续 callout 合并为 visit；少于 2 帧的 visit 丢弃；死亡或缺失 callout 截断序列。",
-    "",
-    "> 本报告只证明 demo 中出现过的相邻转换。未出现的边不代表不可达；本版不使用 nav/tri/callout-grid 补边。",
-    "> 候选完全由 demo 的单个 T 方 player-round 完整序列生成；人工 `map-routes` 不参与生成、聚类或排序。",
-    "",
-    "## 人工审查顺序",
-    "",
-    "1. 先检查高频边是否符合地图方向，特别留意跨层 callout 或死亡附近的假转换。",
-    "2. 检查 family 的共同骨架是否确实属于同一进点入口；它不等同于完整地图控制或战术。",
-    "3. 检查 variants 是否保留不同入口、转点和夹击走向；不应为了合并而删除真实路径。",
-    "4. JSON 块包含全部 family 与 variants；统计结果不写入 runtime 地图真相源。",
+    '投影口径：`entryChokeId` 决定 site-entry trajectory family；同一物理入口下的完整观察轨迹保留为 variants。',
+    '统计窗口：每回合 freezeEndTick 至 endTick；只统计存活玩家的 replay place。',
+    '去抖口径：连续 callout 合并为 visit；少于 2 帧的 visit 丢弃；死亡或缺失 callout 截断序列。',
+    '',
+    '> 本报告只证明 demo 中出现过的相邻转换。未出现的边不代表不可达；本版不使用 nav/tri/callout-grid 补边。',
+    '> 候选完全由 demo 的单个 T 方 player-round 完整序列生成；人工 `map-routes` 不参与生成、聚类或排序。',
+    '',
+    '## 人工审查顺序',
+    '',
+    '1. 先检查高频边是否符合地图方向，特别留意跨层 callout 或死亡附近的假转换。',
+    '2. 检查 family 的共同骨架是否确实属于同一进点入口；它不等同于完整地图控制或战术。',
+    '3. 检查 variants 是否保留不同入口、转点和夹击走向；不应为了合并而删除真实路径。',
+    '4. JSON 块包含全部 family 与 variants；统计结果不写入 runtime 地图真相源。',
   ];
 
   for (const [mapName, evidence] of [...byMap.entries()].sort(([a], [b]) => a.localeCompare(b))) {
     const edges = observedEdges(evidence.transitions);
     const searchBase = {
-      source: "TSpawn",
+      source: 'TSpawn',
       maxHops: options.maxHops,
       minEdgeCount: options.minEdgeCount,
       minRouteSupport: options.minRouteSupport,
     };
-    const a = findRouteCandidates(edges, evidence.tSequences, { ...searchBase, target: "BombsiteA" });
-    const b = findRouteCandidates(edges, evidence.tSequences, { ...searchBase, target: "BombsiteB" });
-    const aCorridors = clusterSiteEntryTrajectories(mapName, "a", a);
-    const bCorridors = clusterSiteEntryTrajectories(mapName, "b", b);
+    const a = findRouteCandidates(edges, evidence.tSequences, {
+      ...searchBase,
+      target: 'BombsiteA',
+    });
+    const b = findRouteCandidates(edges, evidence.tSequences, {
+      ...searchBase,
+      target: 'BombsiteB',
+    });
+    const aCorridors = clusterSiteEntryTrajectories(mapName, 'a', a);
+    const bCorridors = clusterSiteEntryTrajectories(mapName, 'b', b);
     lines.push(
-      "",
+      '',
       `## ${mapName}`,
-      "",
+      '',
       `样本 ZIP：${evidence.zipCount}；回合：${evidence.roundCount}；observed 有向边：${edges.length}`,
-      "",
-      "### 高频有向边",
-      "",
+      '',
+      '### 高频有向边',
+      '',
       ...renderEdges(mapName, edges, options.edgeLimit),
-      "",
-      ...renderTrajectoryFamilies(mapName, "a", aCorridors),
-      "",
-      ...renderTrajectoryFamilies(mapName, "b", bCorridors),
-      "",
-      "### Site-entry trajectory JSON",
-      "",
+      '',
+      ...renderTrajectoryFamilies(mapName, 'a', aCorridors),
+      '',
+      ...renderTrajectoryFamilies(mapName, 'b', bCorridors),
+      '',
+      '### Site-entry trajectory JSON',
+      '',
       ...renderTrajectoryFamilyJson([...aCorridors, ...bCorridors]),
     );
   }
-  return lines.join("\n");
+  return lines.join('\n');
 }
 
 function numberFlag(args: string[], name: string, fallback: number): number {
@@ -565,27 +576,27 @@ function numberFlag(args: string[], name: string, fallback: number): number {
 
 function parseCli(args: string[]): CliOptions {
   const valueIndexes = new Set<number>();
-  for (const name of ["--max-hops", "--min-edge-count", "--min-route-support", "--edge-limit"]) {
+  for (const name of ['--max-hops', '--min-edge-count', '--min-route-support', '--edge-limit']) {
     const index = args.indexOf(name);
     if (index >= 0) {
       valueIndexes.add(index);
       valueIndexes.add(index + 1);
     }
   }
-  const roots = args.filter((arg, index) => !valueIndexes.has(index) && !arg.startsWith("--"));
+  const roots = args.filter((arg, index) => !valueIndexes.has(index) && !arg.startsWith('--'));
   return {
-    roots: roots.length > 0 ? roots : [join(REPO_ROOT, "fixtures/output")],
-    maxHops: numberFlag(args, "--max-hops", 12),
-    minEdgeCount: numberFlag(args, "--min-edge-count", 3),
-    minRouteSupport: numberFlag(args, "--min-route-support", 3),
-    edgeLimit: numberFlag(args, "--edge-limit", 40),
+    roots: roots.length > 0 ? roots : [join(REPO_ROOT, 'fixtures/output')],
+    maxHops: numberFlag(args, '--max-hops', 12),
+    minEdgeCount: numberFlag(args, '--min-edge-count', 3),
+    minRouteSupport: numberFlag(args, '--min-route-support', 3),
+    edgeLimit: numberFlag(args, '--edge-limit', 40),
   };
 }
 
 async function main(args: string[]): Promise<void> {
   const options = parseCli(args);
   const files = options.roots.flatMap(zipFiles);
-  if (files.length === 0) throw new Error(`No .zip files found under: ${options.roots.join(", ")}`);
+  if (files.length === 0) throw new Error(`No .zip files found under: ${options.roots.join(', ')}`);
   const byMap = await collectEvidence(files);
   console.log(renderRouteGraphReport(byMap, files.length, options));
 }

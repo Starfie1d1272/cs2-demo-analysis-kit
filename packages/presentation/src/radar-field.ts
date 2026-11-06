@@ -8,11 +8,14 @@
  *   contested = min(tVis, ctVis)（双方都看到 = 对拼线 / 真实交火点）
  * 给定 baseline（联赛场）则输出「队伍 − 联赛」偏移（队伍倾向 / 防守漏洞）。
  */
-import type { RadarFieldView, RadarFieldBaseView } from "./models/radar-view.js";
+import type { RadarFieldView, RadarFieldBaseView } from './models/radar-view.js';
 
-export type RadarFieldMode = RadarFieldBaseView | "info-diff" | "contested";
-export interface RadarFieldCanvasState { mode: RadarFieldMode; second: number; level: "upper" | "lower" }
-
+export type RadarFieldMode = RadarFieldBaseView | 'info-diff' | 'contested';
+export interface RadarFieldCanvasState {
+  mode: RadarFieldMode;
+  second: number;
+  level: 'upper' | 'lower';
+}
 
 export interface RadarModeOption {
   value: RadarFieldMode;
@@ -24,16 +27,16 @@ export interface RadarModeOption {
  * 盲区不单列模式——画视野覆盖、空白即盲区（配合 canvas「照亮模式」读负空间更直观）。
  */
 export const RADAR_FIELD_MODES: RadarModeOption[] = [
-  { value: "ctVis", label: "CT 屏幕可见" },
-  { value: "tVis", label: "T 屏幕可见" },
-  { value: "ctAim", label: "CT 准星覆盖" },
-  { value: "tAim", label: "T 准星覆盖" },
-  { value: "ctPres", label: "CT 位置" },
-  { value: "tPres", label: "T 位置" },
-  { value: "ctSound", label: "CT 发声风险" },
-  { value: "tSound", label: "T 发声风险" },
-  { value: "info-diff", label: "信息差分" },
-  { value: "contested", label: "对拼线" },
+  { value: 'ctVis', label: 'CT 屏幕可见' },
+  { value: 'tVis', label: 'T 屏幕可见' },
+  { value: 'ctAim', label: 'CT 准星覆盖' },
+  { value: 'tAim', label: 'T 准星覆盖' },
+  { value: 'ctPres', label: 'CT 位置' },
+  { value: 'tPres', label: 'T 位置' },
+  { value: 'ctSound', label: 'CT 发声风险' },
+  { value: 'tSound', label: 'T 发声风险' },
+  { value: 'info-diff', label: '信息差分' },
+  { value: 'contested', label: '对拼线' },
 ];
 
 /** 各模式的颜色强度归一化上限（与原型一致）。 */
@@ -46,7 +49,7 @@ const MODE_CAP: Record<RadarFieldMode, number> = {
   tPres: 0.3,
   ctSound: 1,
   tSound: 1,
-  "info-diff": 0.4,
+  'info-diff': 0.4,
   contested: 0.3,
 };
 const DELTA_CAP = 0.15;
@@ -61,10 +64,15 @@ export interface RadarModeFrame {
 }
 
 /** 某基础场在 [sec−window, sec+window] 的归一化频率（计数 / 对应 side denom）。 */
-function freqAt(field: RadarFieldView, base: RadarFieldBaseView, sec: number, window: number): Float64Array {
+function freqAt(
+  field: RadarFieldView,
+  base: RadarFieldBaseView,
+  sec: number,
+  window: number,
+): Float64Array {
   const nCells = field.grid.cells.length;
   const out = new Float64Array(nCells);
-  const denomArr = base.startsWith("ct") ? field.denomCt : field.denomT;
+  const denomArr = base.startsWith('ct') ? field.denomCt : field.denomT;
   let denom = 0;
   const lo = Math.max(0, sec - window);
   const hi = Math.min(field.maxSec - 1, sec + window);
@@ -78,17 +86,22 @@ function freqAt(field: RadarFieldView, base: RadarFieldBaseView, sec: number, wi
 }
 
 /** 单场在某模式下的逐格频率（未差分）。info-diff/contested 在此合成。 */
-function modeFreq(field: RadarFieldView, mode: RadarFieldMode, sec: number, window: number): Float64Array {
-  if (mode === "info-diff") {
-    const t = freqAt(field, "tVis", sec, window);
-    const c = freqAt(field, "ctVis", sec, window);
+function modeFreq(
+  field: RadarFieldView,
+  mode: RadarFieldMode,
+  sec: number,
+  window: number,
+): Float64Array {
+  if (mode === 'info-diff') {
+    const t = freqAt(field, 'tVis', sec, window);
+    const c = freqAt(field, 'ctVis', sec, window);
     const out = new Float64Array(t.length);
     for (let g = 0; g < t.length; g++) out[g]! = t[g]! - c[g]!;
     return out;
   }
-  if (mode === "contested") {
-    const t = freqAt(field, "tVis", sec, window);
-    const c = freqAt(field, "ctVis", sec, window);
+  if (mode === 'contested') {
+    const t = freqAt(field, 'tVis', sec, window);
+    const c = freqAt(field, 'ctVis', sec, window);
     const out = new Float64Array(t.length);
     for (let g = 0; g < t.length; g++) out[g]! = Math.min(t[g]!, c[g]!);
     return out;
@@ -105,11 +118,11 @@ export function radarModeFrame(
   baseline: RadarFieldView | null,
   mode: RadarFieldMode,
   sec: number,
-  smoothWindow = 2
+  smoothWindow = 2,
 ): RadarModeFrame {
   const team = modeFreq(field, mode, sec, smoothWindow);
   if (!baseline) {
-    return { values: team, signed: mode === "info-diff", cap: MODE_CAP[mode] };
+    return { values: team, signed: mode === 'info-diff', cap: MODE_CAP[mode] };
   }
   const base = modeFreq(baseline, mode, sec, smoothWindow);
   const out = new Float64Array(team.length);

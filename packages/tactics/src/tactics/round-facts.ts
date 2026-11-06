@@ -1,13 +1,33 @@
-import { FLAG_ALIVE, FLAG_HAS_BOMB, type DemoPackage, type EconomyType, type Side, type TeamKey } from "@cs2dak/contract";
-import { calloutNear, getCalloutTendencies, getPrimaryCalloutRegion, resolveSiteEntry, type CalloutGrid, type TacticalRegion, type Vec3 } from "@cs2dak/maps";
-import { buildPlayerTacticalSegments } from "./segments.js";
-import { deriveOpeningPattern, deriveOpeningPressure } from "./formations.js";
-import { createReplayRoundContext, replayCalloutAt, replayTickAt, type ReplayRoundContext } from "./replay-round-context.js";
-import { buildPlayerRoundPerformanceFacts, type PlayerRoundPerformanceFacts } from "@cs2dak/core";
-import type { OpeningPattern, OpeningPressureEvent, TacticalFrameSample } from "./types.js";
+import {
+  FLAG_ALIVE,
+  FLAG_HAS_BOMB,
+  type DemoPackage,
+  type EconomyType,
+  type Side,
+  type TeamKey,
+} from '@cs2dak/contract';
+import {
+  calloutNear,
+  getCalloutTendencies,
+  getPrimaryCalloutRegion,
+  resolveSiteEntry,
+  type CalloutGrid,
+  type TacticalRegion,
+  type Vec3,
+} from '@cs2dak/maps';
+import { buildPlayerTacticalSegments } from './segments.js';
+import { deriveOpeningPattern, deriveOpeningPressure } from './formations.js';
+import {
+  createReplayRoundContext,
+  replayCalloutAt,
+  replayTickAt,
+  type ReplayRoundContext,
+} from './replay-round-context.js';
+import { buildPlayerRoundPerformanceFacts, type PlayerRoundPerformanceFacts } from '@cs2dak/core';
+import type { OpeningPattern, OpeningPressureEvent, TacticalFrameSample } from './types.js';
 
 export const TACTICAL_FACT_VERSION = 9;
-export type ExecuteBucket = "rush" | "fast" | "mid" | "late";
+export type ExecuteBucket = 'rush' | 'fast' | 'mid' | 'late';
 
 export interface SiteEntryOccurrence {
   playerIndex: number;
@@ -35,7 +55,7 @@ export interface SiteEntryFact {
 }
 
 export interface TacticalPlantFact {
-  site: "a" | "b";
+  site: 'a' | 'b';
   tick: number;
   remainSec: number;
 }
@@ -49,19 +69,19 @@ export interface TacticalGrenadeOccurrence {
   effectPosition: Vec3;
   throwCallout: string | null;
   effectCallout: string | null;
-  effectCalloutSource: "exact" | "nearby" | null;
+  effectCalloutSource: 'exact' | 'nearby' | null;
   effectCalloutDistance: number | null;
   confidence: number;
   samples: number;
-  targetRegion: TacticalRegion | "other" | "unknown";
+  targetRegion: TacticalRegion | 'other' | 'unknown';
   tendencies?: readonly TacticalRegion[];
 }
 
 export interface C4RouteFact {
   /** 原始相邻去重轨迹，仅作为证据，不直接等同于战术。 */
   callouts: string[];
-  startRegion: TacticalRegion | "other" | null;
-  endRegion: TacticalRegion | "other" | null;
+  startRegion: TacticalRegion | 'other' | null;
+  endRegion: TacticalRegion | 'other' | null;
   rotated: boolean;
   plantCallout: string | null;
 }
@@ -81,7 +101,7 @@ export interface TacticalRoundFact {
   roundNumber: number;
   openingPattern: OpeningPattern;
   openingPressure: OpeningPressureEvent[];
-  targetSite: "a" | "b" | null;
+  targetSite: 'a' | 'b' | null;
   siteEntries: { a: SiteEntryFact; b: SiteEntryFact };
   plant: TacticalPlantFact | null;
   grenades: TacticalGrenadeOccurrence[];
@@ -105,14 +125,14 @@ function remainSecAt(tick: number, freezeEndTick: number, tickrate: number): num
 
 function bucketOf(remainSec: number | null): ExecuteBucket | null {
   if (remainSec == null) return null;
-  if (remainSec > 95) return "rush";
-  if (remainSec > 70) return "fast";
-  if (remainSec > 40) return "mid";
-  return "late";
+  if (remainSec > 95) return 'rush';
+  if (remainSec > 70) return 'fast';
+  if (remainSec > 40) return 'mid';
+  return 'late';
 }
 
-function economyFor(round: DemoPackage["rounds"][number], teamKey: TeamKey): EconomyType {
-  return teamKey === "teamA" ? round.teamAEconomy : round.teamBEconomy;
+function economyFor(round: DemoPackage['rounds'][number], teamKey: TeamKey): EconomyType {
+  return teamKey === 'teamA' ? round.teamAEconomy : round.teamBEconomy;
 }
 
 function emptySiteEntry(): SiteEntryFact {
@@ -130,7 +150,7 @@ function emptySiteEntry(): SiteEntryFact {
 
 function openingAnalysisFor(
   decoded: ReplayRoundContext | null,
-  round: DemoPackage["rounds"][number],
+  round: DemoPackage['rounds'][number],
   mapName: string,
   side: Side,
   tickrate: number,
@@ -160,14 +180,23 @@ function openingAnalysisFor(
     maxGapTicks: decoded ? decoded.tickStep * 2 : undefined,
   });
   return {
-    openingPattern: deriveOpeningPattern(segments, { side, startTick: round.freezeEndTick, endTick }),
-    openingPressure: deriveOpeningPressure(segments, { mapName, side, startTick: round.freezeEndTick, endTick }),
+    openingPattern: deriveOpeningPattern(segments, {
+      side,
+      startTick: round.freezeEndTick,
+      endTick,
+    }),
+    openingPressure: deriveOpeningPressure(segments, {
+      mapName,
+      side,
+      startTick: round.freezeEndTick,
+      endTick,
+    }),
   };
 }
 
 function siteEntriesFor(
   decoded: ReplayRoundContext | null,
-  round: DemoPackage["rounds"][number],
+  round: DemoPackage['rounds'][number],
   mapName: string,
   side: Side,
   tickrate: number,
@@ -180,7 +209,7 @@ function siteEntriesFor(
   };
   for (const track of decoded.tracks) {
     if (track.side !== side) continue;
-    const seen = new Set<"a" | "b">();
+    const seen = new Set<'a' | 'b'>();
     const trajectory: string[] = [];
     for (let index = 0; index < decoded.frameCount; index += 1) {
       const tick = replayTickAt(decoded, index);
@@ -189,7 +218,7 @@ function siteEntriesFor(
       const callout = replayCalloutAt(decoded, track, index, grid);
       if (!callout) continue;
       if (callout !== trajectory.at(-1)) trajectory.push(callout);
-      const site = callout === "BombsiteA" ? "a" : callout === "BombsiteB" ? "b" : null;
+      const site = callout === 'BombsiteA' ? 'a' : callout === 'BombsiteB' ? 'b' : null;
       if (!site || seen.has(site)) continue;
       seen.add(site);
       const resolved = resolveSiteEntry(mapName, site, trajectory);
@@ -206,8 +235,10 @@ function siteEntriesFor(
       });
     }
   }
-  const build = (site: "a" | "b"): SiteEntryFact => {
-    const order = [...bySite[site].values()].sort((a, b) => a.tick - b.tick || a.playerIndex - b.playerIndex);
+  const build = (site: 'a' | 'b'): SiteEntryFact => {
+    const order = [...bySite[site].values()].sort(
+      (a, b) => a.tick - b.tick || a.playerIndex - b.playerIndex,
+    );
     const first = order[0];
     const last = order.at(-1);
     return {
@@ -216,58 +247,97 @@ function siteEntriesFor(
       secondEntryTick: order[1]?.tick ?? null,
       firstEntryRemainSec: first?.remainSec ?? null,
       executeRemainSec: order[1]?.remainSec ?? null,
-      distinctEntryChokeIds: [...new Set(order.flatMap((row) => row.entryChokeId ? [row.entryChokeId] : []))].sort(),
-      entrySpanSec: first && last ? Math.round(((last.tick - first.tick) / tickrate) * 10) / 10 : null,
+      distinctEntryChokeIds: [
+        ...new Set(order.flatMap((row) => (row.entryChokeId ? [row.entryChokeId] : []))),
+      ].sort(),
+      entrySpanSec:
+        first && last ? Math.round(((last.tick - first.tick) / tickrate) * 10) / 10 : null,
       order,
     };
   };
-  return { a: build("a"), b: build("b") };
+  return { a: build('a'), b: build('b') };
 }
 
-function targetRegion(mapName: string, callout: string | null): TacticalGrenadeOccurrence["targetRegion"] {
-  if (!callout) return "unknown";
-  return getPrimaryCalloutRegion(mapName, callout) ?? "unknown";
+function targetRegion(
+  mapName: string,
+  callout: string | null,
+): TacticalGrenadeOccurrence['targetRegion'] {
+  if (!callout) return 'unknown';
+  return getPrimaryCalloutRegion(mapName, callout) ?? 'unknown';
 }
 
-function plantFor(pkg: DemoPackage, round: DemoPackage["rounds"][number], tickrate: number): TacticalPlantFact | null {
-  const plant = pkg.bombs.find((event) =>
-    event.roundNumber === round.roundNumber && event.type === "planted" && (event.site === "a" || event.site === "b"),
+function plantFor(
+  pkg: DemoPackage,
+  round: DemoPackage['rounds'][number],
+  tickrate: number,
+): TacticalPlantFact | null {
+  const plant = pkg.bombs.find(
+    (event) =>
+      event.roundNumber === round.roundNumber &&
+      event.type === 'planted' &&
+      (event.site === 'a' || event.site === 'b'),
   );
-  if (!plant || (plant.site !== "a" && plant.site !== "b")) return null;
-  return { site: plant.site, tick: plant.tick, remainSec: remainSecAt(plant.tick, round.freezeEndTick, tickrate) };
+  if (!plant || (plant.site !== 'a' && plant.site !== 'b')) return null;
+  return {
+    site: plant.site,
+    tick: plant.tick,
+    remainSec: remainSecAt(plant.tick, round.freezeEndTick, tickrate),
+  };
 }
 
-function targetSiteFor(plant: TacticalPlantFact | null, entries: { a: SiteEntryFact; b: SiteEntryFact }): "a" | "b" | null {
+function targetSiteFor(
+  plant: TacticalPlantFact | null,
+  entries: { a: SiteEntryFact; b: SiteEntryFact },
+): 'a' | 'b' | null {
   if (plant) return plant.site;
-  if (entries.a.entrants > entries.b.entrants) return "a";
-  if (entries.b.entrants > entries.a.entrants) return "b";
+  if (entries.a.entrants > entries.b.entrants) return 'a';
+  if (entries.b.entrants > entries.a.entrants) return 'b';
   return null;
 }
 
-function throwerCallout(pkg: DemoPackage, roundNumber: number, playerIndex: number, tick: number): string | null {
+function throwerCallout(
+  pkg: DemoPackage,
+  roundNumber: number,
+  playerIndex: number,
+  tick: number,
+): string | null {
   const replayRound = pkg.replay?.rounds.find((row) => row.roundNumber === roundNumber);
   const track = replayRound?.players.find((row) => row.playerIndex === playerIndex);
   if (!pkg.replay || !replayRound || !track) return null;
-  const frame = Math.max(0, Math.min(replayRound.frameCount - 1, Math.round((tick - replayRound.startTick) / replayRound.tickStep)));
+  const frame = Math.max(
+    0,
+    Math.min(
+      replayRound.frameCount - 1,
+      Math.round((tick - replayRound.startTick) / replayRound.tickStep),
+    ),
+  );
   return pkg.replay.placeDict[track.place[frame] ?? -1] ?? null;
 }
 
-function sideOf(pkg: DemoPackage, playerIndex: number, round: DemoPackage["rounds"][number]): Side | null {
+function sideOf(
+  pkg: DemoPackage,
+  playerIndex: number,
+  round: DemoPackage['rounds'][number],
+): Side | null {
   const player = pkg.players[playerIndex];
   if (!player) return null;
-  return player.teamKey === "teamA" ? round.teamASide : round.teamBSide;
+  return player.teamKey === 'teamA' ? round.teamASide : round.teamBSide;
 }
 
 function grenadesFor(
   pkg: DemoPackage,
   matchId: string,
-  round: DemoPackage["rounds"][number],
+  round: DemoPackage['rounds'][number],
   side: Side,
   grid: CalloutGrid | null,
 ): TacticalGrenadeOccurrence[] {
   return (pkg.grenades ?? [])
     .map((grenade, index) => ({ grenade, index }))
-    .filter(({ grenade }) => grenade.roundNumber === round.roundNumber && sideOf(pkg, grenade.throwerIndex, round) === side)
+    .filter(
+      ({ grenade }) =>
+        grenade.roundNumber === round.roundNumber &&
+        sideOf(pkg, grenade.throwerIndex, round) === side,
+    )
     .map(({ grenade, index }) => {
       const located = locateGrid(grid, grenade.effectPosition);
       const effectCallout = located?.callout ?? null;
@@ -278,21 +348,28 @@ function grenadesFor(
         effectTick: grenade.effectTick ?? null,
         throwPosition: grenade.throwPosition,
         effectPosition: grenade.effectPosition,
-        throwCallout: throwerCallout(pkg, grenade.roundNumber, grenade.throwerIndex, grenade.throwTick),
+        throwCallout: throwerCallout(
+          pkg,
+          grenade.roundNumber,
+          grenade.throwerIndex,
+          grenade.throwTick,
+        ),
         effectCallout,
         effectCalloutSource: located?.source ?? null,
         effectCalloutDistance: located?.distance ?? null,
         confidence: located?.confidence ?? 0,
         samples: located?.samples ?? 0,
         targetRegion: targetRegion(pkg.match.mapName, effectCallout),
-        tendencies: effectCallout ? getCalloutTendencies(pkg.match.mapName, effectCallout) ?? [] : [],
+        tendencies: effectCallout
+          ? (getCalloutTendencies(pkg.match.mapName, effectCallout) ?? [])
+          : [],
       };
     });
 }
 
 function c4RouteFor(
   decoded: ReplayRoundContext | null,
-  round: DemoPackage["rounds"][number],
+  round: DemoPackage['rounds'][number],
   mapName: string,
   plant: TacticalPlantFact | null,
   grid: CalloutGrid | null,
@@ -304,9 +381,15 @@ function c4RouteFor(
     const tick = replayTickAt(decoded, index);
     if (tick < round.freezeEndTick || tick > round.endTick) continue;
     const cached = decoded.tracks[carrierIndex];
-    if (!cached || ((cached.flags[index] ?? 0) & FLAG_ALIVE) === 0 || ((cached.flags[index] ?? 0) & FLAG_HAS_BOMB) === 0) {
-      carrierIndex = decoded.tracks.findIndex((track) =>
-        ((track.flags[index] ?? 0) & FLAG_ALIVE) !== 0 && ((track.flags[index] ?? 0) & FLAG_HAS_BOMB) !== 0,
+    if (
+      !cached ||
+      ((cached.flags[index] ?? 0) & FLAG_ALIVE) === 0 ||
+      ((cached.flags[index] ?? 0) & FLAG_HAS_BOMB) === 0
+    ) {
+      carrierIndex = decoded.tracks.findIndex(
+        (track) =>
+          ((track.flags[index] ?? 0) & FLAG_ALIVE) !== 0 &&
+          ((track.flags[index] ?? 0) & FLAG_HAS_BOMB) !== 0,
       );
     }
     if (carrierIndex < 0) continue;
@@ -314,19 +397,29 @@ function c4RouteFor(
     if (callout && callout !== callouts.at(-1)) callouts.push(callout);
   }
   if (callouts.length === 0) return null;
-  const regions = callouts.map((callout) => targetRegion(mapName, callout)).filter((region) => region !== "unknown");
-  const directional = regions.filter((region): region is "a" | "b" => region === "a" || region === "b");
+  const regions = callouts
+    .map((callout) => targetRegion(mapName, callout))
+    .filter((region) => region !== 'unknown');
+  const directional = regions.filter(
+    (region): region is 'a' | 'b' => region === 'a' || region === 'b',
+  );
   return {
     callouts,
     startRegion: regions[0] ?? null,
     endRegion: regions.at(-1) ?? null,
     rotated: Boolean(directional[0] && directional.at(-1) && directional[0] !== directional.at(-1)),
-    plantCallout: plant ? callouts.at(-1) ?? null : null,
+    plantCallout: plant ? (callouts.at(-1) ?? null) : null,
   };
 }
 
-function firstKillForTeam(performanceFacts: PlayerRoundPerformanceFacts, roundNumber: number, teamKey: TeamKey): boolean | null {
-  const opening = performanceFacts.playerRounds.find((row) => row.roundNumber === roundNumber && row.openingDuel === "won");
+function firstKillForTeam(
+  performanceFacts: PlayerRoundPerformanceFacts,
+  roundNumber: number,
+  teamKey: TeamKey,
+): boolean | null {
+  const opening = performanceFacts.playerRounds.find(
+    (row) => row.roundNumber === roundNumber && row.openingDuel === 'won',
+  );
   return opening ? opening.teamKey === teamKey : null;
 }
 
@@ -338,7 +431,12 @@ export function extractTacticalRoundFacts(
   pkg: DemoPackage,
   options: { matchId: string; calloutGrid?: CalloutGrid | null },
 ): TacticalRoundFact[] {
-  return extractTacticalRoundFactsWithContexts(pkg, options, undefined, buildPlayerRoundPerformanceFacts(pkg));
+  return extractTacticalRoundFactsWithContexts(
+    pkg,
+    options,
+    undefined,
+    buildPlayerRoundPerformanceFacts(pkg),
+  );
 }
 
 /** Internal composition seam: contexts never cross the @cs2dak/core public boundary. */
@@ -353,12 +451,26 @@ export function extractTacticalRoundFactsWithContexts(
   for (const round of pkg.rounds) {
     const decoded = replayContexts?.get(round.roundNumber) ?? createReplayRoundContext(pkg, round);
     const plant = plantFor(pkg, round, tickrate);
-    for (const side of ["t", "ct"] as const) {
+    for (const side of ['t', 'ct'] as const) {
       if (!decoded?.tracks.some((track) => track.side === side)) continue;
-      const teamKey: TeamKey = round.teamASide === side ? "teamA" : "teamB";
-      const opponentKey: TeamKey = teamKey === "teamA" ? "teamB" : "teamA";
-      const entries = siteEntriesFor(decoded, round, pkg.match.mapName, side, tickrate, options.calloutGrid ?? null);
-      const opening = openingAnalysisFor(decoded, round, pkg.match.mapName, side, tickrate, options.calloutGrid ?? null);
+      const teamKey: TeamKey = round.teamASide === side ? 'teamA' : 'teamB';
+      const opponentKey: TeamKey = teamKey === 'teamA' ? 'teamB' : 'teamA';
+      const entries = siteEntriesFor(
+        decoded,
+        round,
+        pkg.match.mapName,
+        side,
+        tickrate,
+        options.calloutGrid ?? null,
+      );
+      const opening = openingAnalysisFor(
+        decoded,
+        round,
+        pkg.match.mapName,
+        side,
+        tickrate,
+        options.calloutGrid ?? null,
+      );
       const targetSite = targetSiteFor(plant, entries);
       const executeRemainSec = targetSite ? entries[targetSite].executeRemainSec : null;
       const grenades = grenadesFor(pkg, options.matchId, round, side, options.calloutGrid ?? null);
@@ -380,7 +492,10 @@ export function extractTacticalRoundFactsWithContexts(
         siteEntries: entries,
         plant,
         grenades,
-        c4Route: side === "t" ? c4RouteFor(decoded, round, pkg.match.mapName, plant, options.calloutGrid ?? null) : null,
+        c4Route:
+          side === 't'
+            ? c4RouteFor(decoded, round, pkg.match.mapName, plant, options.calloutGrid ?? null)
+            : null,
         executeRemainSec,
         executeBucket: bucketOf(executeRemainSec),
         firstKillForTeam: firstKillForTeam(performanceFacts, round.roundNumber, teamKey),

@@ -1,9 +1,15 @@
-import type { RRIndicators, RRResult, PrismResult, CohortAccountResult, RRSixAccountResult } from "@rivalhub/rival-rating";
-import { z } from "zod";
+import type {
+  RRIndicators,
+  RRResult,
+  PrismResult,
+  CohortAccountResult,
+  RRSixAccountResult,
+} from '@rivalhub/rival-rating';
+import { z } from 'zod';
 
 const clutchSplitSchema = z.object({
   count: z.number().int().nonnegative(),
-  won: z.number().int().nonnegative()
+  won: z.number().int().nonnegative(),
 });
 
 export const rrIndicatorsSchema: z.ZodType<RRIndicators> = z.object({
@@ -73,7 +79,7 @@ export const rrIndicatorsSchema: z.ZodType<RRIndicators> = z.object({
   bombDeathCount: z.number().int().nonnegative().nullable(),
   wallbangKillCount: z.number().int().nonnegative().nullable(),
   roundSwingTotal: z.number().nullable(),
-  roundSwingPerKill: z.number().nullable()
+  roundSwingPerKill: z.number().nullable(),
 });
 
 export type {
@@ -83,10 +89,10 @@ export type {
   RRResult,
   RRSignals,
   RRSixAccountResult,
-  RRSixAccountWeights
-} from "@rivalhub/rival-rating";
+  RRSixAccountWeights,
+} from '@rivalhub/rival-rating';
 
-export const accountContextAvailabilitySchema = z.enum(["available", "partial", "missing"]);
+export const accountContextAvailabilitySchema = z.enum(['available', 'partial', 'missing']);
 export type AccountContextAvailability = z.infer<typeof accountContextAvailabilitySchema>;
 
 export const indicatorRatingResultSchema = z.object({
@@ -94,7 +100,8 @@ export const indicatorRatingResultSchema = z.object({
   indicators: rrIndicatorsSchema,
   rr: z.custom<RRResult>(),
   rrPercentile: z.number().min(0).max(100),
-  prism: z.custom<PrismResult>().nullable()
+  prism: z.custom<PrismResult>().nullable(),
 });
 export type IndicatorRatingResult = z.infer<typeof indicatorRatingResultSchema>;
-export type AccountRatingResult = CohortAccountResult & Pick<RRSixAccountResult, "combatContextFactor" | "weightsVersion" | "model">;
+export type AccountRatingResult = CohortAccountResult &
+  Pick<RRSixAccountResult, 'combatContextFactor' | 'weightsVersion' | 'model'>;

@@ -1,8 +1,17 @@
-import { decodeDelta, FLAG_ALIVE, type DemoPackage } from "@cs2dak/contract";
-import { replayWeaponAt, type ReplayRoundContext, type ReplayRoundTrack } from "../tactics/replay-round-context.js";
+import { decodeDelta, FLAG_ALIVE, type DemoPackage } from '@cs2dak/contract';
+import {
+  replayWeaponAt,
+  type ReplayRoundContext,
+  type ReplayRoundTrack,
+} from '../tactics/replay-round-context.js';
 
 function isAwp(weapon: string | null | undefined): boolean {
-  return weapon?.trim().toLowerCase().replace(/^weapon_/, "") === "awp";
+  return (
+    weapon
+      ?.trim()
+      .toLowerCase()
+      .replace(/^weapon_/, '') === 'awp'
+  );
 }
 
 export interface AwpRoundFacts {
@@ -23,7 +32,9 @@ export function extractAwpRoundFacts(
   if (!context || !track) {
     return { freezeAwpOwnership: null, activeAwpSeconds: null, awpShots: null, awpKills: null };
   }
-  const economy = pkg.playerEconomies.find((row) => row.roundNumber === roundNumber && row.playerIndex === playerIndex);
+  const economy = pkg.playerEconomies.find(
+    (row) => row.roundNumber === roundNumber && row.playerIndex === playerIndex,
+  );
   const freezeAwpOwnership = economy ? isAwp(economy.primaryWeapon) : null;
   const frameSeconds = context.tickStep / (pkg.match.tickrate || 64);
   let activeFrames = 0;
@@ -31,13 +42,24 @@ export function extractAwpRoundFacts(
     const tick = context.startTick + index * context.tickStep;
     if (tick < context.round.freezeEndTick || tick > context.round.endTick) continue;
     if (((track.flags[index] ?? 0) & FLAG_ALIVE) === 0) continue;
-    if (![track.x[index], track.y[index], track.z[index]].every((value) => value != null && Number.isFinite(value))) continue;
+    if (
+      ![track.x[index], track.y[index], track.z[index]].every(
+        (value) => value != null && Number.isFinite(value),
+      )
+    )
+      continue;
     if (isAwp(replayWeaponAt(context, track, index))) activeFrames += 1;
   }
-  const shotTrack = pkg.shots?.tracks.find((row) => row.roundNumber === roundNumber && row.playerIndex === playerIndex);
+  const shotTrack = pkg.shots?.tracks.find(
+    (row) => row.roundNumber === roundNumber && row.playerIndex === playerIndex,
+  );
   const awpShots = shotTrack
-    ? decodeDelta(shotTrack.tick).filter((_, index) => isAwp(pkg.shots?.weaponDict[shotTrack.weapon[index] ?? -1])).length
-    : pkg.shots ? 0 : null;
+    ? decodeDelta(shotTrack.tick).filter((_, index) =>
+        isAwp(pkg.shots?.weaponDict[shotTrack.weapon[index] ?? -1]),
+      ).length
+    : pkg.shots
+      ? 0
+      : null;
   const awpKills = pkg.kills
     .filter((kill) => kill.roundNumber === roundNumber && kill.killerIndex === playerIndex)
     .filter((kill) => isAwp(kill.weapon)).length;

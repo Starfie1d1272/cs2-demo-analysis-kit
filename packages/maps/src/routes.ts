@@ -25,14 +25,14 @@ export interface RouteZone {
 
 /** 动线类型——区分进攻线 vs 控制/入侵线。 */
 export type RouteType =
-  | "primary_entry"    // 主进攻线：A厅、B坡、Dust2 B洞 —— 直插包点的干道
-  | "secondary_entry"  // 副进攻线：A小、B侧门、Inferno二楼 —— 次要/split 进点路径
-  | "mid_connector"    // 中路 connector：中路→拱门/甜甜圈/连接 —— 价值在夹击与压缩防守
-  | "lurk_lane"        // 单挂牵制线：控VIP/黑屋 —— 终点是控制区而非包点
-  | "rotation_cut";    // 断回防线：入侵警家/切轮转路线 —— 切断CT回防通道
+  | 'primary_entry' // 主进攻线：A厅、B坡、Dust2 B洞 —— 直插包点的干道
+  | 'secondary_entry' // 副进攻线：A小、B侧门、Inferno二楼 —— 次要/split 进点路径
+  | 'mid_connector' // 中路 connector：中路→拱门/甜甜圈/连接 —— 价值在夹击与压缩防守
+  | 'lurk_lane' // 单挂牵制线：控VIP/黑屋 —— 终点是控制区而非包点
+  | 'rotation_cut'; // 断回防线：入侵警家/切轮转路线 —— 切断CT回防通道
 
 /** 可信度——数据支撑程度。 */
-export type RouteConfidence = "high" | "medium" | "low";
+export type RouteConfidence = 'high' | 'medium' | 'low';
 
 /** 一条进攻动线：从 T 出生区到某包点的有序 callout 序列。 */
 export interface MapRoute {
@@ -43,7 +43,7 @@ export interface MapRoute {
   /** 动线类型。 */
   type: RouteType;
   /** 该动线指向的包点。 */
-  bombsite: "a" | "b";
+  bombsite: 'a' | 'b';
   /** 可信度标签。 */
   confidence: RouteConfidence;
   /**

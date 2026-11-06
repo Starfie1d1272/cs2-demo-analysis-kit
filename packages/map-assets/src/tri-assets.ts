@@ -8,16 +8,12 @@
  * DAK Studio 浏览器端不经过此 Node 路径；开发/桌面端通过 HTTP 按需加载 `.tri`。
  */
 
-import { readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
-import { buildTriangleBvh, parseAwpyTri, type TriangleBvh } from "@cs2dak/maps";
+import { readFileSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+import { buildTriangleBvh, parseAwpyTri, type TriangleBvh } from '@cs2dak/maps';
 
 /** 可通过环境变量 AWPY_TRIS_DIR 覆盖默认路径。 */
-const DEFAULT_TRIS_DIR = join(
-  process.env.HOME ?? process.env.USERPROFILE ?? "~",
-  ".awpy",
-  "tris",
-);
+const DEFAULT_TRIS_DIR = join(process.env.HOME ?? process.env.USERPROFILE ?? '~', '.awpy', 'tris');
 
 const triBvhCache = new Map<string, TriangleBvh | null>();
 

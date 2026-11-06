@@ -1,4 +1,4 @@
-import type { RecordStore } from "./types";
+import type { RecordStore } from './types';
 
 /** Row keys use an exact matchId or matchId + tab, never a filename prefix. */
 export function isMatchRowKey(key: string, matchId: string): boolean {
@@ -8,7 +8,9 @@ export function isMatchRowKey(key: string, matchId: string): boolean {
 /** Wait for every started write before reporting failure (rollback must not race it). */
 export async function settleWrites(writes: Promise<unknown>[]): Promise<void> {
   const results = await Promise.allSettled(writes);
-  const failed = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
+  const failed = results.find(
+    (result): result is PromiseRejectedResult => result.status === 'rejected',
+  );
   if (failed) throw failed.reason;
 }
 

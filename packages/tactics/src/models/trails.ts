@@ -1,5 +1,5 @@
-import { z } from "zod";
-import { sideSchema, teamEconomySchema, grenadeTypeSchema } from "@cs2dak/contract";
+import { z } from 'zod';
+import { sideSchema, teamEconomySchema, grenadeTypeSchema } from '@cs2dak/contract';
 
 /**
  * 开局动线：单选手在指定经济类型回合（默认长枪局）开局窗口内的
@@ -11,7 +11,7 @@ export const trailPointSchema = z.object({
   /** 距 freeze 结束的秒数。 */
   t: z.number().nonnegative(),
   x: z.number(),
-  y: z.number()
+  y: z.number(),
 });
 
 export const trailGrenadeSchema = z.object({
@@ -26,7 +26,7 @@ export const trailGrenadeSchema = z.object({
   destroyT: z.number().nonnegative().nullable(),
   /** 落点（world 坐标）。 */
   effectX: z.number(),
-  effectY: z.number()
+  effectY: z.number(),
 });
 
 export const openingTrailRoundSchema = z.object({
@@ -35,11 +35,11 @@ export const openingTrailRoundSchema = z.object({
   side: sideSchema,
   economyType: teamEconomySchema,
   points: z.array(trailPointSchema),
-  grenades: z.array(trailGrenadeSchema)
+  grenades: z.array(trailGrenadeSchema),
 });
 
 export const openingTrailsModelSchema = z.object({
-  version: z.literal("cs2-demo-analysis-kit/opening-trails-0.2"),
+  version: z.literal('cs2-demo-analysis-kit/opening-trails-0.2'),
   matchId: z.string(),
   mapName: z.string(),
   steamId64: z.string(),
@@ -47,7 +47,7 @@ export const openingTrailsModelSchema = z.object({
   /** 该导出包是否含回放流；false 时 rounds 为空。 */
   available: z.boolean(),
   windowSeconds: z.number().positive(),
-  rounds: z.array(openingTrailRoundSchema)
+  rounds: z.array(openingTrailRoundSchema),
 });
 
 export type TrailPoint = z.infer<typeof trailPointSchema>;

@@ -1,17 +1,27 @@
-import type { BracketCell, ElimModel, ElimNode, SwissColumn, SwissModel } from "@cs2dak/presentation";
-import type { EventStage } from "@cs2dak/contract";
-import type { StudioSeriesRecord } from "./series";
+import type {
+  BracketCell,
+  ElimModel,
+  ElimNode,
+  SwissColumn,
+  SwissModel,
+} from '@cs2dak/presentation';
+import type { EventStage } from '@cs2dak/contract';
+import type { StudioSeriesRecord } from './series';
 
 // 类型 BracketCell / SwissModel / ElimModel 由 @cs2dak/presentation 拥有，
 // 本文件仅保留 Studio 侧模型推导函数（依赖 StudioSeriesRecord）。
 
-function winnerOf(scoreA: number | null, scoreB: number | null, finished: boolean): "A" | "B" | null {
+function winnerOf(
+  scoreA: number | null,
+  scoreB: number | null,
+  finished: boolean,
+): 'A' | 'B' | null {
   if (!finished || scoreA == null || scoreB == null || scoreA === scoreB) return null;
-  return scoreA > scoreB ? "A" : "B";
+  return scoreA > scoreB ? 'A' : 'B';
 }
 
 function cellFromSeries(row: StudioSeriesRecord): BracketCell {
-  const finished = row.status === "finished";
+  const finished = row.status === 'finished';
   return {
     key: row.id,
     teamA: row.teamAName,
@@ -25,7 +35,7 @@ function cellFromSeries(row: StudioSeriesRecord): BracketCell {
 }
 
 function parseRecord(record: string): { w: number; l: number } {
-  const [w, l] = record.split("-").map((value) => Number(value) || 0);
+  const [w, l] = record.split('-').map((value) => Number(value) || 0);
   return { w: w ?? 0, l: l ?? 0 };
 }
 
@@ -51,9 +61,12 @@ export function swissModelFromResults(
     (col.get(before) ?? col.set(before, []).get(before)!).push(cell);
     columns.set(round, col);
     if (cell.winner) {
-      const [winName, loseName] = cell.winner === "A" ? [row.teamAName, row.teamBName] : [row.teamBName, row.teamAName];
-      const win = get(winName); rec.set(winName, { w: win.w + 1, l: win.l });
-      const lose = get(loseName); rec.set(loseName, { w: lose.w, l: lose.l + 1 });
+      const [winName, loseName] =
+        cell.winner === 'A' ? [row.teamAName, row.teamBName] : [row.teamBName, row.teamAName];
+      const win = get(winName);
+      rec.set(winName, { w: win.w + 1, l: win.l });
+      const lose = get(loseName);
+      rec.set(loseName, { w: lose.w, l: lose.l + 1 });
     }
   }
 
@@ -68,8 +81,12 @@ export function swissModelFromResults(
     if (w >= winsTarget) advanced.push({ team, record: `${w}-${l}` });
     else if (l >= lossTarget) eliminated.push({ team, record: `${w}-${l}` });
   }
-  advanced.sort((a, b) => parseRecord(a.record).l - parseRecord(b.record).l || a.team.localeCompare(b.team));
-  eliminated.sort((a, b) => parseRecord(b.record).w - parseRecord(a.record).w || a.team.localeCompare(b.team));
+  advanced.sort(
+    (a, b) => parseRecord(a.record).l - parseRecord(b.record).l || a.team.localeCompare(b.team),
+  );
+  eliminated.sort(
+    (a, b) => parseRecord(b.record).w - parseRecord(a.record).w || a.team.localeCompare(b.team),
+  );
 
   const cols: SwissColumn[] = [...columns.entries()]
     .sort((a, b) => a[0] - b[0])
@@ -77,14 +94,24 @@ export function swissModelFromResults(
       round,
       groups: [...groups.entries()]
         .map(([record, matches]) => ({ record, matches }))
-        .sort((a, b) => parseRecord(b.record).w - parseRecord(a.record).w || parseRecord(a.record).l - parseRecord(b.record).l),
+        .sort(
+          (a, b) =>
+            parseRecord(b.record).w - parseRecord(a.record).w ||
+            parseRecord(a.record).l - parseRecord(b.record).l,
+        ),
     }));
 
   return { columns: cols, advanced, eliminated, winsTarget, lossTarget };
 }
 
 const ELIM_ROUND_LABEL = (round: number, total: number): string =>
-  round === total ? "决赛" : round === total - 1 ? "半决赛" : round === total - 2 ? "四分之一决赛" : `第 ${round} 轮`;
+  round === total
+    ? '决赛'
+    : round === total - 1
+      ? '半决赛'
+      : round === total - 2
+        ? '四分之一决赛'
+        : `第 ${round} 轮`;
 
 /**
  * 淘汰赛 bracket：有 bracketNodes 用节点轮次/标签；否则从 series 的 round 推算列（决赛 / 半决赛 …）。
@@ -93,17 +120,33 @@ export function elimModelFromResults(series: StudioSeriesRecord[], stage: EventS
   const nodes = stage.bracketNodes ?? [];
   if (nodes.length > 0) {
     const rounds = [...new Set(nodes.map((node) => node.round))].sort((a, b) => a - b);
-    const byNode = new Map(series.filter((row) => row.bracketNodeId).map((row) => [row.bracketNodeId!, row]));
+    const byNode = new Map(
+      series.filter((row) => row.bracketNodeId).map((row) => [row.bracketNodeId!, row]),
+    );
     // EventBracketNode 与 ElimNode 字段完全相同，直接复用
     const elimNodes = nodes as ElimNode[];
     return {
       columns: rounds.map((round) => ({
         round,
-        label: nodes.find((node) => node.round === round)?.label?.replace(/\s*\d+$/, "") ?? `第 ${round} 轮`,
-        matches: nodes.filter((node) => node.round === round).map((node) => {
-          const row = byNode.get(node.id);
-          return row ? cellFromSeries(row) : { key: node.id, teamA: null, teamB: null, scoreA: null, scoreB: null, winner: null, date: null };
-        }),
+        label:
+          nodes.find((node) => node.round === round)?.label?.replace(/\s*\d+$/, '') ??
+          `第 ${round} 轮`,
+        matches: nodes
+          .filter((node) => node.round === round)
+          .map((node) => {
+            const row = byNode.get(node.id);
+            return row
+              ? cellFromSeries(row)
+              : {
+                  key: node.id,
+                  teamA: null,
+                  teamB: null,
+                  scoreA: null,
+                  scoreB: null,
+                  winner: null,
+                  date: null,
+                };
+          }),
       })),
       nodes: elimNodes,
     };

@@ -9,27 +9,33 @@ interface Props {
 }
 
 export function Changelog({ markdown }: Props) {
-  const lines = markdown.split("\n");
+  const lines = markdown.split('\n');
   const elements: React.ReactNode[] = [];
   let inList = false;
   const pushList = () => {
-    if (inList) { elements.push(<li key={`ul-end-${elements.length}`} style={{ display: "none" }} />); inList = false; }
+    if (inList) {
+      elements.push(<li key={`ul-end-${elements.length}`} style={{ display: 'none' }} />);
+      inList = false;
+    }
   };
 
   for (let i = 0; i < lines.length; i++) {
     const raw = lines[i];
     const trimmed = raw.trim();
-    if (!trimmed) { pushList(); continue; }
+    if (!trimmed) {
+      pushList();
+      continue;
+    }
 
     // ### heading
-    if (trimmed.startsWith("### ")) {
+    if (trimmed.startsWith('### ')) {
       pushList();
       elements.push(<h3 key={i}>{renderInline(trimmed.slice(4))}</h3>);
       continue;
     }
 
     // - list items (also ** : before description)
-    if (trimmed.startsWith("- ")) {
+    if (trimmed.startsWith('- ')) {
       inList = true;
       elements.push(<li key={i}>{renderInline(trimmed.slice(2))}</li>);
       continue;
@@ -54,9 +60,9 @@ function renderInline(text: string): React.ReactNode[] {
       parts.push(text.slice(last, match.index));
     }
     const inner = match[0];
-    if (inner.startsWith("**") && inner.endsWith("**")) {
+    if (inner.startsWith('**') && inner.endsWith('**')) {
       parts.push(<strong key={last}>{inner.slice(2, -2)}</strong>);
-    } else if (inner.startsWith("`") && inner.endsWith("`")) {
+    } else if (inner.startsWith('`') && inner.endsWith('`')) {
       parts.push(<code key={last}>{inner.slice(1, -1)}</code>);
     }
     last = re.lastIndex;

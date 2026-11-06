@@ -11,18 +11,23 @@
  * 无 positions / routes 时 take/execute 为 null（降级为 default），并在
  * RoundPhaseModel.hasPositions/hasRoutes 标注，供 evidenceQuality 使用。
  */
-import type { DemoPackage } from "@cs2dak/contract";
-import { getMapRoutes } from "@cs2dak/map-assets";
-import { routeIndex, type MapRoutes } from "@cs2dak/maps";
-import { createResolverFromPackage } from "@cs2dak/core";
-import { groupBy } from "@cs2dak/core";
-import type { RoundPhase, RoundPhaseModel } from "./types.js";
+import type { DemoPackage } from '@cs2dak/contract';
+import { getMapRoutes } from '@cs2dak/map-assets';
+import { routeIndex, type MapRoutes } from '@cs2dak/maps';
+import { createResolverFromPackage } from '@cs2dak/core';
+import { groupBy } from '@cs2dak/core';
+import type { RoundPhase, RoundPhaseModel } from './types.js';
 
-type Round = DemoPackage["rounds"][number];
-type PositionRow = { roundNumber: number; tick: number; steamId64: string; lastPlaceName?: string | null };
+type Round = DemoPackage['rounds'][number];
+type PositionRow = {
+  roundNumber: number;
+  tick: number;
+  steamId64: string;
+  lastPlaceName?: string | null;
+};
 
 export function inferRoundPhases(pkg: DemoPackage): Map<number, RoundPhaseModel> {
-  const routes = getMapRoutes(pkg.match?.mapName ?? "");
+  const routes = getMapRoutes(pkg.match?.mapName ?? '');
   // Build positions from replay 8Hz stream (v3 replaces positions-1s)
   const positions = buildPositionRows(pkg);
   const hasPositions = positions.length > 0;
@@ -34,18 +39,18 @@ export function inferRoundPhases(pkg: DemoPackage): Map<number, RoundPhaseModel>
   const clutchesByRound = groupBy(pkg.clutches ?? [], (clutch) => clutch.roundNumber);
   const plantByRound = new Map<number, number>();
   for (const bomb of pkg.bombs) {
-    if (bomb.type === "planted" && !plantByRound.has(bomb.roundNumber)) {
+    if (bomb.type === 'planted' && !plantByRound.has(bomb.roundNumber)) {
       plantByRound.set(bomb.roundNumber, bomb.tick);
     }
   }
 
   const out = new Map<number, RoundPhaseModel>();
   for (const round of pkg.rounds) {
-    const tTeam = round.teamASide === "t" ? "teamA" : round.teamBSide === "t" ? "teamB" : null;
+    const tTeam = round.teamASide === 't' ? 'teamA' : round.teamBSide === 't' ? 'teamB' : null;
     const plantTick = plantByRound.get(round.roundNumber) ?? null;
-    const clutchStartTick = [...(clutchesByRound.get(round.roundNumber) ?? [])]
-      .sort((a, b) => a.tick - b.tick)
-      .at(0)?.tick ?? null;
+    const clutchStartTick =
+      [...(clutchesByRound.get(round.roundNumber) ?? [])].sort((a, b) => a.tick - b.tick).at(0)
+        ?.tick ?? null;
     const { takeTick, executeTick } = computeTakeExecute(
       round,
       tTeam,
@@ -71,17 +76,17 @@ export function inferRoundPhases(pkg: DemoPackage): Map<number, RoundPhaseModel>
 }
 
 export function phaseAtTick(model: RoundPhaseModel, tick: number): RoundPhase {
-  if (tick < model.freezeEndTick) return "freeze";
-  if (model.clutchStartTick != null && tick >= model.clutchStartTick) return "clutch";
-  if (model.plantTick != null && tick >= model.plantTick) return "postPlant";
-  if (model.executeTick != null && tick >= model.executeTick) return "execute";
-  if (model.takeTick != null && tick >= model.takeTick) return "take";
-  return "default";
+  if (tick < model.freezeEndTick) return 'freeze';
+  if (model.clutchStartTick != null && tick >= model.clutchStartTick) return 'clutch';
+  if (model.plantTick != null && tick >= model.plantTick) return 'postPlant';
+  if (model.executeTick != null && tick >= model.executeTick) return 'execute';
+  if (model.takeTick != null && tick >= model.takeTick) return 'take';
+  return 'default';
 }
 
 function computeTakeExecute(
   round: Round,
-  tTeam: "teamA" | "teamB" | null,
+  tTeam: 'teamA' | 'teamB' | null,
   routes: MapRoutes | null,
   rows: PositionRow[],
   teamByPlayer: Map<string, string>,

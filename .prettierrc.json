@@ -1,0 +1,14 @@
+{
+  "printWidth": 100,
+  "semi": true,
+  "singleQuote": true,
+  "trailingComma": "all",
+  "overrides": [
+    {
+      "files": "apps/dak-studio/src/lib/updater-bridge.ts",
+      "options": {
+        "singleQuote": false
+      }
+    }
+  ]
+}

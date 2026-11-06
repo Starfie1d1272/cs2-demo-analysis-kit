@@ -1,8 +1,8 @@
-import { useMemo, type ReactNode } from "react";
-import type { SeriesSummary } from "@cs2dak/presentation";
-import type { StudioDemoEntry } from "../lib/demo-entry";
-import { mapDisplayName, sortEntriesByVeto, type StudioSeriesRecord } from "../lib/series";
-import { BpView } from "./BpView";
+import { useMemo, type ReactNode } from 'react';
+import type { SeriesSummary } from '@cs2dak/presentation';
+import type { StudioDemoEntry } from '../lib/demo-entry';
+import { mapDisplayName, sortEntriesByVeto, type StudioSeriesRecord } from '../lib/series';
+import { BpView } from './BpView';
 
 export interface SeriesWorkspaceProps {
   series: StudioSeriesRecord;
@@ -19,17 +19,22 @@ export interface SeriesWorkspaceProps {
 function pickBadge(series: StudioSeriesRecord, mapName: string): string | null {
   const veto = series.veto;
   if (!veto) return null;
-  if (veto.maps.decider === mapName) return "决胜图";
+  if (veto.maps.decider === mapName) return '决胜图';
   const picked = veto.maps.picked.find((row) => row.mapName === mapName);
   if (!picked) return null;
-  const who = picked.teamKey === "teamA" ? series.teamAName : picked.teamKey === "teamB" ? series.teamBName : null;
-  return who ? `${who} PICK` : "PICK";
+  const who =
+    picked.teamKey === 'teamA'
+      ? series.teamAName
+      : picked.teamKey === 'teamB'
+        ? series.teamBName
+        : null;
+  return who ? `${who} PICK` : 'PICK';
 }
 
 /** 系列比分：始终按 series 的 A/B 顺序统计，不能继承某张地图里可能反转的 teamA/teamB。 */
 export function seriesScore(
-  series: Pick<StudioSeriesRecord, "teamAName" | "teamBName">,
-  entries: StudioDemoEntry[]
+  series: Pick<StudioSeriesRecord, 'teamAName' | 'teamBName'>,
+  entries: StudioDemoEntry[],
 ): { winsA: number; winsB: number } | null {
   if (entries.length === 0) return null;
   let winsA = 0;
@@ -49,9 +54,9 @@ export function seriesScore(
 
 function copyRawDemoUrl(url: string): void {
   if (navigator.clipboard?.writeText) {
-    navigator.clipboard.writeText(url).catch(() => window.prompt("复制原始 demo 链接", url));
+    navigator.clipboard.writeText(url).catch(() => window.prompt('复制原始 demo 链接', url));
   } else {
-    window.prompt("复制原始 demo 链接", url);
+    window.prompt('复制原始 demo 链接', url);
   }
 }
 
@@ -63,19 +68,23 @@ export function SeriesWorkspace({
   summary,
   onSelectMap,
   onShowSummary,
-  children
+  children,
 }: SeriesWorkspaceProps) {
   const score = seriesScore(series, entries);
   const sortedEntries = useMemo(
-    () => series.veto ? sortEntriesByVeto(entries, series.veto) : entries,
-    [entries, series.veto]
+    () => (series.veto ? sortEntriesByVeto(entries, series.veto) : entries),
+    [entries, series.veto],
   );
   return (
     <div className="stu-series">
       <header className="stu-series-head">
         <div className="stu-series-teams">
           <strong>{series.teamAName}</strong>
-          {score && <span className="stu-series-score">{score.winsA} : {score.winsB}</span>}
+          {score && (
+            <span className="stu-series-score">
+              {score.winsA} : {score.winsB}
+            </span>
+          )}
           <strong>{series.teamBName}</strong>
         </div>
         <span className="stu-series-format">{series.format.toUpperCase()}</span>
@@ -94,14 +103,20 @@ export function SeriesWorkspace({
           {series.rawDemoHint?.downloadUrl ? (
             <>
               <a href={series.rawDemoHint.downloadUrl} target="_blank" rel="noreferrer">
-                {series.rawDemoHint.fileName ?? "下载链接"}
+                {series.rawDemoHint.fileName ?? '下载链接'}
               </a>
-              <button type="button" className="stu-button-sm" onClick={() => copyRawDemoUrl(series.rawDemoHint!.downloadUrl!)}>
+              <button
+                type="button"
+                className="stu-button-sm"
+                onClick={() => copyRawDemoUrl(series.rawDemoHint!.downloadUrl!)}
+              >
                 复制直链
               </button>
             </>
           ) : series.matchUrl ? (
-            <a href={series.matchUrl} target="_blank" rel="noreferrer">打开 HLTV 来源页</a>
+            <a href={series.matchUrl} target="_blank" rel="noreferrer">
+              打开 HLTV 来源页
+            </a>
           ) : null}
         </div>
       )}
@@ -109,7 +124,7 @@ export function SeriesWorkspace({
       <nav className="stu-series-tabs" aria-label="系列赛地图">
         <button
           type="button"
-          className={summaryMode ? "stu-series-tab stu-series-tab-active" : "stu-series-tab"}
+          className={summaryMode ? 'stu-series-tab stu-series-tab-active' : 'stu-series-tab'}
           onClick={onShowSummary}
         >
           系列汇总
@@ -121,11 +136,15 @@ export function SeriesWorkspace({
             <button
               key={entry.id}
               type="button"
-              className={active ? "stu-series-tab stu-series-tab-active" : "stu-series-tab"}
+              className={active ? 'stu-series-tab stu-series-tab-active' : 'stu-series-tab'}
               onClick={() => onSelectMap(entry.id)}
             >
-              <span className="stu-series-tab-map">M{index + 1} · {mapDisplayName(entry.meta.mapName)}</span>
-              <span className="stu-series-tab-score">{entry.meta.teamAScore ?? "—"}:{entry.meta.teamBScore ?? "—"}</span>
+              <span className="stu-series-tab-map">
+                M{index + 1} · {mapDisplayName(entry.meta.mapName)}
+              </span>
+              <span className="stu-series-tab-score">
+                {entry.meta.teamAScore ?? '—'}:{entry.meta.teamBScore ?? '—'}
+              </span>
               {badge && <span className="stu-series-tab-badge">{badge}</span>}
             </button>
           );
@@ -148,7 +167,7 @@ function SeriesSummaryPanel({ summary }: { summary: SeriesSummary | null }) {
             <div key={map.matchId} className="stu-series-map-row">
               <b>{mapDisplayName(map.mapName)}</b>
               <span>{map.scoreline}</span>
-              <small>{map.winnerName ? `${map.winnerName} 胜` : "平"}</small>
+              <small>{map.winnerName ? `${map.winnerName} 胜` : '平'}</small>
             </div>
           ))}
         </div>
@@ -157,7 +176,17 @@ function SeriesSummaryPanel({ summary }: { summary: SeriesSummary | null }) {
         <h3>跨图记分板（RR 回合加权）</h3>
         <table className="stu-mini-table">
           <thead>
-            <tr><th>选手</th><th>队伍</th><th className="stu-num">图</th><th className="stu-num">K</th><th className="stu-num">D</th><th className="stu-num">A</th><th className="stu-num">ADR</th><th className="stu-num">KAST</th><th className="stu-num">RR</th></tr>
+            <tr>
+              <th>选手</th>
+              <th>队伍</th>
+              <th className="stu-num">图</th>
+              <th className="stu-num">K</th>
+              <th className="stu-num">D</th>
+              <th className="stu-num">A</th>
+              <th className="stu-num">ADR</th>
+              <th className="stu-num">KAST</th>
+              <th className="stu-num">RR</th>
+            </tr>
           </thead>
           <tbody>
             {summary.scoreboard.map((row) => (

@@ -1,7 +1,11 @@
-import { z } from "zod";
-import { accountContextAvailabilitySchema, rrIndicatorsSchema, type PrismResult } from "@cs2dak/rating";
+import { z } from 'zod';
+import {
+  accountContextAvailabilitySchema,
+  rrIndicatorsSchema,
+  type PrismResult,
+} from '@cs2dak/rating';
 
-const teamKeySchema = z.enum(["teamA", "teamB"]);
+const teamKeySchema = z.enum(['teamA', 'teamB']);
 export type CohortTeamKey = z.infer<typeof teamKeySchema>;
 
 /** Frozen weapon input used by cohort aggregation. */
@@ -13,7 +17,7 @@ export const cohortWeaponKillRowSchema = z.object({
   noScopeKills: z.number().int().nonnegative(),
   throughSmokeKills: z.number().int().nonnegative(),
   wallbangKills: z.number().int().nonnegative(),
-  penetratedObjects: z.number().int().nonnegative()
+  penetratedObjects: z.number().int().nonnegative(),
 });
 
 export const cohortWeaponHighlightFactsSchema = z.object({
@@ -24,8 +28,8 @@ export const cohortWeaponHighlightFactsSchema = z.object({
     wallbangKills: z.number().int().nonnegative().nullable(),
     noScopeKills: z.number().int().nonnegative().nullable(),
     throughSmokeKills: z.number().int().nonnegative().nullable(),
-    collateralKills: z.number().int().nonnegative().nullable()
-  })
+    collateralKills: z.number().int().nonnegative().nullable(),
+  }),
 });
 
 export type CohortWeaponHighlightFacts = z.infer<typeof cohortWeaponHighlightFactsSchema>;
@@ -50,35 +54,39 @@ export const seasonPlayerRowSchema = z.object({
     mapControl: z.number(),
     clutch: z.number(),
     objective: z.number(),
-    utility: z.number()
+    utility: z.number(),
   }),
   accountContextStatus: z.object({
     buyDelta: accountContextAvailabilitySchema,
-    manState: accountContextAvailabilitySchema
+    manState: accountContextAvailabilitySchema,
   }),
   prism: z.custom<PrismResult>().nullable(),
   confidence: z.number().min(0).max(1),
-  perMatch: z.array(z.object({
-    matchId: z.string(),
-    steamId64: z.string(),
-    accountRR: z.number().nonnegative(),
-    rrV1: z.number().nonnegative()
-  }))
+  perMatch: z.array(
+    z.object({
+      matchId: z.string(),
+      steamId64: z.string(),
+      accountRR: z.number().nonnegative(),
+      rrV1: z.number().nonnegative(),
+    }),
+  ),
 });
 
 export const seasonCohortBundleSchema = z.object({
-  version: z.literal("cs2-demo-analysis-kit/cohort-1.0"),
+  version: z.literal('cs2-demo-analysis-kit/cohort-1.0'),
   matchCount: z.number().int().nonnegative(),
   players: z.array(seasonPlayerRowSchema),
   weightsVersion: z.string(),
   provenance: z.object({
-    cohortVersion: z.literal("cs2-demo-analysis-kit/cohort-1.0"),
-    sourceSchemaVersion: z.literal("cs2-demo-format/3.0"),
-    matches: z.array(z.object({
-      matchId: z.string(),
-      sourceDemoHash: z.string().nullable()
-    }))
-  })
+    cohortVersion: z.literal('cs2-demo-analysis-kit/cohort-1.0'),
+    sourceSchemaVersion: z.literal('cs2-demo-format/3.0'),
+    matches: z.array(
+      z.object({
+        matchId: z.string(),
+        sourceDemoHash: z.string().nullable(),
+      }),
+    ),
+  }),
 });
 
 export type SeasonPlayerRow = z.infer<typeof seasonPlayerRowSchema>;

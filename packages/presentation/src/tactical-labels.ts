@@ -1,10 +1,15 @@
-import { calloutCn, entryRouteCn, SITE_ENTRY_SEMANTICS, DEFAULT_POSITION_GROUPS } from "@cs2dak/maps";
+import {
+  calloutCn,
+  entryRouteCn,
+  SITE_ENTRY_SEMANTICS,
+  DEFAULT_POSITION_GROUPS,
+} from '@cs2dak/maps';
 
-export type EconomyEntry = "pistol" | "gun" | "anti_eco" | "force" | "semi" | "eco";
+export type EconomyEntry = 'pistol' | 'gun' | 'anti_eco' | 'force' | 'semi' | 'eco';
 
 export interface TacticalClusterLabelInput {
   mapName: string;
-  side: "t" | "ct";
+  side: 't' | 'ct';
   economyEntry: EconomyEntry;
   openingIntent: {
     regionCounts: { a: number; b: number; mid: number; unknown: number };
@@ -14,16 +19,16 @@ export interface TacticalClusterLabelInput {
 }
 
 export const ECONOMY_ENTRY_CN: Record<EconomyEntry, string> = {
-  pistol: "手枪局",
-  gun: "长枪局",
-  anti_eco: "Anti-eco",
-  force: "强起",
-  semi: "半起",
-  eco: "Eco",
+  pistol: '手枪局',
+  gun: '长枪局',
+  anti_eco: 'Anti-eco',
+  force: '强起',
+  semi: '半起',
+  eco: 'Eco',
 };
 
 export function sideLabel(side: string): string {
-  return side === "t" ? "进攻方" : "防守方";
+  return side === 't' ? '进攻方' : '防守方';
 }
 
 function chokeCn(mapName: string, chokeId: string): string {
@@ -36,14 +41,14 @@ function chokeCn(mapName: string, chokeId: string): string {
 }
 
 function structuralEntryName(mapName: string, combo: string): string {
-  const ids = combo.split("+");
+  const ids = combo.split('+');
   const names = ids.map((id) => chokeCn(mapName, id));
   if (ids.length === 1) return names[0]!;
-  return names.join(" + ");
+  return names.join(' + ');
 }
 
 /** 进点路线只用于 evidence 文案；词典不会参与主簇命名。 */
-export function formatEntryEvidenceLabel(mapName: string, site: "a" | "b", combo: string): string {
+export function formatEntryEvidenceLabel(mapName: string, site: 'a' | 'b', combo: string): string {
   return entryRouteCn(mapName, site, combo) || structuralEntryName(mapName, combo);
 }
 
@@ -63,13 +68,13 @@ function positionGroupLabels(input: TacticalClusterLabelInput): string[] {
 /** 左栏短名显式保留 formation，禁止用字符串 regex 截断完整名称。 */
 export function formatTacticalClusterShortName(cluster: TacticalClusterLabelInput): string {
   const groups = positionGroupLabels(cluster);
-  const structure = groups.length > 0 ? groups.join(" / ") : formationLabel(cluster);
+  const structure = groups.length > 0 ? groups.join(' / ') : formationLabel(cluster);
   return `${formationLabel(cluster)} · ${structure}`;
 }
 
 /** 主簇名只描述已审核的默认位资产与真实开局人数结构。 */
 export function formatTacticalClusterName(cluster: TacticalClusterLabelInput): string {
   const econ = ECONOMY_ENTRY_CN[cluster.economyEntry];
-  const side = cluster.side === "ct" ? "CT " : "";
+  const side = cluster.side === 'ct' ? 'CT ' : '';
   return `${side}${econ} · ${formatTacticalClusterShortName(cluster)}`;
 }

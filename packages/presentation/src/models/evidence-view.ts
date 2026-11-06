@@ -6,5 +6,5 @@ export interface EvidenceRef {
   eventKey?: string;
   areaKey?: string;
   reason: string;
-  role?: "example" | "supporting" | "counterexample";
+  role?: 'example' | 'supporting' | 'counterexample';
 }

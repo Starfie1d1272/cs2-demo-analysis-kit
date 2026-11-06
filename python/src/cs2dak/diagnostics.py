@@ -1,4 +1,5 @@
 """Bounded diagnostics shared by the desktop shells; never export raw payloads."""
+
 from __future__ import annotations
 
 import json
@@ -23,20 +24,30 @@ class SourceFailures(RuntimeError):
             return
         detail = safe_exception(error, self.stage)
         inner = "; ".join(f"{item['type']}: {item['message']}" for item in detail["causes"][1:3])
-        self.failures.append({"source": source, "type": detail["type"],
-                              "message": sanitize_text(detail["message"], 180),
-                              "cause": sanitize_text(inner, 180)})
+        self.failures.append(
+            {
+                "source": source,
+                "type": detail["type"],
+                "message": sanitize_text(detail["message"], 180),
+                "cause": sanitize_text(inner, 180),
+            }
+        )
 
     def __str__(self) -> str:
-        items = [f"源 {item['source']} {item['type']}：{item['message']}"
-                 + (f"（内层：{item['cause']}）" if item["cause"] else "") for item in self.failures]
+        items = [
+            f"源 {item['source']} {item['type']}：{item['message']}"
+            + (f"（内层：{item['cause']}）" if item["cause"] else "")
+            for item in self.failures
+        ]
         if self.omitted:
             items.append(f"另有 {self.omitted} 个来源失败")
         return super().__str__() + ("；" + "；".join(items) if items else "")
 
 
-_SECRET_KEY = (r"authorization|(?:access|refresh|device|poll|session|auth|id)[_-]?token|"
-               r"token|password|passwd|credential|secret|pairing[_-]?code|device[_-]?code|client[_-]?secret|api[_-]?key")
+_SECRET_KEY = (
+    r"authorization|(?:access|refresh|device|poll|session|auth|id)[_-]?token|"
+    r"token|password|passwd|credential|secret|pairing[_-]?code|device[_-]?code|client[_-]?secret|api[_-]?key"
+)
 _QUOTED_VALUE = r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\''
 _CREDENTIAL_SPAN = re.compile(
     rf"(?i)[\"']?(?:{_SECRET_KEY})[\"']?\s*[:=]\s*(?:{_QUOTED_VALUE}|[^\r\n,;}}]+)|"
@@ -69,9 +80,12 @@ def sanitize_text(value, limit: int = 2000) -> str:
 
 def _sanitize_json(value):
     if isinstance(value, dict):
-        return {_sanitize_plain_text(key)[:16000]: "[redacted]"
-                if re.search(rf"(?i)(?:{_SECRET_KEY}|set-cookie|cookie)$", key)
-                else _sanitize_json(item) for key, item in value.items()}
+        return {
+            _sanitize_plain_text(key)[:16000]: "[redacted]"
+            if re.search(rf"(?i)(?:{_SECRET_KEY}|set-cookie|cookie)$", key)
+            else _sanitize_json(item)
+            for key, item in value.items()
+        }
     if isinstance(value, list):
         return [_sanitize_json(item) for item in value]
     if isinstance(value, str):
@@ -107,6 +121,7 @@ def _sanitize_plain_text(text: str) -> str:
     secret_key = _SECRET_KEY
     # JSON quoted strings can contain escaped quotes; consume the complete value.
     quoted_value = _QUOTED_VALUE
+
     # Retain quoted boundaries for another pass; never trust a bare marker from input.
     def redact_credential(match):
         value = match.group(2)
@@ -115,11 +130,13 @@ def _sanitize_plain_text(text: str) -> str:
 
     text = re.sub(
         rf"(?i)([\"']?(?:{secret_key})[\"']?\s*[:=]\s*)({quoted_value}|[^\r\n,;}}]+)",
-        redact_credential, text,
+        redact_credential,
+        text,
     )
     text = re.sub(
         rf"(?i)([\"']?(?:set-cookie|cookie)[\"']?\s*[:=]\s*)(?:{quoted_value}|[^\r\n]+)",
-        r"\1[redacted]", text,
+        r"\1[redacted]",
+        text,
     )
     # Parse complete credential values before URL rules can alter escaped quotes.
     text = re.sub(r"(?i)\b(?:https?|file)://[^\s<>\"']+", "[url]", text)
@@ -144,8 +161,13 @@ def _frames(exc) -> list[dict]:
     current = _attribute(exc, "__traceback__")
     while isinstance(current, TracebackType) and len(result) < 24:
         code = current.tb_frame.f_code
-        result.append({"file": sanitize_text(code.co_filename.replace("\\", "/").rsplit("/", 1)[-1], 200),
-                       "function": sanitize_text(code.co_name, 100), "line": current.tb_lineno})
+        result.append(
+            {
+                "file": sanitize_text(code.co_filename.replace("\\", "/").rsplit("/", 1)[-1], 200),
+                "function": sanitize_text(code.co_name, 100),
+                "line": current.tb_lineno,
+            }
+        )
         current = current.tb_next
     return result
 
@@ -167,19 +189,35 @@ def safe_exception(exc: BaseException, stage: str = "unknown") -> dict:
         if id(error) in seen:
             continue
         seen.add(id(error))
-        causes.append({"type": sanitize_text(type(error).__name__, 100),
-                       "message": sanitize_text(error, 1000), "relation": relation, "frames": _frames(error)})
+        causes.append(
+            {
+                "type": sanitize_text(type(error).__name__, 100),
+                "message": sanitize_text(error, 1000),
+                "relation": relation,
+                "frames": _frames(error),
+            }
+        )
         for attr in ("__cause__", "__context__", "InnerException"):
             inner = _attribute(error, attr)
             if inner is not None:
                 pending.append((inner, attr))
-    result = {"stage": sanitize_text(stage, 100), "type": causes[0]["type"],
-              "message": causes[0]["message"], "causes": causes,
-              "cause": sanitize_text("; ".join(
-                  f"{item['relation']} {item['type']}: {item['message']}" for item in causes), 4000)}
-    if any("Loader.Initialize" in item["message"] or "ClrLoader" in item["message"] for item in causes):
-        result["guidance"] = ("请保留诊断日志并重运行官方安装器修复完整应用；确认 .NET Framework 4.8 "
-                              "和 WebView2 Runtime 已安装。Loader.Initialize 的具体原因仍需根据异常链排查。")
+    result = {
+        "stage": sanitize_text(stage, 100),
+        "type": causes[0]["type"],
+        "message": causes[0]["message"],
+        "causes": causes,
+        "cause": sanitize_text(
+            "; ".join(f"{item['relation']} {item['type']}: {item['message']}" for item in causes),
+            4000,
+        ),
+    }
+    if any(
+        "Loader.Initialize" in item["message"] or "ClrLoader" in item["message"] for item in causes
+    ):
+        result["guidance"] = (
+            "请保留诊断日志并重运行官方安装器修复完整应用；确认 .NET Framework 4.8 "
+            "和 WebView2 Runtime 已安装。Loader.Initialize 的具体原因仍需根据异常链排查。"
+        )
     return result
 
 
@@ -188,8 +226,14 @@ def safe_metadata(value) -> dict:
     if not isinstance(value, dict):
         return {}
     result = {}
-    for key, limit in {"code": 80, "message": 1000, "cause": 4000, "requestId": 160,
-                       "stage": 100, "fileId": 80}.items():
+    for key, limit in {
+        "code": 80,
+        "message": 1000,
+        "cause": 4000,
+        "requestId": 160,
+        "stage": 100,
+        "fileId": 80,
+    }.items():
         if isinstance(value.get(key), str):
             result[key] = sanitize_text(value[key], limit)
     for key in ("status", "attempt"):
@@ -229,15 +273,18 @@ def export_logs(logger: logging.Logger, destination: Path, fallback: Path | None
         if isinstance(handler, logging.FileHandler):
             path = Path(handler.baseFilename)
             count = min(max(getattr(handler, "backupCount", 2), 0), 10)
-            sources.extend([path.with_name(path.name + f".{i}")
-                            for i in range(count, 0, -1)] + [path])
+            sources.extend(
+                [path.with_name(path.name + f".{i}") for i in range(count, 0, -1)] + [path]
+            )
     if not sources and fallback is not None:
         sources = [fallback.with_name(fallback.name + f".{i}") for i in (2, 1)] + [fallback]
     destination = Path(destination)
     # Include absent rotations in this guard: they may become active while exporting.
-    if any(destination.resolve() == source.resolve() or
-           (destination.exists() and source.exists() and destination.samefile(source))
-           for source in sources):
+    if any(
+        destination.resolve() == source.resolve()
+        or (destination.exists() and source.exists() and destination.samefile(source))
+        for source in sources
+    ):
         raise ValueError("请选择其他文件名，不能覆盖正在使用的诊断日志")
     chunks = []
     for source in dict.fromkeys(sources):
@@ -252,7 +299,9 @@ def export_logs(logger: logging.Logger, destination: Path, fallback: Path | None
                 # Drop the cut first line so a partial credential cannot evade redaction.
                 _, _, raw = raw.partition(b"\n")
             content = raw.decode("utf-8", errors="replace")
-            marker = "[older log content omitted; newest complete lines retained]\n" if omitted else ""
+            marker = (
+                "[older log content omitted; newest complete lines retained]\n" if omitted else ""
+            )
             # Redaction can expand short matches. This bound retains the complete safe tail.
             chunks.append(f"--- {source.name} ---\n" + marker + sanitize_text(content, limit * 8))
     if not chunks:

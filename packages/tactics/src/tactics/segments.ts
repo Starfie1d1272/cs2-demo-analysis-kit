@@ -1,5 +1,5 @@
-import { classifyTacticalLocation } from "@cs2dak/maps";
-import type { PlayerTacticalSegment, TacticalFrameSample } from "./types.js";
+import { classifyTacticalLocation } from '@cs2dak/maps';
+import type { PlayerTacticalSegment, TacticalFrameSample } from './types.js';
 
 export interface BuildSegmentsOptions {
   mapName: string;
@@ -37,7 +37,7 @@ export function buildPlayerTacticalSegments(
         primaryRegion: location.primaryRegion,
         positionGroupId: location.positionGroupId,
         evidence: {
-          type: "dwell",
+          type: 'dwell',
           tick: active.tick,
           endTick,
           playerIndices: [active.playerIndex],
@@ -52,11 +52,12 @@ export function buildPlayerTacticalSegments(
         close();
         continue;
       }
-      const gapExceeded = active != null
-        && options.maxGapTicks != null
-        && sample.tick - endTick > options.maxGapTicks;
-      const changed = active != null
-        && (active.callout !== sample.callout || active.side !== sample.side);
+      const gapExceeded =
+        active != null &&
+        options.maxGapTicks != null &&
+        sample.tick - endTick > options.maxGapTicks;
+      const changed =
+        active != null && (active.callout !== sample.callout || active.side !== sample.side);
       if (gapExceeded || changed) close();
       if (!active) active = sample;
       endTick = sample.tick;

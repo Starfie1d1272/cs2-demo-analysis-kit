@@ -1,21 +1,21 @@
-import ancientNav from "../map-nav/de_ancient.nav.json" with { type: "json" };
-import anubisNav from "../map-nav/de_anubis.nav.json" with { type: "json" };
-import dust2Nav from "../map-nav/de_dust2.nav.json" with { type: "json" };
-import infernoNav from "../map-nav/de_inferno.nav.json" with { type: "json" };
-import mirageNav from "../map-nav/de_mirage.nav.json" with { type: "json" };
-import nukeNav from "../map-nav/de_nuke.nav.json" with { type: "json" };
-import overpassNav from "../map-nav/de_overpass.nav.json" with { type: "json" };
-import type { CompactNav } from "@cs2dak/maps";
-import type { TriangleBvh } from "@cs2dak/maps";
-import type { SpatialAssetMap } from "@cs2dak/maps";
+import ancientNav from '../map-nav/de_ancient.nav.json' with { type: 'json' };
+import anubisNav from '../map-nav/de_anubis.nav.json' with { type: 'json' };
+import dust2Nav from '../map-nav/de_dust2.nav.json' with { type: 'json' };
+import infernoNav from '../map-nav/de_inferno.nav.json' with { type: 'json' };
+import mirageNav from '../map-nav/de_mirage.nav.json' with { type: 'json' };
+import nukeNav from '../map-nav/de_nuke.nav.json' with { type: 'json' };
+import overpassNav from '../map-nav/de_overpass.nav.json' with { type: 'json' };
+import type { CompactNav } from '@cs2dak/maps';
+import type { TriangleBvh } from '@cs2dak/maps';
+import type { SpatialAssetMap } from '@cs2dak/maps';
 
 export interface MapGeometry {
   mapName: string;
   nav: CompactNav;
   visibility?: TriangleBvh;
   sources: {
-    nav: "awpy-nav-json";
-    visibility: "awpy-tri-bvh" | "missing";
+    nav: 'awpy-nav-json';
+    visibility: 'awpy-tri-bvh' | 'missing';
   };
 }
 
@@ -49,8 +49,8 @@ export function getMapGeometry(mapName: string, triBvh?: TriangleBvh | null): Ma
     nav,
     visibility,
     sources: {
-      nav: "awpy-nav-json",
-      visibility: visibility ? "awpy-tri-bvh" : "missing",
+      nav: 'awpy-nav-json',
+      visibility: visibility ? 'awpy-tri-bvh' : 'missing',
     },
   };
 }

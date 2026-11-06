@@ -1,6 +1,15 @@
-import { invalidateAnalysisQueries } from "./queries/query-cache";
+import { invalidateAnalysisQueries } from './queries/query-cache';
 export interface StorageCategory {
-  id: "database" | "demos" | "cache" | "bundledEvents" | "tris" | "updates" | "reports" | "logs" | "backups";
+  id:
+    | 'database'
+    | 'demos'
+    | 'cache'
+    | 'bundledEvents'
+    | 'tris'
+    | 'updates'
+    | 'reports'
+    | 'logs'
+    | 'backups';
   bytes: number;
   files: number;
   path: string;
@@ -15,7 +24,9 @@ export interface StorageOverview {
 interface LibraryMaintenanceApi {
   storage_overview(): Promise<StorageOverview>;
   storage_backup(): Promise<{ ok: boolean; path?: string; demoCount?: number; error?: string }>;
-  storage_restore(path?: string): Promise<{ ok: boolean; path?: string; restartRequired?: boolean; error?: string }>;
+  storage_restore(
+    path?: string,
+  ): Promise<{ ok: boolean; path?: string; restartRequired?: boolean; error?: string }>;
   storage_cleanup(category: string): Promise<{ ok: boolean; freedBytes?: number; error?: string }>;
   storage_repair(): Promise<{
     ok: boolean;
@@ -27,11 +38,17 @@ interface LibraryMaintenanceApi {
 }
 
 function api(): LibraryMaintenanceApi | null {
-  const bridge = typeof window === "undefined"
-    ? null
-    : (window as typeof window & { pywebview?: { api?: Partial<LibraryMaintenanceApi> } }).pywebview?.api;
-  return bridge?.storage_overview && bridge.storage_backup && bridge.storage_restore && bridge.storage_cleanup && bridge.storage_repair
-    ? bridge as LibraryMaintenanceApi
+  const bridge =
+    typeof window === 'undefined'
+      ? null
+      : (window as typeof window & { pywebview?: { api?: Partial<LibraryMaintenanceApi> } })
+          .pywebview?.api;
+  return bridge?.storage_overview &&
+    bridge.storage_backup &&
+    bridge.storage_restore &&
+    bridge.storage_cleanup &&
+    bridge.storage_repair
+    ? (bridge as LibraryMaintenanceApi)
     : null;
 }
 
@@ -44,20 +61,27 @@ export async function loadStorageOverview(): Promise<StorageOverview | null> {
 }
 
 export async function backupLibrary() {
-  return api()?.storage_backup() ?? { ok: false, error: "仅桌面版支持资料库备份" };
+  return api()?.storage_backup() ?? { ok: false, error: '仅桌面版支持资料库备份' };
 }
 
 export async function restoreLibrary() {
-  return api()?.storage_restore() ?? { ok: false, error: "仅桌面版支持资料库恢复" };
+  return api()?.storage_restore() ?? { ok: false, error: '仅桌面版支持资料库恢复' };
 }
 
-export async function cleanupStorage(category: StorageCategory["id"]) {
-  const result = await (api()?.storage_cleanup(category) ?? { ok: false, error: "仅桌面版支持存储清理" });
-  if (category !== "cache" || !result.ok) return result;
-  try { await invalidateAnalysisQueries(); return result; }
-  catch (error) { return { ...result, ok: false, error: `磁盘缓存已清理，分析缓存刷新失败：${String(error)}` }; }
+export async function cleanupStorage(category: StorageCategory['id']) {
+  const result = await (api()?.storage_cleanup(category) ?? {
+    ok: false,
+    error: '仅桌面版支持存储清理',
+  });
+  if (category !== 'cache' || !result.ok) return result;
+  try {
+    await invalidateAnalysisQueries();
+    return result;
+  } catch (error) {
+    return { ...result, ok: false, error: `磁盘缓存已清理，分析缓存刷新失败：${String(error)}` };
+  }
 }
 
 export async function repairLibrary() {
-  return api()?.storage_repair() ?? { ok: false, error: "仅桌面版支持资料库修复" };
+  return api()?.storage_repair() ?? { ok: false, error: '仅桌面版支持资料库修复' };
 }

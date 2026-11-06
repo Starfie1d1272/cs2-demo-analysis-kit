@@ -1,11 +1,11 @@
-import type { Vec3 } from "./nav.js";
+import type { Vec3 } from './nav.js';
 
 /** CS2 竞技模式标准回合时长（秒，freeze 结束后）。 */
 const ROUND_DURATION_SECONDS = 115;
 
-export type LineupClusterMode = "loose" | "strict";
+export type LineupClusterMode = 'loose' | 'strict';
 
-type GrenadeClusterKind = "smoke" | "molotov" | "incendiary" | "flashbang" | "he";
+type GrenadeClusterKind = 'smoke' | 'molotov' | 'incendiary' | 'flashbang' | 'he';
 
 export const GRENADE_CLUSTER_PRESETS = {
   loose: {
@@ -71,7 +71,7 @@ export interface LineupGrenadeLike {
   /** effectCallout 所在格采样数。 */
   effectCalloutSamples?: number | null;
   /** thrower 所在方。 */
-  side?: "t" | "ct" | null;
+  side?: 't' | 'ct' | null;
   /**
    * thrower 的队伍 key（"teamA" / "teamB"），跨场聚类时替代 throwerTeam 回调。
    * 单场场景下 throwerTeam 回调也能用，但跨场后 playerIndex 不复跨场有效。
@@ -107,7 +107,7 @@ export interface LineupCluster {
   /** 同簇内落点 callout 采样总数。 */
   effectCalloutSamples: number | null;
   /** 最高频 side。 */
-  side: "t" | "ct" | null;
+  side: 't' | 'ct' | null;
 }
 
 export interface BuildLineupClustersOptions {
@@ -138,26 +138,28 @@ export function buildLineupClusters({
   throwerTeam,
   throwToleranceUnits,
   effectToleranceUnits,
-  mode = "strict",
-  tickrate = 64
+  mode = 'strict',
+  tickrate = 64,
 }: BuildLineupClustersOptions): LineupCluster[] {
-  const clusters: Array<
-    LineupCluster & { wins: number; teamRounds: number }
-  > = [];
+  const clusters: Array<LineupCluster & { wins: number; teamRounds: number }> = [];
   // 辅助 map：记录 throwTimeBucket 的频次分布，用于取 mode
   const bucketCounts: Array<Map<string, number>> = [];
   const placeCounts: Array<Map<string, number>> = [];
   const effectCalloutCounts: Array<Map<string, number>> = [];
-  const effectCalloutStats: Array<Map<string, { confidenceSum: number; confidenceCount: number; samples: number }>> = [];
+  const effectCalloutStats: Array<
+    Map<string, { confidenceSum: number; confidenceCount: number; samples: number }>
+  > = [];
   const sideCounts: Array<Map<string, number>> = [];
 
   for (const grenade of grenades) {
     const effectTolerance = effectToleranceUnits ?? landingRadiusFor(mode, grenade.grenade);
     const throwTolerance = throwToleranceUnits ?? originRadiusFor(mode, grenade.grenade);
-    const existing = clusters.find((cluster) =>
-      cluster.grenade === grenade.grenade &&
-      (throwTolerance == null || distance(cluster.throwPosition, grenade.throwPosition) <= throwTolerance) &&
-      distance(cluster.effectPosition, grenade.effectPosition) <= effectTolerance
+    const existing = clusters.find(
+      (cluster) =>
+        cluster.grenade === grenade.grenade &&
+        (throwTolerance == null ||
+          distance(cluster.throwPosition, grenade.throwPosition) <= throwTolerance) &&
+        distance(cluster.effectPosition, grenade.effectPosition) <= effectTolerance,
     );
     const team = throwerTeam?.(grenade.throwerIndex) ?? grenade.teamKey ?? null;
     const winner = roundWinners?.get(`${grenade.entryId}:${grenade.roundNumber}`) ?? null;
@@ -207,7 +209,11 @@ export function buildLineupClusters({
       practicePose: grenade.practicePose ?? null,
     });
     target.throwPosition = averagePoint(target.throwPosition, grenade.throwPosition, target.count);
-    target.effectPosition = averagePoint(target.effectPosition, grenade.effectPosition, target.count);
+    target.effectPosition = averagePoint(
+      target.effectPosition,
+      grenade.effectPosition,
+      target.count,
+    );
     if (counted) target.teamRounds += 1;
     if (won) target.wins += 1;
 
@@ -224,7 +230,7 @@ export function buildLineupClusters({
         const bucketStart = Math.floor(secondsSinceFreeze / 10) * 10;
         const midpoint = bucketStart + 5; // 桶中值，如 10-20s 桶取 15s
         const remaining = Math.max(0, ROUND_DURATION_SECONDS - midpoint);
-        const label = `${Math.floor(remaining / 60)}:${String(Math.round(remaining % 60)).padStart(2, "0")}`;
+        const label = `${Math.floor(remaining / 60)}:${String(Math.round(remaining % 60)).padStart(2, '0')}`;
         const bc = bucketCounts[idx];
         bc.set(label, (bc.get(label) ?? 0) + 1);
       }
@@ -241,12 +247,16 @@ export function buildLineupClusters({
       const ec = effectCalloutCounts[idx];
       ec.set(grenade.effectCallout, (ec.get(grenade.effectCallout) ?? 0) + 1);
       const statsByCallout = effectCalloutStats[idx];
-      const stats = statsByCallout.get(grenade.effectCallout) ?? { confidenceSum: 0, confidenceCount: 0, samples: 0 };
-      if (typeof grenade.effectCalloutConfidence === "number") {
+      const stats = statsByCallout.get(grenade.effectCallout) ?? {
+        confidenceSum: 0,
+        confidenceCount: 0,
+        samples: 0,
+      };
+      if (typeof grenade.effectCalloutConfidence === 'number') {
         stats.confidenceSum += grenade.effectCalloutConfidence;
         stats.confidenceCount += 1;
       }
-      if (typeof grenade.effectCalloutSamples === "number") {
+      if (typeof grenade.effectCalloutSamples === 'number') {
         stats.samples += grenade.effectCalloutSamples;
       }
       statsByCallout.set(grenade.effectCallout, stats);
@@ -269,22 +279,25 @@ export function buildLineupClusters({
         ...cluster,
         roundNumbers: [...new Set(cluster.roundNumbers)].sort((a, b) => a - b),
         throwerIndices: [...new Set(cluster.throwerIndices)].sort((a, b) => a - b),
-        throws: [...cluster.throws].sort((a, b) =>
-          a.entryId.localeCompare(b.entryId) || a.roundNumber - b.roundNumber || a.tick - b.tick
+        throws: [...cluster.throws].sort(
+          (a, b) =>
+            a.entryId.localeCompare(b.entryId) || a.roundNumber - b.roundNumber || a.tick - b.tick,
         ),
-        winRatePercent: cluster.teamRounds > 0
-          ? Math.round((cluster.wins / cluster.teamRounds) * 1000) / 10
-          : null,
+        winRatePercent:
+          cluster.teamRounds > 0
+            ? Math.round((cluster.wins / cluster.teamRounds) * 1000) / 10
+            : null,
         entryIds: [...new Set(cluster.entryIds)].sort(),
         demoCount: new Set(cluster.entryIds).size,
         throwTimeBucket: modeOfMap(bucketCounts[i]),
         throwerPlaceName: modeOfMap(placeCounts[i]),
         effectCallout,
-        effectCalloutConfidence: effectStats && effectStats.confidenceCount > 0
-          ? Math.round((effectStats.confidenceSum / effectStats.confidenceCount) * 1000) / 1000
-          : null,
+        effectCalloutConfidence:
+          effectStats && effectStats.confidenceCount > 0
+            ? Math.round((effectStats.confidenceSum / effectStats.confidenceCount) * 1000) / 1000
+            : null,
         effectCalloutSamples: effectStats && effectStats.samples > 0 ? effectStats.samples : null,
-        side: modeOfMap(sideCounts[i]) as "t" | "ct" | null,
+        side: modeOfMap(sideCounts[i]) as 't' | 'ct' | null,
       };
     })
     .sort((a, b) => b.count - a.count || a.grenade.localeCompare(b.grenade));
@@ -296,11 +309,11 @@ function distance(a: Vec3, b: Vec3): number {
 
 function grenadeKind(grenade: string): GrenadeClusterKind {
   const value = grenade.toLowerCase();
-  if (value.includes("smoke")) return "smoke";
-  if (value.includes("molotov")) return "molotov";
-  if (value.includes("incendiary") || value.includes("incgrenade")) return "incendiary";
-  if (value.includes("flash")) return "flashbang";
-  return "he";
+  if (value.includes('smoke')) return 'smoke';
+  if (value.includes('molotov')) return 'molotov';
+  if (value.includes('incendiary') || value.includes('incgrenade')) return 'incendiary';
+  if (value.includes('flash')) return 'flashbang';
+  return 'he';
 }
 
 function landingRadiusFor(mode: LineupClusterMode, grenade: string): number {

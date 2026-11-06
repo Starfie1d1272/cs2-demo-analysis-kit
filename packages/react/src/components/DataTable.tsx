@@ -1,6 +1,6 @@
-import { normalizeTableState, type TableState } from "@cs2dak/presentation";
-import { useCallback, useEffect, useMemo, useState, useId, type ReactNode } from "react";
-import { Pagination } from "./Pagination";
+import { normalizeTableState, type TableState } from '@cs2dak/presentation';
+import { useCallback, useEffect, useMemo, useState, useId, type ReactNode } from 'react';
+import { Pagination } from './Pagination';
 
 /**
  * 产品中立的通用数据表：列配置 → 客户端排序（升/降切换）→ 可选分页 → 渲染。
@@ -15,10 +15,10 @@ import { Pagination } from "./Pagination";
  * `rowProps`（hover 联动等特例）。
  */
 
-export type SortDirection = "asc" | "desc";
+export type SortDirection = 'asc' | 'desc';
 
 /** 热力图色调：供列 `heat` 回调返回，由 classes.heatCell 映射为 CSS class。 */
-export type HeatTone = "high" | "mid" | "low" | "neutral";
+export type HeatTone = 'high' | 'mid' | 'low' | 'neutral';
 
 export interface DataTableColumn<T> {
   key: string;
@@ -43,18 +43,23 @@ export interface DataTableColumn<T> {
 }
 
 /** Sort the full filtered result using the same column semantics as DataTable. */
-export function sortTableRows<T>(rows: T[], columns: DataTableColumn<T>[], sort: TableState["sort"]): T[] {
-  const col = columns.find(c => c.key === sort.key && c.sortable && c.sortValue);
+export function sortTableRows<T>(
+  rows: T[],
+  columns: DataTableColumn<T>[],
+  sort: TableState['sort'],
+): T[] {
+  const col = columns.find((c) => c.key === sort.key && c.sortable && c.sortValue);
   if (!col?.sortValue) return [...rows];
   const value = col.sortValue;
-  const dir = sort.direction === "desc" ? 1 : -1;
+  const dir = sort.direction === 'desc' ? 1 : -1;
   return [...rows].sort((a, b) => {
     const va = value(a);
     const vb = value(b);
     if (va == null && vb == null) return 0;
     if (va == null) return 1;
     if (vb == null) return -1;
-    if (typeof va === "string" || typeof vb === "string") return String(vb).localeCompare(String(va)) * dir;
+    if (typeof va === 'string' || typeof vb === 'string')
+      return String(vb).localeCompare(String(va)) * dir;
     return (vb - va) * dir;
   });
 }
@@ -73,12 +78,12 @@ export interface DataTableClasses {
 
 /** React 包原生表（dak-*）。CSS 在 theme.css。 */
 export const DAK_TABLE_CLASSES: DataTableClasses = {
-  table: "dak-table",
-  numeric: "dak-mono",
-  sortable: "dak-col-sortable",
-  sortableActive: "dak-col-sorted",
-  rowClickable: "dak-row-clickable",
-  pagination: "dak-pagination",
+  table: 'dak-table',
+  numeric: 'dak-mono',
+  sortable: 'dak-col-sortable',
+  sortableActive: 'dak-col-sorted',
+  rowClickable: 'dak-row-clickable',
+  pagination: 'dak-pagination',
 };
 
 export interface DataTableProps<T> {
@@ -141,17 +146,40 @@ export function DataTable<T>({
   showRank = false,
 }: DataTableProps<T>) {
   const tableId = useId();
-  const normalized = normalizeTableState(state, { sortableKeys: columns.filter(c => c.sortable && c.sortValue).map(c => c.key), totalRows: rows.length, pageSize });
+  const normalized = normalizeTableState(state, {
+    sortableKeys: columns.filter((c) => c.sortable && c.sortValue).map((c) => c.key),
+    totalRows: rows.length,
+    pageSize,
+  });
   const { key: sortKey, direction } = normalized.sort;
-  const sortDesc = direction === "desc";
+  const sortDesc = direction === 'desc';
   useEffect(() => {
-    if (normalized.sort.key !== state.sort.key || normalized.sort.direction !== state.sort.direction || normalized.page !== state.page) onStateChange(normalized);
-  }, [normalized.sort.key, normalized.sort.direction, normalized.page, state.sort.key, state.sort.direction, state.page, onStateChange]);
+    if (
+      normalized.sort.key !== state.sort.key ||
+      normalized.sort.direction !== state.sort.direction ||
+      normalized.page !== state.page
+    )
+      onStateChange(normalized);
+  }, [
+    normalized.sort.key,
+    normalized.sort.direction,
+    normalized.page,
+    state.sort.key,
+    state.sort.direction,
+    state.page,
+    onStateChange,
+  ]);
   function handleSort(key: string) {
-    onStateChange({ sort: { key, direction: sortKey === key && sortDesc ? "asc" : "desc" }, page: 0 });
+    onStateChange({
+      sort: { key, direction: sortKey === key && sortDesc ? 'asc' : 'desc' },
+      page: 0,
+    });
   }
 
-  const sortedRows = useMemo(() => sortTableRows(rows, columns, normalized.sort), [rows, columns, sortKey, sortDesc]);
+  const sortedRows = useMemo(
+    () => sortTableRows(rows, columns, normalized.sort),
+    [rows, columns, sortKey, sortDesc],
+  );
 
   const totalPages = pageSize ? Math.max(1, Math.ceil(sortedRows.length / pageSize)) : 1;
   const safePage = normalized.page;
@@ -159,7 +187,7 @@ export function DataTable<T>({
     ? sortedRows.slice(safePage * pageSize, (safePage + 1) * pageSize)
     : sortedRows;
 
-  const arrow = (key: string) => (sortKey === key ? (sortDesc ? " ↓" : " ↑") : "");
+  const arrow = (key: string) => (sortKey === key ? (sortDesc ? ' ↓' : ' ↑') : '');
 
   return (
     <>
@@ -173,7 +201,9 @@ export function DataTable<T>({
           className={classes.pagination}
         />
       )}
-      <span id={`${tableId}-sort-label`} className="dak-table-sort-label">排序</span>
+      <span id={`${tableId}-sort-label`} className="dak-table-sort-label">
+        排序
+      </span>
       <table className={classes.table}>
         <thead>
           <tr>
@@ -181,24 +211,41 @@ export function DataTable<T>({
             {columns.map((col, columnIndex) => {
               const active = sortKey === col.key;
               const thClass = [
-                col.numeric ? classes.numeric : "",
-                col.sortable ? classes.sortable : "",
-                col.sortable && active ? classes.sortableActive : "",
+                col.numeric ? classes.numeric : '',
+                col.sortable ? classes.sortable : '',
+                col.sortable && active ? classes.sortableActive : '',
               ]
                 .filter(Boolean)
-                .join(" ");
+                .join(' ');
               return (
                 <th
                   key={col.key}
                   className={thClass || undefined}
                   title={col.title}
                   scope="col"
-                  aria-sort={active ? (sortDesc ? "descending" : "ascending") : undefined}
+                  aria-sort={active ? (sortDesc ? 'descending' : 'ascending') : undefined}
                 >
-                  {col.sortable && col.sortValue ? <>
-                    <label id={`${tableId}-column-${columnIndex}`} htmlFor={`${tableId}-button-${columnIndex}`}>{col.label}</label>
-                    <button id={`${tableId}-button-${columnIndex}`} type="button" className="dak-table-sort-button" aria-labelledby={`${tableId}-column-${columnIndex} ${tableId}-sort-label`} onClick={() => handleSort(col.key)}>{active ? arrow(col.key) : " ↕"}</button>
-                  </> : col.label}
+                  {col.sortable && col.sortValue ? (
+                    <>
+                      <label
+                        id={`${tableId}-column-${columnIndex}`}
+                        htmlFor={`${tableId}-button-${columnIndex}`}
+                      >
+                        {col.label}
+                      </label>
+                      <button
+                        id={`${tableId}-button-${columnIndex}`}
+                        type="button"
+                        className="dak-table-sort-button"
+                        aria-labelledby={`${tableId}-column-${columnIndex} ${tableId}-sort-label`}
+                        onClick={() => handleSort(col.key)}
+                      >
+                        {active ? arrow(col.key) : ' ↕'}
+                      </button>
+                    </>
+                  ) : (
+                    col.label
+                  )}
                 </th>
               );
             })}
@@ -211,16 +258,22 @@ export function DataTable<T>({
               <tr
                 key={rowKey(row)}
                 {...extra}
-                className={[onRowClick ? classes.rowClickable : "", rowClassName?.(row) ?? "", extra.className ?? ""]
-                  .filter(Boolean)
-                  .join(" ") || undefined}
+                className={
+                  [
+                    onRowClick ? classes.rowClickable : '',
+                    rowClassName?.(row) ?? '',
+                    extra.className ?? '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ') || undefined
+                }
                 onClick={onRowClick ? () => onRowClick(row) : extra.onClick}
                 tabIndex={onRowClick ? 0 : extra.tabIndex}
-                role={onRowClick ? "button" : extra.role}
+                role={onRowClick ? 'button' : extra.role}
                 onKeyDown={
                   onRowClick
                     ? (e) => {
-                        if (e.key === "Enter" || e.key === " ") {
+                        if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault();
                           onRowClick(row);
                         }
@@ -228,16 +281,18 @@ export function DataTable<T>({
                     : extra.onKeyDown
                 }
               >
-                {showRank && <td className={classes.numeric}>{safePage * (pageSize ?? 0) + i + 1}</td>}
+                {showRank && (
+                  <td className={classes.numeric}>{safePage * (pageSize ?? 0) + i + 1}</td>
+                )}
                 {columns.map((col) => {
                   const tone = col.heat?.(row);
                   const cellClass = [
-                    col.numeric ? classes.numeric : "",
-                    tone && classes.heatCell ? classes.heatCell(tone) : "",
-                    col.cellClassName?.(row) ?? "",
+                    col.numeric ? classes.numeric : '',
+                    tone && classes.heatCell ? classes.heatCell(tone) : '',
+                    col.cellClassName?.(row) ?? '',
                   ]
                     .filter(Boolean)
-                    .join(" ");
+                    .join(' ');
                   return (
                     <td key={col.key} className={cellClass || undefined}>
                       {col.render ? col.render(row) : col.format ? col.format(row) : null}

@@ -1,8 +1,8 @@
-import { type TournamentInsights, type DuelInsightsFacts } from "@cs2dak/analytics";
-import { CACHE_VERSION } from "./cache-version";
-import { FACTS_REVISION } from "../analysis-manifest";
-import { entryDate, matchIdForEntry, type StudioDemoEntry } from "../demo-entry";
-import { originalTeamNamesForDisplay } from "../team-identity";
+import { type TournamentInsights, type DuelInsightsFacts } from '@cs2dak/analytics';
+import { CACHE_VERSION } from './cache-version';
+import { FACTS_REVISION } from '../analysis-manifest';
+import { entryDate, matchIdForEntry, type StudioDemoEntry } from '../demo-entry';
+import { originalTeamNamesForDisplay } from '../team-identity';
 
 export function seasonCacheKey(
   entries: StudioDemoEntry[],
@@ -11,20 +11,34 @@ export function seasonCacheKey(
   factsRevision = FACTS_REVISION,
 ): string {
   const factsPart = `:facts=${factsRevision}`;
-  const idPart = identityVersion ? `:idv${identityVersion}` : "";
-  const teamPart = selectedTeams.length > 0 ? `:teams=${[...selectedTeams].sort().join(",")}` : "";
-  return `v${CACHE_VERSION}${factsPart}${idPart}${teamPart}:` + entries.map((entry) => {
-    return `${entry.id}@${matchIdForEntry(entry)}`;
-  }).sort().join("|");
+  const idPart = identityVersion ? `:idv${identityVersion}` : '';
+  const teamPart = selectedTeams.length > 0 ? `:teams=${[...selectedTeams].sort().join(',')}` : '';
+  return (
+    `v${CACHE_VERSION}${factsPart}${idPart}${teamPart}:` +
+    entries
+      .map((entry) => {
+        return `${entry.id}@${matchIdForEntry(entry)}`;
+      })
+      .sort()
+      .join('|')
+  );
 }
 
 export const keyOf = seasonCacheKey;
 
 export function orderedMatchIds(entries: StudioDemoEntry[]): string[] {
-  return [...entries].sort((a, b) => (entryDate(a) ?? "9999").localeCompare(entryDate(b) ?? "9999") || a.id.localeCompare(b.id)).map(matchIdForEntry);
+  return [...entries]
+    .sort(
+      (a, b) =>
+        (entryDate(a) ?? '9999').localeCompare(entryDate(b) ?? '9999') || a.id.localeCompare(b.id),
+    )
+    .map(matchIdForEntry);
 }
 
-export function selectedOriginalTeams(selectedTeams: string[], renames?: Record<string, string>): Set<string> {
+export function selectedOriginalTeams(
+  selectedTeams: string[],
+  renames?: Record<string, string>,
+): Set<string> {
   return new Set(selectedTeams.flatMap((team) => originalTeamNamesForDisplay(team, renames ?? {})));
 }
 
@@ -32,15 +46,17 @@ export function allowedTeamKeysByMatch(
   entries: StudioDemoEntry[],
   selectedTeams: string[],
   renames?: Record<string, string>,
-): Map<string, Set<"teamA" | "teamB">> | null {
+): Map<string, Set<'teamA' | 'teamB'>> | null {
   if (selectedTeams.length === 0) return null;
   const selected = selectedOriginalTeams(selectedTeams, renames);
-  return new Map(entries.map((entry) => {
-    const keys = new Set<"teamA" | "teamB">();
-    if (selected.has(entry.meta.teamAName)) keys.add("teamA");
-    if (selected.has(entry.meta.teamBName)) keys.add("teamB");
-    return [matchIdForEntry(entry), keys];
-  }));
+  return new Map(
+    entries.map((entry) => {
+      const keys = new Set<'teamA' | 'teamB'>();
+      if (selected.has(entry.meta.teamAName)) keys.add('teamA');
+      if (selected.has(entry.meta.teamBName)) keys.add('teamB');
+      return [matchIdForEntry(entry), keys];
+    }),
+  );
 }
 
 export function filterDuelFactsByTeam(
@@ -51,9 +67,11 @@ export function filterDuelFactsByTeam(
   if (selectedTeams.length === 0) return facts;
   const selected = selectedOriginalTeams(selectedTeams, renames);
   return facts.map((fact) => {
-    const selectedSteamIds = new Set(Object.entries(fact.teamNamesBySteamId)
-      .filter(([, teamName]) => selected.has(teamName))
-      .map(([steamId]) => steamId));
+    const selectedSteamIds = new Set(
+      Object.entries(fact.teamNamesBySteamId)
+        .filter(([, teamName]) => selected.has(teamName))
+        .map(([steamId]) => steamId),
+    );
     const involvedInDuel = (row: { killerSteamId64: string; victimSteamId64: string }) =>
       selectedSteamIds.has(row.killerSteamId64) || selectedSteamIds.has(row.victimSteamId64);
     return {
@@ -71,10 +89,15 @@ export function filterDuelFactsByTeam(
 /**
  * 队伍透镜：按当前分析分组键过滤各队伍数组。
  */
-export function filterTournamentInsightsByTeam(insights: TournamentInsights, selectedKeys: string[], active = selectedKeys.length > 0): TournamentInsights {
+export function filterTournamentInsightsByTeam(
+  insights: TournamentInsights,
+  selectedKeys: string[],
+  active = selectedKeys.length > 0,
+): TournamentInsights {
   if (!active) return insights;
   const selected = new Set(selectedKeys);
-  const byTeam = <T extends { teamEntityKey: string }>(rows: T[]) => rows.filter((row) => selected.has(row.teamEntityKey));
+  const byTeam = <T extends { teamEntityKey: string }>(rows: T[]) =>
+    rows.filter((row) => selected.has(row.teamEntityKey));
   return {
     ...insights,
     teamPistols: byTeam(insights.teamPistols),
@@ -95,11 +118,11 @@ export function missingFactsError(scope: string): Error {
  */
 export function withTeamRenames<T extends { teams: Record<string, string> }>(
   facts: T[],
-  renames?: Record<string, string>
+  renames?: Record<string, string>,
 ): T[] {
   if (!renames || Object.keys(renames).length === 0) return facts;
   return facts.map((f) => ({
     ...f,
-    teams: Object.fromEntries(Object.entries(f.teams).map(([k, v]) => [k, renames[v] ?? v]))
+    teams: Object.fromEntries(Object.entries(f.teams).map(([k, v]) => [k, renames[v] ?? v])),
   }));
 }

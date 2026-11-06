@@ -18,16 +18,17 @@
  * Pres = 位置占据（最近 nav 格，无 LOS）；Sound = 在该格发声会被对面听到的风险（800u 半径）。
  */
 export type RadarFieldBase =
-  | "ctVis" | "tVis"
-  | "ctAim" | "tAim"
-  | "ctPres" | "tPres"
-  | "ctSound" | "tSound";
+  'ctVis' | 'tVis' | 'ctAim' | 'tAim' | 'ctPres' | 'tPres' | 'ctSound' | 'tSound';
 
 export const RADAR_FIELD_BASES: readonly RadarFieldBase[] = [
-  "ctVis", "tVis",
-  "ctAim", "tAim",
-  "ctPres", "tPres",
-  "ctSound", "tSound",
+  'ctVis',
+  'tVis',
+  'ctAim',
+  'tAim',
+  'ctPres',
+  'tPres',
+  'ctSound',
+  'tSound',
 ] as const;
 
 export interface RadarFieldGrid {
@@ -39,10 +40,10 @@ export interface RadarFieldGrid {
 
 export interface RadarFieldScope {
   /** league = 赛事/当前范围基线；team = 单队（identity 归并后的显示名）。 */
-  kind: "league" | "team";
+  kind: 'league' | 'team';
   team: string | null;
   /** gun = 长枪局（双方 full/conversion）；all = 全部回合。 */
-  economy: "gun" | "all";
+  economy: 'gun' | 'all';
   /** 贡献的回合总数（含全部采样秒之前的回合计数）。 */
   roundCount: number;
   matchIds: string[];
@@ -57,7 +58,7 @@ export interface RadarField {
   /** world→radar 标定版本；变了不可与旧场合并/差分。 */
   calibrationVersion: string;
   /** full = 这批 LOS 射线可信（有 .tri）；none = 只有锥+烟，无墙体遮挡，不可与 full 互比。 */
-  triAvailability: "full" | "none";
+  triAvailability: 'full' | 'none';
   scope: RadarFieldScope;
   grid: RadarFieldGrid;
   /** 采样秒上界（一回合 1:55 = 115s）。 */
