@@ -1,6 +1,6 @@
-import type { ReactNode } from "react";
-import type { EvidenceRef } from "@cs2dak/presentation";
-import type { AnalysisFinding } from "@cs2dak/presentation";
+import type { ReactNode } from 'react';
+import type { EvidenceRef } from '@cs2dak/presentation';
+import type { AnalysisFinding } from '@cs2dak/presentation';
 
 /**
  * 产品中立原语（docs/design-language.md §3/§4）。
@@ -9,13 +9,13 @@ import type { AnalysisFinding } from "@cs2dak/presentation";
 
 /** 空态三件套：empty（无数据）/ insufficient（数据不足）/ error（失败）。加载中用 dak-loading。 */
 export function EmptyState({
-  variant = "empty",
+  variant = 'empty',
   title,
   hint,
   mark,
-  action
+  action,
 }: {
-  variant?: "empty" | "insufficient" | "error";
+  variant?: 'empty' | 'insufficient' | 'error';
   title: string;
   /** 文案需说明「需要什么才能点亮本页」 */
   hint?: ReactNode;
@@ -37,8 +37,8 @@ export function EmptyState({
 export function EvidenceLink({
   onOpen,
   disabled,
-  hint = "打开该场比赛复盘",
-  children
+  hint = '打开该场比赛复盘',
+  children,
 }: {
   onOpen: () => void;
   disabled?: boolean;
@@ -47,7 +47,13 @@ export function EvidenceLink({
   children: ReactNode;
 }) {
   return (
-    <button type="button" className="dak-evidence" disabled={disabled} onClick={onOpen} title={hint}>
+    <button
+      type="button"
+      className="dak-evidence"
+      disabled={disabled}
+      onClick={onOpen}
+      title={hint}
+    >
       {children}
     </button>
   );
@@ -55,17 +61,26 @@ export function EvidenceLink({
 
 /** 派生指标的 ⓘ 口径说明（公式、窗口参数、已知误差）。 */
 export function MetricInfo({ note }: { note?: ReactNode }) {
-  if (note == null || note === false || (typeof note === "string" && note.trim().length === 0)) return null;
+  if (note == null || note === false || (typeof note === 'string' && note.trim().length === 0))
+    return null;
   return (
     <span className="dak-info" tabIndex={0} aria-label="口径说明">
-      ⓘ<span className="dak-info-tip" role="tooltip">{note}</span>
+      ⓘ
+      <span className="dak-info-tip" role="tooltip">
+        {note}
+      </span>
     </span>
   );
 }
 
 /** 一行的解释边界；Finding 与 observation 都可复用。 */
 export function LimitNote({ children }: { children: ReactNode }) {
-  return <p className="dak-limit-note"><b>限制</b>{children}</p>;
+  return (
+    <p className="dak-limit-note">
+      <b>限制</b>
+      {children}
+    </p>
+  );
 }
 
 /** 系统 Finding 的纯展示外壳；证据定位与用户动作由 Studio container 注入。 */
@@ -91,11 +106,20 @@ export function FindingPanel({
       </div>
       <p>{finding.statement}</p>
       <div className="dak-finding-meta">
-        <span>{finding.sample.label}{finding.sample.numerator != null ? ` · ${finding.sample.numerator}${finding.sample.denominator != null ? `/${finding.sample.denominator}` : ""}` : ""}</span>
-        <span>{finding.baseline ? `参照：${finding.baseline}` : "仅描述性样本"}</span>
+        <span>
+          {finding.sample.label}
+          {finding.sample.numerator != null
+            ? ` · ${finding.sample.numerator}${finding.sample.denominator != null ? `/${finding.sample.denominator}` : ''}`
+            : ''}
+        </span>
+        <span>{finding.baseline ? `参照：${finding.baseline}` : '仅描述性样本'}</span>
       </div>
       {finding.evidence.length > 0 && onOpenEvidence && (
-        <button type="button" className="dak-evidence" onClick={() => onOpenEvidence(finding.evidence[0]!, finding)}>
+        <button
+          type="button"
+          className="dak-evidence"
+          onClick={() => onOpenEvidence(finding.evidence[0]!, finding)}
+        >
           查看证据 · R{finding.evidence[0]!.roundNumber}
         </button>
       )}

@@ -1,6 +1,6 @@
-import { getStorage } from "./storage";
-import { FACTS_RECORD_NAMESPACES } from "./facts-store";
-import { DERIVED_CACHE_RECORD_NAMESPACES } from "./derived-cache";
+import { getStorage } from './storage';
+import { FACTS_RECORD_NAMESPACES } from './facts-store';
+import { DERIVED_CACHE_RECORD_NAMESPACES } from './derived-cache';
 
 /**
  * 浏览器端（IndexedDB 后端）存储总览。
@@ -14,7 +14,7 @@ import { DERIVED_CACHE_RECORD_NAMESPACES } from "./derived-cache";
  */
 
 export interface BrowserStorageCategory {
-  id: "demos" | "cache" | "tris" | "database";
+  id: 'demos' | 'cache' | 'tris' | 'database';
   label: string;
   files: number;
   /** 已知字节数；不便宜计算时为 null（界面显示 —）。 */
@@ -28,11 +28,33 @@ export interface BrowserStorageOverview {
 
 /** 资料库元数据/设置等"数据库"类命名空间（非派生缓存、非原始字节）。 */
 const DATABASE_NAMESPACES = [
-  "saved-analyses", "demos", "identity", "identity-audit", "series", "series-settings",
-  "coach-match-sheets", "coach-assignments", "coach-playbook", "study-notes", "training-focus", "prep-items", "practice-lineups", "role-declarations", "playbook", "playlist", "map-pool-notes", "events", "kv",
+  'saved-analyses',
+  'demos',
+  'identity',
+  'identity-audit',
+  'series',
+  'series-settings',
+  'coach-match-sheets',
+  'coach-assignments',
+  'coach-playbook',
+  'study-notes',
+  'training-focus',
+  'prep-items',
+  'practice-lineups',
+  'role-declarations',
+  'playbook',
+  'playlist',
+  'map-pool-notes',
+  'events',
+  'kv',
 ];
 
-const CACHE_NAMESPACES = [...FACTS_RECORD_NAMESPACES, ...DERIVED_CACHE_RECORD_NAMESPACES, "cache", "cache-meta"];
+const CACHE_NAMESPACES = [
+  ...FACTS_RECORD_NAMESPACES,
+  ...DERIVED_CACHE_RECORD_NAMESPACES,
+  'cache',
+  'cache-meta',
+];
 
 async function countKeys(namespaces: string[]): Promise<number> {
   const storage = getStorage();
@@ -43,15 +65,18 @@ async function countKeys(namespaces: string[]): Promise<number> {
       } catch {
         return 0;
       }
-    })
+    }),
   );
   return counts.reduce((sum, n) => sum + n, 0);
 }
 
-export async function loadBrowserStorageOverview(demoSizeBytes: number, demoCount: number): Promise<BrowserStorageOverview> {
-  let estimate: BrowserStorageOverview["estimate"] = null;
+export async function loadBrowserStorageOverview(
+  demoSizeBytes: number,
+  demoCount: number,
+): Promise<BrowserStorageOverview> {
+  let estimate: BrowserStorageOverview['estimate'] = null;
   try {
-    if (typeof navigator !== "undefined" && navigator.storage?.estimate) {
+    if (typeof navigator !== 'undefined' && navigator.storage?.estimate) {
       const est = await navigator.storage.estimate();
       estimate = { usage: est.usage ?? 0, quota: est.quota ?? 0 };
     }
@@ -61,7 +86,11 @@ export async function loadBrowserStorageOverview(demoSizeBytes: number, demoCoun
 
   const storage = getStorage();
   const [triFiles, cacheFiles, dbFiles] = await Promise.all([
-    storage.blobs("tri").keys().then((k) => k.length).catch(() => 0),
+    storage
+      .blobs('tri')
+      .keys()
+      .then((k) => k.length)
+      .catch(() => 0),
     countKeys(CACHE_NAMESPACES),
     countKeys(DATABASE_NAMESPACES),
   ]);
@@ -69,10 +98,10 @@ export async function loadBrowserStorageOverview(demoSizeBytes: number, demoCoun
   return {
     estimate,
     categories: [
-      { id: "demos", label: "原始 ZIP", files: demoCount, bytes: demoSizeBytes },
-      { id: "cache", label: "派生缓存（facts）", files: cacheFiles, bytes: null },
-      { id: "tris", label: ".tri 地图资产", files: triFiles, bytes: null },
-      { id: "database", label: "资料库数据", files: dbFiles, bytes: null },
+      { id: 'demos', label: '原始 ZIP', files: demoCount, bytes: demoSizeBytes },
+      { id: 'cache', label: '派生缓存（facts）', files: cacheFiles, bytes: null },
+      { id: 'tris', label: '.tri 地图资产', files: triFiles, bytes: null },
+      { id: 'database', label: '资料库数据', files: dbFiles, bytes: null },
     ],
   };
 }

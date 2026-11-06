@@ -1,32 +1,32 @@
-import { readFileSync, readdirSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { join } from "node:path";
-import { bundledDependencies } from "./lib/bundled-dependencies.mjs";
+import { readFileSync, readdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+import { bundledDependencies } from './lib/bundled-dependencies.mjs';
 
-const repoRoot = fileURLToPath(new URL("../", import.meta.url));
-const repositoryUrl = "https://github.com/Starfie1d1272/cs2-demo-analysis-kit.git";
-const workflowPath = join(repoRoot, ".github", "workflows", "npm-publish.yml");
-const releaseDocsPath = join(repoRoot, "docs", "release.md");
+const repoRoot = fileURLToPath(new URL('../', import.meta.url));
+const repositoryUrl = 'https://github.com/Starfie1d1272/cs2-demo-analysis-kit.git';
+const workflowPath = join(repoRoot, '.github', 'workflows', 'npm-publish.yml');
+const releaseDocsPath = join(repoRoot, 'docs', 'release.md');
 const publicPackages = [
-  ["@cs2dak/rating", "packages/rating"],
-  ["@cs2dak/map-assets", "packages/map-assets"],
-  ["@cs2dak/tactics", "packages/tactics"],
-  ["@cs2dak/demo-io", "packages/demo-io"],
-  ["@cs2dak/analytics", "packages/analytics"],
-  ["@cs2dak/pipeline", "packages/pipeline"],
-  ["@cs2dak/cohort", "packages/cohort"],
-  ["@cs2dak/contract", "packages/contract"],
-  ["@cs2dak/core", "packages/core"],
-  ["@cs2dak/maps", "packages/maps"],
-  ["@cs2dak/presentation", "packages/presentation"],
-  ["@cs2dak/react", "packages/react"],
-  ["@cs2dak/tournament", "packages/tournament"],
+  ['@cs2dak/rating', 'packages/rating'],
+  ['@cs2dak/map-assets', 'packages/map-assets'],
+  ['@cs2dak/tactics', 'packages/tactics'],
+  ['@cs2dak/demo-io', 'packages/demo-io'],
+  ['@cs2dak/analytics', 'packages/analytics'],
+  ['@cs2dak/pipeline', 'packages/pipeline'],
+  ['@cs2dak/cohort', 'packages/cohort'],
+  ['@cs2dak/contract', 'packages/contract'],
+  ['@cs2dak/core', 'packages/core'],
+  ['@cs2dak/maps', 'packages/maps'],
+  ['@cs2dak/presentation', 'packages/presentation'],
+  ['@cs2dak/react', 'packages/react'],
+  ['@cs2dak/tournament', 'packages/tournament'],
 ];
 
 const errors = [];
 
 function readJson(path) {
-  return JSON.parse(readFileSync(path, "utf8"));
+  return JSON.parse(readFileSync(path, 'utf8'));
 }
 
 function check(condition, message) {
@@ -34,104 +34,177 @@ function check(condition, message) {
 }
 
 for (const [expectedName, directory] of publicPackages) {
-  const manifestPath = join(repoRoot, directory, "package.json");
+  const manifestPath = join(repoRoot, directory, 'package.json');
   const manifest = readJson(manifestPath);
   const repository = manifest.repository ?? {};
   for (const [name, policy] of Object.entries(bundledDependencies)) {
-    for (const kind of ['dependencies', 'peerDependencies', 'optionalDependencies']) check(!manifest[kind]?.[name], `${expectedName}: ${name} is a build-only upstream`);
-    if (manifest.devDependencies?.[name]) check(manifest.devDependencies[name] === policy.version, `${expectedName}: ${name} must pin the compiled source/declaration version ${policy.version}`);
+    for (const kind of ['dependencies', 'peerDependencies', 'optionalDependencies'])
+      check(!manifest[kind]?.[name], `${expectedName}: ${name} is a build-only upstream`);
+    if (manifest.devDependencies?.[name])
+      check(
+        manifest.devDependencies[name] === policy.version,
+        `${expectedName}: ${name} must pin the compiled source/declaration version ${policy.version}`,
+      );
   }
   check(manifest.main === './dist/index.js', `${expectedName}: main must be compiled ESM`);
-  check(manifest.types === './dist/index.d.ts', `${expectedName}: types must be compiled declarations`);
-  check(Array.isArray(manifest.files) && manifest.files.includes('dist') && !manifest.files.includes('src'), `${expectedName}: files must contain dist, not source`);
+  check(
+    manifest.types === './dist/index.d.ts',
+    `${expectedName}: types must be compiled declarations`,
+  );
+  check(
+    Array.isArray(manifest.files) &&
+      manifest.files.includes('dist') &&
+      !manifest.files.includes('src'),
+    `${expectedName}: files must contain dist, not source`,
+  );
   check(manifest.scripts?.build, `${expectedName}: build script is required`);
-  check(expectedName === '@cs2dak/react' ? JSON.stringify(manifest.sideEffects) === '["**/*.css"]' : manifest.sideEffects === false, `${expectedName}: sideEffects must match actual CSS/pure behavior`);
+  check(
+    expectedName === '@cs2dak/react'
+      ? JSON.stringify(manifest.sideEffects) === '["**/*.css"]'
+      : manifest.sideEffects === false,
+    `${expectedName}: sideEffects must match actual CSS/pure behavior`,
+  );
   for (const [key, entry] of Object.entries(manifest.exports ?? {})) {
     if (expectedName === '@cs2dak/react' && key === './theme.css') {
       check(entry === './dist/theme.css', `${expectedName}: CSS export must be copied into dist`);
       continue;
     }
     if (expectedName === '@cs2dak/map-assets' && key === './callout-grid/*.json') {
-      check(entry === './callout-grid/*.json', `${expectedName}: raw callout grid export must point to packaged assets`);
+      check(
+        entry === './callout-grid/*.json',
+        `${expectedName}: raw callout grid export must point to packaged assets`,
+      );
       continue;
     }
-    check(typeof entry === 'object' && /^\.\/dist\/.*\.d\.ts$/.test(entry.types) && /^\.\/dist\/.*\.js$/.test(entry.import) && entry.default === entry.import, `${expectedName} ${key}: explicit compiled types/import/default exports required`);
+    check(
+      typeof entry === 'object' &&
+        /^\.\/dist\/.*\.d\.ts$/.test(entry.types) &&
+        /^\.\/dist\/.*\.js$/.test(entry.import) &&
+        entry.default === entry.import,
+      `${expectedName} ${key}: explicit compiled types/import/default exports required`,
+    );
   }
-
 
   check(manifest.name === expectedName, `${directory}: package name must be ${expectedName}`);
   check(manifest.private !== true, `${expectedName}: public package must not be private`);
-  check(manifest.publishConfig?.access === "public", `${expectedName}: publishConfig.access must be public`);
-  check(repository.type === "git", `${expectedName}: repository.type must be git`);
-  check(repository.url === repositoryUrl, `${expectedName}: repository.url must be ${repositoryUrl}`);
+  check(
+    manifest.publishConfig?.access === 'public',
+    `${expectedName}: publishConfig.access must be public`,
+  );
+  check(repository.type === 'git', `${expectedName}: repository.type must be git`);
+  check(
+    repository.url === repositoryUrl,
+    `${expectedName}: repository.url must be ${repositoryUrl}`,
+  );
   check(
     repository.directory === directory,
     `${expectedName}: repository.directory must be ${directory}`,
   );
 }
 
-const workspacePackageDirectories = readdirSync(join(repoRoot, "packages"), { withFileTypes: true })
+const workspacePackageDirectories = readdirSync(join(repoRoot, 'packages'), { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
   .map((entry) => entry.name);
 const expectedPublicDirectories = new Set(publicPackages.map(([, directory]) => directory));
 
 for (const directoryName of workspacePackageDirectories) {
   const directory = `packages/${directoryName}`;
-  const manifest = readJson(join(repoRoot, directory, "package.json"));
-  const isPublic = manifest.private !== true && manifest.publishConfig?.access === "public";
-  if (isPublic) check(expectedPublicDirectories.has(directory), `${directory}: public package is missing from the allowlist`);
+  const manifest = readJson(join(repoRoot, directory, 'package.json'));
+  const isPublic = manifest.private !== true && manifest.publishConfig?.access === 'public';
+  if (isPublic)
+    check(
+      expectedPublicDirectories.has(directory),
+      `${directory}: public package is missing from the allowlist`,
+    );
 }
 
 for (const directory of ['packages/rivalhub-upload', 'apps/dak-studio', 'apps/rivalhub-uploader']) {
   const manifest = readJson(join(repoRoot, directory, 'package.json'));
-  check(manifest.private === true && manifest.publishConfig == null, `${directory}: must remain private`);
+  check(
+    manifest.private === true && manifest.publishConfig == null,
+    `${directory}: must remain private`,
+  );
 }
 
-const cli = readJson(join(repoRoot, "packages", "cli", "package.json"));
-check(cli.private === true, "packages/cli: @cs2dak/cli must remain private");
-check(cli.publishConfig == null, "packages/cli: private CLI must not gain publishConfig");
+const cli = readJson(join(repoRoot, 'packages', 'cli', 'package.json'));
+check(cli.private === true, 'packages/cli: @cs2dak/cli must remain private');
+check(cli.publishConfig == null, 'packages/cli: private CLI must not gain publishConfig');
 
-const workflow = readFileSync(workflowPath, "utf8");
+const workflow = readFileSync(workflowPath, 'utf8');
 const workflowEventLines = workflow.split(/\r?\n/);
 const onLine = workflowEventLines.findIndex((line) => /^on:\s*$/.test(line));
 const eventKeys = [];
 if (onLine >= 0) {
   for (const line of workflowEventLines.slice(onLine + 1)) {
-    if (/^\S/.test(line) && line.trim() !== "") break;
+    if (/^\S/.test(line) && line.trim() !== '') break;
     const match = line.match(/^\s{2}([A-Za-z0-9_-]+):\s*(?:#.*)?$/);
     if (match) eventKeys.push(match[1]);
   }
 }
 
-check(onLine >= 0, "npm-publish.yml: workflow must define on.workflow_dispatch");
-check(eventKeys.length === 1 && eventKeys[0] === "workflow_dispatch", "npm-publish.yml: only workflow_dispatch may trigger publishing");
-check(/^\s+contents:\s+write\s*$/m.test(workflow), "npm-publish.yml: publish job needs contents: write");
-check(/^\s+id-token:\s+write\s*$/m.test(workflow), "npm-publish.yml: publish job needs id-token: write");
-check(/^\s+environment:\s+npm-publish\s*$/m.test(workflow), "npm-publish.yml: publish job must use npm-publish environment");
-check(/runs-on:\s*ubuntu-latest/.test(workflow), "npm-publish.yml: publishing must use ubuntu-latest");
-check(/fetch-depth:\s*0/.test(workflow), "npm-publish.yml: checkout must use fetch-depth: 0");
-check(/pnpm install --frozen-lockfile/.test(workflow), "npm-publish.yml: install must be frozen");
-check(/pnpm build/.test(workflow), "npm-publish.yml: build gate is missing");
-check(/pnpm test:all/.test(workflow), "npm-publish.yml: test:all gate is missing");
-check(/pnpm typecheck/.test(workflow), "npm-publish.yml: typecheck gate is missing");
+check(onLine >= 0, 'npm-publish.yml: workflow must define on.workflow_dispatch');
+check(
+  eventKeys.length === 1 && eventKeys[0] === 'workflow_dispatch',
+  'npm-publish.yml: only workflow_dispatch may trigger publishing',
+);
+check(
+  /^\s+contents:\s+write\s*$/m.test(workflow),
+  'npm-publish.yml: publish job needs contents: write',
+);
+check(
+  /^\s+id-token:\s+write\s*$/m.test(workflow),
+  'npm-publish.yml: publish job needs id-token: write',
+);
+check(
+  /^\s+environment:\s+npm-publish\s*$/m.test(workflow),
+  'npm-publish.yml: publish job must use npm-publish environment',
+);
+check(
+  /runs-on:\s*ubuntu-latest/.test(workflow),
+  'npm-publish.yml: publishing must use ubuntu-latest',
+);
+check(/fetch-depth:\s*0/.test(workflow), 'npm-publish.yml: checkout must use fetch-depth: 0');
+check(/pnpm install --frozen-lockfile/.test(workflow), 'npm-publish.yml: install must be frozen');
+check(/pnpm build/.test(workflow), 'npm-publish.yml: build gate is missing');
+check(/pnpm test:all/.test(workflow), 'npm-publish.yml: test:all gate is missing');
+check(/pnpm typecheck/.test(workflow), 'npm-publish.yml: typecheck gate is missing');
 check(workflow.includes('pnpm check:package-boundaries'), 'npm-publish.yml: graph gate is missing');
-check(workflow.includes('pnpm check:package-consumers'), 'npm-publish.yml: actual all-package tarball consumer gate is missing');
-check(/changeset publish --no-git-tag/.test(workflow), "npm-publish.yml: publish must disable Changesets local tag creation");
-check(/reconcile-npm-publish\.mjs/.test(workflow), "npm-publish.yml: npm/tag reconciliation step is missing");
-check(/github\.ref\s*==\s*['"]refs\/heads\/main['"]/.test(workflow), "npm-publish.yml: publishing must be guarded to main");
-check(workflow.includes("github.repository == 'Starfie1d1272/cs2-demo-analysis-kit'"), "npm-publish.yml: publishing must be guarded to the canonical repository");
+check(
+  workflow.includes('pnpm check:package-consumers'),
+  'npm-publish.yml: actual all-package tarball consumer gate is missing',
+);
+check(
+  /changeset publish --no-git-tag/.test(workflow),
+  'npm-publish.yml: publish must disable Changesets local tag creation',
+);
+check(
+  /reconcile-npm-publish\.mjs/.test(workflow),
+  'npm-publish.yml: npm/tag reconciliation step is missing',
+);
+check(
+  /github\.ref\s*==\s*['"]refs\/heads\/main['"]/.test(workflow),
+  'npm-publish.yml: publishing must be guarded to main',
+);
+check(
+  workflow.includes("github.repository == 'Starfie1d1272/cs2-demo-analysis-kit'"),
+  'npm-publish.yml: publishing must be guarded to the canonical repository',
+);
 
-for (const forbidden of ["NPM_TOKEN", "NODE_AUTH_TOKEN", "npm login", "npm whoami"]) {
-  check(!workflow.toLowerCase().includes(forbidden.toLowerCase()), `npm-publish.yml: forbidden token/auth reference ${forbidden}`);
+for (const forbidden of ['NPM_TOKEN', 'NODE_AUTH_TOKEN', 'npm login', 'npm whoami']) {
+  check(
+    !workflow.toLowerCase().includes(forbidden.toLowerCase()),
+    `npm-publish.yml: forbidden token/auth reference ${forbidden}`,
+  );
 }
 
 const allowedPublishActions = new Set([
-  "actions/checkout",
-  "pnpm/action-setup",
-  "actions/setup-node",
+  'actions/checkout',
+  'pnpm/action-setup',
+  'actions/setup-node',
 ]);
-const publishActionRefs = [...workflow.matchAll(/^\s*-\s+uses:\s+([^@\s]+)@([^\s#]+)/gm)]
-  .map((match) => ({ action: match[1], ref: match[2] }));
+const publishActionRefs = [...workflow.matchAll(/^\s*-\s+uses:\s+([^@\s]+)@([^\s#]+)/gm)].map(
+  (match) => ({ action: match[1], ref: match[2] }),
+);
 
 check(
   publishActionRefs.length === allowedPublishActions.size,
@@ -151,29 +224,38 @@ for (const { action, ref } of publishActionRefs) {
   );
 }
 
-const rootManifest = readJson(join(repoRoot, "package.json"));
-check(rootManifest.scripts?.["release:npm"] === "node scripts/release-npm.mjs", "release:npm must redirect to the OIDC workflow");
-check(typeof rootManifest.scripts?.["check:release"] === "string" && !/changeset publish|npm publish/.test(rootManifest.scripts["check:release"]), "check:release must only validate artifacts");
+const rootManifest = readJson(join(repoRoot, 'package.json'));
+check(
+  rootManifest.scripts?.['release:npm'] === 'node scripts/release-npm.mjs',
+  'release:npm must redirect to the OIDC workflow',
+);
+check(
+  typeof rootManifest.scripts?.['check:release'] === 'string' &&
+    !/changeset publish|npm publish/.test(rootManifest.scripts['check:release']),
+  'check:release must only validate artifacts',
+);
 
-const releaseDocs = readFileSync(releaseDocsPath, "utf8");
+const releaseDocs = readFileSync(releaseDocsPath, 'utf8');
 for (const required of [
-  "npm-publish.yml",
-  "Trusted Publishing",
-  "pnpm exec changeset publish --no-git-tag",
-  "本地 `pnpm release:npm`",
-  "npm login",
+  'npm-publish.yml',
+  'Trusted Publishing',
+  'pnpm exec changeset publish --no-git-tag',
+  '本地 `pnpm release:npm`',
+  'npm login',
 ]) {
   check(releaseDocs.includes(required), `docs/release.md: missing ${required}`);
 }
 check(
-  !releaseDocs.includes("需要有效的 npm Automation/Granular Access Token"),
-  "docs/release.md: active release path still requires a legacy npm token",
+  !releaseDocs.includes('需要有效的 npm Automation/Granular Access Token'),
+  'docs/release.md: active release path still requires a legacy npm token',
 );
 
 if (errors.length > 0) {
-  console.error("npm publish policy check failed:");
+  console.error('npm publish policy check failed:');
   for (const error of errors) console.error(`- ${error}`);
   process.exitCode = 1;
 } else {
-  console.log(`npm publish policy OK: ${publicPackages.length} public packages, private @cs2dak/cli excluded`);
+  console.log(
+    `npm publish policy OK: ${publicPackages.length} public packages, private @cs2dak/cli excluded`,
+  );
 }

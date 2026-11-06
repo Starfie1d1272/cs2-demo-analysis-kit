@@ -26,10 +26,16 @@ import type {
   TournamentSide,
   TournamentTeamSlot,
   TournamentPerformancePlayerWeaponFact,
-} from "./types.js";
+} from './types.js';
 
-const TEAM_SLOTS = ["teamA", "teamB"] as const satisfies readonly TournamentTeamSlot[];
-const CLUTCH_KEYS = ["1", "2", "3", "4", "5"] as const satisfies readonly TournamentClutchSplitKey[];
+const TEAM_SLOTS = ['teamA', 'teamB'] as const satisfies readonly TournamentTeamSlot[];
+const CLUTCH_KEYS = [
+  '1',
+  '2',
+  '3',
+  '4',
+  '5',
+] as const satisfies readonly TournamentClutchSplitKey[];
 
 type MutableRateSample = { successes: number; attempts: number };
 
@@ -107,14 +113,14 @@ interface MutablePlayer {
   mapKeys: Set<string>;
   matchKeys: Set<string>;
   teamEntityKeys: Set<string>;
-  slices: Record<"overall" | "t" | "ct", MutablePlayerSlice>;
+  slices: Record<'overall' | 't' | 'ct', MutablePlayerSlice>;
   weapons: Map<string, MutableWeapon>;
 }
 
 interface MutableTeam {
   mapKeys: Set<string>;
   matchKeys: Set<string>;
-  slices: Record<"overall" | "t" | "ct", MutableSharedSlice>;
+  slices: Record<'overall' | 't' | 'ct', MutableSharedSlice>;
   weapons: Map<string, MutableWeapon>;
 }
 
@@ -140,75 +146,123 @@ function invalid(mapKey: string, path: string, message: string): never {
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function assertNonEmptyString(value: unknown, mapKey: string, path: string): asserts value is string {
-  if (typeof value !== "string" || value.length === 0) invalid(mapKey, path, "must be a non-empty string");
+function assertNonEmptyString(
+  value: unknown,
+  mapKey: string,
+  path: string,
+): asserts value is string {
+  if (typeof value !== 'string' || value.length === 0)
+    invalid(mapKey, path, 'must be a non-empty string');
 }
 
 function assertBoolean(value: unknown, mapKey: string, path: string): asserts value is boolean {
-  if (typeof value !== "boolean") invalid(mapKey, path, "must be a boolean");
+  if (typeof value !== 'boolean') invalid(mapKey, path, 'must be a boolean');
 }
 
 function assertCount(value: unknown, mapKey: string, path: string): asserts value is number {
-  if (typeof value !== "number" || !Number.isInteger(value) || value < 0) {
-    invalid(mapKey, path, "must be a non-negative integer");
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+    invalid(mapKey, path, 'must be a non-negative integer');
   }
 }
 
-function assertPositiveInteger(value: unknown, mapKey: string, path: string): asserts value is number {
-  if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
-    invalid(mapKey, path, "must be a positive integer");
+function assertPositiveInteger(
+  value: unknown,
+  mapKey: string,
+  path: string,
+): asserts value is number {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0) {
+    invalid(mapKey, path, 'must be a positive integer');
   }
 }
 
-function assertFiniteNonNegative(value: unknown, mapKey: string, path: string): asserts value is number {
-  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
-    invalid(mapKey, path, "must be a finite non-negative number");
+function assertFiniteNonNegative(
+  value: unknown,
+  mapKey: string,
+  path: string,
+): asserts value is number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+    invalid(mapKey, path, 'must be a finite non-negative number');
   }
 }
 
 function assertSide(value: unknown, mapKey: string, path: string): asserts value is TournamentSide {
-  if (value !== "t" && value !== "ct") invalid(mapKey, path, "must be t or ct");
+  if (value !== 't' && value !== 'ct') invalid(mapKey, path, 'must be t or ct');
 }
 
-function assertUtility(value: unknown, mapKey: string, path: string): asserts value is TournamentPerformanceUtilityFact {
-  if (!isRecord(value)) invalid(mapKey, path, "must be a utility fact");
-  for (const field of ["flashesThrown", "enemyBlindVictims", "flashAssists", "heThrows", "fireThrows", "smokesThrown", "utilityKills"] as const) {
+function assertUtility(
+  value: unknown,
+  mapKey: string,
+  path: string,
+): asserts value is TournamentPerformanceUtilityFact {
+  if (!isRecord(value)) invalid(mapKey, path, 'must be a utility fact');
+  for (const field of [
+    'flashesThrown',
+    'enemyBlindVictims',
+    'flashAssists',
+    'heThrows',
+    'fireThrows',
+    'smokesThrown',
+    'utilityKills',
+  ] as const) {
     assertCount(value[field], mapKey, `${path}.${field}`);
   }
-  for (const field of ["enemyBlindSeconds", "teamBlindSeconds", "heDamage", "fireDamage", "utilityDamage"] as const) {
+  for (const field of [
+    'enemyBlindSeconds',
+    'teamBlindSeconds',
+    'heDamage',
+    'fireDamage',
+    'utilityDamage',
+  ] as const) {
     assertFiniteNonNegative(value[field], mapKey, `${path}.${field}`);
   }
 }
 
-function assertClutch(value: unknown, mapKey: string, path: string): asserts value is NonNullable<TournamentPerformancePlayerRoundFact["clutch"]> {
-  if (!isRecord(value)) invalid(mapKey, path, "must be a clutch fact or null");
+function assertClutch(
+  value: unknown,
+  mapKey: string,
+  path: string,
+): asserts value is NonNullable<TournamentPerformancePlayerRoundFact['clutch']> {
+  if (!isRecord(value)) invalid(mapKey, path, 'must be a clutch fact or null');
   assertCount(value.opponentCount, mapKey, `${path}.opponentCount`);
-  if (value.opponentCount < 1 || value.opponentCount > 5) invalid(mapKey, `${path}.opponentCount`, "must be between 1 and 5");
+  if (value.opponentCount < 1 || value.opponentCount > 5)
+    invalid(mapKey, `${path}.opponentCount`, 'must be between 1 and 5');
   assertBoolean(value.won, mapKey, `${path}.won`);
 }
 
-function assertPlayerRoundFact(value: unknown, mapKey: string, path: string): asserts value is TournamentPerformancePlayerRoundFact {
-  if (!isRecord(value)) invalid(mapKey, path, "must be a player-round fact");
+function assertPlayerRoundFact(
+  value: unknown,
+  mapKey: string,
+  path: string,
+): asserts value is TournamentPerformancePlayerRoundFact {
+  if (!isRecord(value)) invalid(mapKey, path, 'must be a player-round fact');
   const row = value as unknown as TournamentPerformancePlayerRoundFact;
   assertPositiveInteger(row.roundSeq, mapKey, `${path}.roundSeq`);
   assertNonEmptyString(row.playerEntityKey, mapKey, `${path}.playerEntityKey`);
   assertNonEmptyString(row.teamEntityKey, mapKey, `${path}.teamEntityKey`);
   assertSide(row.side, mapKey, `${path}.side`);
   assertBoolean(row.teamWonRound, mapKey, `${path}.teamWonRound`);
-  for (const field of ["kills", "deaths", "assists", "headshots", "tradeKills", "tradedDeaths"] as const) {
+  for (const field of [
+    'kills',
+    'deaths',
+    'assists',
+    'headshots',
+    'tradeKills',
+    'tradedDeaths',
+  ] as const) {
     assertCount(row[field], mapKey, `${path}.${field}`);
   }
   assertFiniteNonNegative(row.damage, mapKey, `${path}.damage`);
   assertBoolean(row.survived, mapKey, `${path}.survived`);
   assertBoolean(row.kast, mapKey, `${path}.kast`);
-  if (row.headshots > row.kills) invalid(mapKey, `${path}.headshots`, "must not exceed kills");
-  if (row.tradeKills > row.kills) invalid(mapKey, `${path}.tradeKills`, "must not exceed kills");
-  if (row.tradedDeaths > row.deaths) invalid(mapKey, `${path}.tradedDeaths`, "must not exceed deaths");
-  if (row.openingDuel !== "none" && row.openingDuel !== "won" && row.openingDuel !== "lost") {
-    invalid(mapKey, `${path}.openingDuel`, "must be none, won, or lost");
+  if (row.headshots > row.kills) invalid(mapKey, `${path}.headshots`, 'must not exceed kills');
+  if (row.tradeKills > row.kills) invalid(mapKey, `${path}.tradeKills`, 'must not exceed kills');
+  if (row.tradedDeaths > row.deaths)
+    invalid(mapKey, `${path}.tradedDeaths`, 'must not exceed deaths');
+  if (row.openingDuel !== 'none' && row.openingDuel !== 'won' && row.openingDuel !== 'lost') {
+    invalid(mapKey, `${path}.openingDuel`, 'must be none, won, or lost');
   }
   // Tournament consumes frozen semantic facts. Relationships such as survived
   // vs deaths or clutch outcome vs round outcome are owned by Core/Evidence QA;
@@ -217,55 +271,77 @@ function assertPlayerRoundFact(value: unknown, mapKey: string, path: string): as
   assertUtility(row.utility, mapKey, `${path}.utility`);
 }
 
-function assertObjectiveFact(value: unknown, mapKey: string, path: string): asserts value is TournamentPerformanceObjectiveFact {
-  if (!isRecord(value)) invalid(mapKey, path, "must be an objective fact");
+function assertObjectiveFact(
+  value: unknown,
+  mapKey: string,
+  path: string,
+): asserts value is TournamentPerformanceObjectiveFact {
+  if (!isRecord(value)) invalid(mapKey, path, 'must be an objective fact');
   const row = value as unknown as TournamentPerformanceObjectiveFact;
   assertPositiveInteger(row.roundSeq, mapKey, `${path}.roundSeq`);
-  if (row.type !== "planted" && row.type !== "defused") invalid(mapKey, `${path}.type`, "must be planted or defused");
-  if (row.playerEntityKey !== null) assertNonEmptyString(row.playerEntityKey, mapKey, `${path}.playerEntityKey`);
-  if (row.teamEntityKey !== null) assertNonEmptyString(row.teamEntityKey, mapKey, `${path}.teamEntityKey`);
+  if (row.type !== 'planted' && row.type !== 'defused')
+    invalid(mapKey, `${path}.type`, 'must be planted or defused');
+  if (row.playerEntityKey !== null)
+    assertNonEmptyString(row.playerEntityKey, mapKey, `${path}.playerEntityKey`);
+  if (row.teamEntityKey !== null)
+    assertNonEmptyString(row.teamEntityKey, mapKey, `${path}.teamEntityKey`);
   if (row.side !== null) assertSide(row.side, mapKey, `${path}.side`);
   if (row.teamWonRound !== null) assertBoolean(row.teamWonRound, mapKey, `${path}.teamWonRound`);
   if (row.teamEntityKey === null) {
-    if (row.playerEntityKey !== null) invalid(mapKey, `${path}.teamEntityKey`, "is required when playerEntityKey is present");
-    if (row.side !== null) invalid(mapKey, `${path}.side`, "must be null when teamEntityKey is null");
-    if (row.teamWonRound !== null) invalid(mapKey, `${path}.teamWonRound`, "must be null when teamEntityKey is null");
+    if (row.playerEntityKey !== null)
+      invalid(mapKey, `${path}.teamEntityKey`, 'is required when playerEntityKey is present');
+    if (row.side !== null)
+      invalid(mapKey, `${path}.side`, 'must be null when teamEntityKey is null');
+    if (row.teamWonRound !== null)
+      invalid(mapKey, `${path}.teamWonRound`, 'must be null when teamEntityKey is null');
   } else {
-    if (row.side === null) invalid(mapKey, `${path}.side`, "is required when teamEntityKey is present");
-    if (row.teamWonRound === null) invalid(mapKey, `${path}.teamWonRound`, "is required when teamEntityKey is present");
+    if (row.side === null)
+      invalid(mapKey, `${path}.side`, 'is required when teamEntityKey is present');
+    if (row.teamWonRound === null)
+      invalid(mapKey, `${path}.teamWonRound`, 'is required when teamEntityKey is present');
   }
 }
 
-function assertPlayerWeaponFact(value: unknown, mapKey: string, path: string): asserts value is TournamentPerformancePlayerWeaponFact {
-  if (!isRecord(value)) invalid(mapKey, path, "must be a player-weapon fact");
+function assertPlayerWeaponFact(
+  value: unknown,
+  mapKey: string,
+  path: string,
+): asserts value is TournamentPerformancePlayerWeaponFact {
+  if (!isRecord(value)) invalid(mapKey, path, 'must be a player-weapon fact');
   const row = value as unknown as TournamentPerformancePlayerWeaponFact;
   assertNonEmptyString(row.playerEntityKey, mapKey, `${path}.playerEntityKey`);
   assertNonEmptyString(row.teamEntityKey, mapKey, `${path}.teamEntityKey`);
   assertNonEmptyString(row.weapon, mapKey, `${path}.weapon`);
   assertCount(row.kills, mapKey, `${path}.kills`);
   assertCount(row.headshotKills, mapKey, `${path}.headshotKills`);
-  if (row.headshotKills > row.kills) invalid(mapKey, `${path}.headshotKills`, "must not exceed kills");
+  if (row.headshotKills > row.kills)
+    invalid(mapKey, `${path}.headshotKills`, 'must not exceed kills');
 }
 
-function otherTeam(teamEntityKey: string, teamEntityKeys: Record<TournamentTeamSlot, string>): string {
+function otherTeam(
+  teamEntityKey: string,
+  teamEntityKeys: Record<TournamentTeamSlot, string>,
+): string {
   return teamEntityKey === teamEntityKeys.teamA ? teamEntityKeys.teamB : teamEntityKeys.teamA;
 }
 
 function validateMapFacts(facts: TournamentPerformanceMapFacts): MapValidation {
-  if (!isRecord(facts)) invalid("<invalid-map>", "facts", "must be an object");
+  if (!isRecord(facts)) invalid('<invalid-map>', 'facts', 'must be an object');
   const rawMapKey = facts.mapKey;
-  const mapKey = typeof rawMapKey === "string" ? rawMapKey : "<invalid-map>";
-  assertNonEmptyString(facts.semanticProfile, mapKey, "semanticProfile");
-  assertNonEmptyString(facts.analysisVersion, mapKey, "analysisVersion");
-  assertNonEmptyString(facts.mapKey, mapKey, "mapKey");
-  assertNonEmptyString(facts.matchKey, mapKey, "matchKey");
-  assertNonEmptyString(facts.mapName, mapKey, "mapName");
-  if (!isRecord(facts.teamEntityKeys)) invalid(mapKey, "teamEntityKeys", "must be an object");
-  for (const slot of TEAM_SLOTS) assertNonEmptyString(facts.teamEntityKeys[slot], mapKey, `teamEntityKeys.${slot}`);
-  if (facts.teamEntityKeys.teamA === facts.teamEntityKeys.teamB) invalid(mapKey, "teamEntityKeys", "teamA and teamB must differ");
-  if (!Array.isArray(facts.playerRounds)) invalid(mapKey, "playerRounds", "must be an array");
-  if (!Array.isArray(facts.objectives)) invalid(mapKey, "objectives", "must be an array");
-  if (!Array.isArray(facts.playerWeapons)) invalid(mapKey, "playerWeapons", "must be an array");
+  const mapKey = typeof rawMapKey === 'string' ? rawMapKey : '<invalid-map>';
+  assertNonEmptyString(facts.semanticProfile, mapKey, 'semanticProfile');
+  assertNonEmptyString(facts.analysisVersion, mapKey, 'analysisVersion');
+  assertNonEmptyString(facts.mapKey, mapKey, 'mapKey');
+  assertNonEmptyString(facts.matchKey, mapKey, 'matchKey');
+  assertNonEmptyString(facts.mapName, mapKey, 'mapName');
+  if (!isRecord(facts.teamEntityKeys)) invalid(mapKey, 'teamEntityKeys', 'must be an object');
+  for (const slot of TEAM_SLOTS)
+    assertNonEmptyString(facts.teamEntityKeys[slot], mapKey, `teamEntityKeys.${slot}`);
+  if (facts.teamEntityKeys.teamA === facts.teamEntityKeys.teamB)
+    invalid(mapKey, 'teamEntityKeys', 'teamA and teamB must differ');
+  if (!Array.isArray(facts.playerRounds)) invalid(mapKey, 'playerRounds', 'must be an array');
+  if (!Array.isArray(facts.objectives)) invalid(mapKey, 'objectives', 'must be an array');
+  if (!Array.isArray(facts.playerWeapons)) invalid(mapKey, 'playerWeapons', 'must be an array');
 
   const playerTeams = new Map<string, string>();
   const duplicateRoundPlayers = new Set<string>();
@@ -282,27 +358,39 @@ function validateMapFacts(facts: TournamentPerformanceMapFacts): MapValidation {
     const path = `playerRounds[${index}]`;
     assertPlayerRoundFact(row, mapKey, path);
     if (!TEAM_SLOTS.some((slot) => facts.teamEntityKeys[slot] === row.teamEntityKey)) {
-      invalid(mapKey, `${path}.teamEntityKey`, "must belong to this map");
+      invalid(mapKey, `${path}.teamEntityKey`, 'must belong to this map');
     }
     const duplicateKey = `${row.roundSeq}\u0000${row.playerEntityKey}`;
     if (duplicateRoundPlayers.has(duplicateKey)) {
-      invalid(mapKey, path, `duplicate (roundSeq=${row.roundSeq}, playerEntityKey=${row.playerEntityKey})`);
+      invalid(
+        mapKey,
+        path,
+        `duplicate (roundSeq=${row.roundSeq}, playerEntityKey=${row.playerEntityKey})`,
+      );
     }
     duplicateRoundPlayers.add(duplicateKey);
     const priorTeam = playerTeams.get(row.playerEntityKey);
     if (priorTeam && priorTeam !== row.teamEntityKey) {
-      invalid(mapKey, `${path}.teamEntityKey`, `playerEntityKey ${row.playerEntityKey} changes team within one map`);
+      invalid(
+        mapKey,
+        `${path}.teamEntityKey`,
+        `playerEntityKey ${row.playerEntityKey} changes team within one map`,
+      );
     }
     playerTeams.set(row.playerEntityKey, row.teamEntityKey);
 
     const round = roundFor(row.roundSeq);
     const priorTeamRound = round.teams.get(row.teamEntityKey);
-    if (priorTeamRound && priorTeamRound.side !== row.side) invalid(mapKey, `${path}.side`, "team side changes within one round");
-    if (priorTeamRound && priorTeamRound.teamWonRound !== row.teamWonRound) invalid(mapKey, `${path}.teamWonRound`, "team winner flag changes within one round");
+    if (priorTeamRound && priorTeamRound.side !== row.side)
+      invalid(mapKey, `${path}.side`, 'team side changes within one round');
+    if (priorTeamRound && priorTeamRound.teamWonRound !== row.teamWonRound)
+      invalid(mapKey, `${path}.teamWonRound`, 'team winner flag changes within one round');
     round.teams.set(row.teamEntityKey, { side: row.side, teamWonRound: row.teamWonRound });
-    const winnerTeamKey = row.teamWonRound ? row.teamEntityKey : otherTeam(row.teamEntityKey, facts.teamEntityKeys);
+    const winnerTeamKey = row.teamWonRound
+      ? row.teamEntityKey
+      : otherTeam(row.teamEntityKey, facts.teamEntityKeys);
     if (round.winnerTeamKey && round.winnerTeamKey !== winnerTeamKey) {
-      invalid(mapKey, `${path}.teamWonRound`, "round winner is inconsistent across teams");
+      invalid(mapKey, `${path}.teamWonRound`, 'round winner is inconsistent across teams');
     }
     round.winnerTeamKey = winnerTeamKey;
   });
@@ -313,19 +401,26 @@ function validateMapFacts(facts: TournamentPerformanceMapFacts): MapValidation {
     const round = roundFor(row.roundSeq);
     if (row.teamEntityKey !== null) {
       if (!TEAM_SLOTS.some((slot) => facts.teamEntityKeys[slot] === row.teamEntityKey)) {
-        invalid(mapKey, `${path}.teamEntityKey`, "must belong to this map");
+        invalid(mapKey, `${path}.teamEntityKey`, 'must belong to this map');
       }
       if (row.playerEntityKey !== null) {
         const playerTeam = playerTeams.get(row.playerEntityKey);
-        if (!playerTeam) invalid(mapKey, `${path}.playerEntityKey`, "does not reference a known player");
-        if (playerTeam !== row.teamEntityKey) invalid(mapKey, `${path}.teamEntityKey`, "must match the referenced player's team");
+        if (!playerTeam)
+          invalid(mapKey, `${path}.playerEntityKey`, 'does not reference a known player');
+        if (playerTeam !== row.teamEntityKey)
+          invalid(mapKey, `${path}.teamEntityKey`, "must match the referenced player's team");
       }
       const priorTeamRound = round.teams.get(row.teamEntityKey);
-      if (priorTeamRound && priorTeamRound.side !== row.side) invalid(mapKey, `${path}.side`, "team side conflicts with player-round facts");
-      if (priorTeamRound && priorTeamRound.teamWonRound !== row.teamWonRound) invalid(mapKey, `${path}.teamWonRound`, "conflicts with player-round facts");
+      if (priorTeamRound && priorTeamRound.side !== row.side)
+        invalid(mapKey, `${path}.side`, 'team side conflicts with player-round facts');
+      if (priorTeamRound && priorTeamRound.teamWonRound !== row.teamWonRound)
+        invalid(mapKey, `${path}.teamWonRound`, 'conflicts with player-round facts');
       round.teams.set(row.teamEntityKey, { side: row.side!, teamWonRound: row.teamWonRound! });
-      const winnerTeamKey = row.teamWonRound ? row.teamEntityKey : otherTeam(row.teamEntityKey, facts.teamEntityKeys);
-      if (round.winnerTeamKey && round.winnerTeamKey !== winnerTeamKey) invalid(mapKey, `${path}.teamWonRound`, "round winner is inconsistent across facts");
+      const winnerTeamKey = row.teamWonRound
+        ? row.teamEntityKey
+        : otherTeam(row.teamEntityKey, facts.teamEntityKeys);
+      if (round.winnerTeamKey && round.winnerTeamKey !== winnerTeamKey)
+        invalid(mapKey, `${path}.teamWonRound`, 'round winner is inconsistent across facts');
       round.winnerTeamKey = winnerTeamKey;
     }
   });
@@ -334,24 +429,41 @@ function validateMapFacts(facts: TournamentPerformanceMapFacts): MapValidation {
     const teamA = round.teams.get(facts.teamEntityKeys.teamA);
     const teamB = round.teams.get(facts.teamEntityKeys.teamB);
     if (teamA && teamB) {
-      if (teamA.side === teamB.side) invalid(mapKey, `playerRounds.roundSeq=${roundSeq}.side`, "teams must have opposite sides");
-      if (teamA.teamWonRound === teamB.teamWonRound) invalid(mapKey, `playerRounds.roundSeq=${roundSeq}.teamWonRound`, "exactly one team must win the round");
+      if (teamA.side === teamB.side)
+        invalid(mapKey, `playerRounds.roundSeq=${roundSeq}.side`, 'teams must have opposite sides');
+      if (teamA.teamWonRound === teamB.teamWonRound)
+        invalid(
+          mapKey,
+          `playerRounds.roundSeq=${roundSeq}.teamWonRound`,
+          'exactly one team must win the round',
+        );
     }
   }
 
-  const openingByRound = new Map<number, { won: TournamentPerformancePlayerRoundFact[]; lost: TournamentPerformancePlayerRoundFact[] }>();
+  const openingByRound = new Map<
+    number,
+    { won: TournamentPerformancePlayerRoundFact[]; lost: TournamentPerformancePlayerRoundFact[] }
+  >();
   facts.playerRounds.forEach((row) => {
-    if (row.openingDuel === "none") return;
+    if (row.openingDuel === 'none') return;
     const entry = openingByRound.get(row.roundSeq) ?? { won: [], lost: [] };
     entry[row.openingDuel].push(row);
     openingByRound.set(row.roundSeq, entry);
   });
   for (const [roundSeq, opening] of openingByRound) {
     if (opening.won.length !== 1 || opening.lost.length !== 1) {
-      invalid(mapKey, `playerRounds.roundSeq=${roundSeq}.openingDuel`, "an opening duel must contain exactly one won and one lost player");
+      invalid(
+        mapKey,
+        `playerRounds.roundSeq=${roundSeq}.openingDuel`,
+        'an opening duel must contain exactly one won and one lost player',
+      );
     }
     if (opening.won[0]!.teamEntityKey === opening.lost[0]!.teamEntityKey) {
-      invalid(mapKey, `playerRounds.roundSeq=${roundSeq}.openingDuel`, "opening duel players must be on opposite teams");
+      invalid(
+        mapKey,
+        `playerRounds.roundSeq=${roundSeq}.openingDuel`,
+        'opening duel players must be on opposite teams',
+      );
     }
   }
 
@@ -359,10 +471,12 @@ function validateMapFacts(facts: TournamentPerformanceMapFacts): MapValidation {
     const path = `playerWeapons[${index}]`;
     assertPlayerWeaponFact(row, mapKey, path);
     const playerTeam = playerTeams.get(row.playerEntityKey);
-    if (!playerTeam) invalid(mapKey, `${path}.playerEntityKey`, "does not reference a known player");
-    if (playerTeam !== row.teamEntityKey) invalid(mapKey, `${path}.teamEntityKey`, "must match the player's team");
+    if (!playerTeam)
+      invalid(mapKey, `${path}.playerEntityKey`, 'does not reference a known player');
+    if (playerTeam !== row.teamEntityKey)
+      invalid(mapKey, `${path}.teamEntityKey`, "must match the player's team");
     if (!TEAM_SLOTS.some((slot) => facts.teamEntityKeys[slot] === row.teamEntityKey)) {
-      invalid(mapKey, `${path}.teamEntityKey`, "must belong to this map");
+      invalid(mapKey, `${path}.teamEntityKey`, 'must belong to this map');
     }
   });
 
@@ -370,15 +484,34 @@ function validateMapFacts(facts: TournamentPerformanceMapFacts): MapValidation {
 }
 
 function emptyCombat(): MutableCombat {
-  return { kills: 0, deaths: 0, assists: 0, damage: 0, headshots: 0, twoKillRounds: 0, threeKillRounds: 0, fourKillRounds: 0, fiveKillRounds: 0 };
+  return {
+    kills: 0,
+    deaths: 0,
+    assists: 0,
+    damage: 0,
+    headshots: 0,
+    twoKillRounds: 0,
+    threeKillRounds: 0,
+    fourKillRounds: 0,
+    fiveKillRounds: 0,
+  };
 }
 
 function emptyOpening(): MutableOpening {
-  return { firstKills: 0, firstDeaths: 0, roundWinsAfterWinningOpeningDuel: 0, roundWinsAfterLosingOpeningDuel: 0 };
+  return {
+    firstKills: 0,
+    firstDeaths: 0,
+    roundWinsAfterWinningOpeningDuel: 0,
+    roundWinsAfterLosingOpeningDuel: 0,
+  };
 }
 
 function emptyOpeningConversion(): MutableOpeningConversion {
-  return { roundsWithOpening: new Set(), openingWinnerTeamRoundWins: 0, openingLoserTeamComebacks: 0 };
+  return {
+    roundsWithOpening: new Set(),
+    openingWinnerTeamRoundWins: 0,
+    openingLoserTeamComebacks: 0,
+  };
 }
 
 function emptyTrade(): MutableTrade {
@@ -389,7 +522,9 @@ function emptyClutch(): MutableClutch {
   return {
     attempts: 0,
     wins: 0,
-    byOpponentCount: Object.fromEntries(CLUTCH_KEYS.map((key) => [key, { successes: 0, attempts: 0 }])) as Record<TournamentClutchSplitKey, MutableRateSample>,
+    byOpponentCount: Object.fromEntries(
+      CLUTCH_KEYS.map((key) => [key, { successes: 0, attempts: 0 }]),
+    ) as Record<TournamentClutchSplitKey, MutableRateSample>,
   };
 }
 
@@ -415,7 +550,14 @@ function emptyObjective(): MutableObjective {
 }
 
 function emptySharedSlice(): MutableSharedSlice {
-  return { roundKeys: new Set(), opening: emptyOpening(), trade: emptyTrade(), clutch: emptyClutch(), utility: emptyUtility(), objective: emptyObjective() };
+  return {
+    roundKeys: new Set(),
+    opening: emptyOpening(),
+    trade: emptyTrade(),
+    clutch: emptyClutch(),
+    utility: emptyUtility(),
+    objective: emptyObjective(),
+  };
 }
 
 function emptyPlayerSlice(): MutablePlayerSlice {
@@ -423,15 +565,31 @@ function emptyPlayerSlice(): MutablePlayerSlice {
 }
 
 function emptyPlayer(): MutablePlayer {
-  return { mapKeys: new Set(), matchKeys: new Set(), teamEntityKeys: new Set(), slices: { overall: emptyPlayerSlice(), t: emptyPlayerSlice(), ct: emptyPlayerSlice() }, weapons: new Map() };
+  return {
+    mapKeys: new Set(),
+    matchKeys: new Set(),
+    teamEntityKeys: new Set(),
+    slices: { overall: emptyPlayerSlice(), t: emptyPlayerSlice(), ct: emptyPlayerSlice() },
+    weapons: new Map(),
+  };
 }
 
 function emptyTeam(): MutableTeam {
-  return { mapKeys: new Set(), matchKeys: new Set(), slices: { overall: emptySharedSlice(), t: emptySharedSlice(), ct: emptySharedSlice() }, weapons: new Map() };
+  return {
+    mapKeys: new Set(),
+    matchKeys: new Set(),
+    slices: { overall: emptySharedSlice(), t: emptySharedSlice(), ct: emptySharedSlice() },
+    weapons: new Map(),
+  };
 }
 
 function emptyMap(): MutableMap {
-  return { mapKeys: new Set(), matchKeys: new Set(), shared: emptySharedSlice(), opening: emptyOpeningConversion() };
+  return {
+    mapKeys: new Set(),
+    matchKeys: new Set(),
+    shared: emptySharedSlice(),
+    opening: emptyOpeningConversion(),
+  };
 }
 
 function addUtility(target: MutableUtility, source: TournamentPerformanceUtilityFact): void {
@@ -449,39 +607,55 @@ function addUtility(target: MutableUtility, source: TournamentPerformanceUtility
   target.utilityDamage += source.utilityDamage;
 }
 
-function addSharedPlayerRound(target: MutableSharedSlice, row: TournamentPerformancePlayerRoundFact, roundKey: string, includeOpening = true): void {
+function addSharedPlayerRound(
+  target: MutableSharedSlice,
+  row: TournamentPerformancePlayerRoundFact,
+  roundKey: string,
+  includeOpening = true,
+): void {
   target.roundKeys.add(roundKey);
   if (includeOpening) {
-    if (row.openingDuel === "won") target.opening.firstKills += 1;
-    if (row.openingDuel === "lost") target.opening.firstDeaths += 1;
-    if (row.openingDuel === "won" && row.teamWonRound) target.opening.roundWinsAfterWinningOpeningDuel += 1;
-    if (row.openingDuel === "lost" && row.teamWonRound) target.opening.roundWinsAfterLosingOpeningDuel += 1;
+    if (row.openingDuel === 'won') target.opening.firstKills += 1;
+    if (row.openingDuel === 'lost') target.opening.firstDeaths += 1;
+    if (row.openingDuel === 'won' && row.teamWonRound)
+      target.opening.roundWinsAfterWinningOpeningDuel += 1;
+    if (row.openingDuel === 'lost' && row.teamWonRound)
+      target.opening.roundWinsAfterLosingOpeningDuel += 1;
   }
   target.trade.tradeKills += row.tradeKills;
   target.trade.tradedDeaths += row.tradedDeaths;
-  target.trade.tradedOpeningDeaths += row.openingDuel === "lost" ? row.tradedDeaths : 0;
+  target.trade.tradedOpeningDeaths += row.openingDuel === 'lost' ? row.tradedDeaths : 0;
   target.trade.deaths += row.deaths;
   if (row.clutch) {
     target.clutch.attempts += 1;
     if (row.clutch.won) target.clutch.wins += 1;
-    const split = target.clutch.byOpponentCount[String(row.clutch.opponentCount) as TournamentClutchSplitKey];
+    const split =
+      target.clutch.byOpponentCount[String(row.clutch.opponentCount) as TournamentClutchSplitKey];
     split.attempts += 1;
     if (row.clutch.won) split.successes += 1;
   }
   addUtility(target.utility, row.utility);
 }
 
-function addOpeningConversion(target: MutableOpeningConversion, row: TournamentPerformancePlayerRoundFact, roundKey: string): void {
-  if (row.openingDuel === "won") {
+function addOpeningConversion(
+  target: MutableOpeningConversion,
+  row: TournamentPerformancePlayerRoundFact,
+  roundKey: string,
+): void {
+  if (row.openingDuel === 'won') {
     target.roundsWithOpening.add(roundKey);
     if (row.teamWonRound) target.openingWinnerTeamRoundWins += 1;
-  } else if (row.openingDuel === "lost") {
+  } else if (row.openingDuel === 'lost') {
     target.roundsWithOpening.add(roundKey);
     if (row.teamWonRound) target.openingLoserTeamComebacks += 1;
   }
 }
 
-function addPlayerRound(target: MutablePlayerSlice, row: TournamentPerformancePlayerRoundFact, roundKey: string): void {
+function addPlayerRound(
+  target: MutablePlayerSlice,
+  row: TournamentPerformancePlayerRoundFact,
+  roundKey: string,
+): void {
   addSharedPlayerRound(target, row, roundKey);
   target.combat.kills += row.kills;
   target.combat.deaths += row.deaths;
@@ -496,9 +670,13 @@ function addPlayerRound(target: MutablePlayerSlice, row: TournamentPerformancePl
   if (row.survived) target.survivalRounds += 1;
 }
 
-function addObjective(target: MutableSharedSlice, row: TournamentPerformanceObjectiveFact, roundKey: string): void {
+function addObjective(
+  target: MutableSharedSlice,
+  row: TournamentPerformanceObjectiveFact,
+  roundKey: string,
+): void {
   target.roundKeys.add(roundKey);
-  if (row.type === "planted") {
+  if (row.type === 'planted') {
     target.objective.plants += 1;
     if (row.teamWonRound !== null) {
       target.objective.knownPlantOpportunities += 1;
@@ -513,11 +691,17 @@ function emptyWeapon(weapon: string): MutableWeapon {
   return { weapon, kills: 0, headshotKills: 0, players: new Map(), teamEntityKeys: new Set() };
 }
 
-function addWeapon(target: Map<string, MutableWeapon>, row: TournamentPerformancePlayerWeaponFact): void {
+function addWeapon(
+  target: Map<string, MutableWeapon>,
+  row: TournamentPerformancePlayerWeaponFact,
+): void {
   const weapon = target.get(row.weapon) ?? emptyWeapon(row.weapon);
   weapon.kills += row.kills;
   weapon.headshotKills += row.headshotKills;
-  weapon.players.set(row.playerEntityKey, (weapon.players.get(row.playerEntityKey) ?? 0) + row.kills);
+  weapon.players.set(
+    row.playerEntityKey,
+    (weapon.players.get(row.playerEntityKey) ?? 0) + row.kills,
+  );
   weapon.teamEntityKeys.add(row.teamEntityKey);
   target.set(row.weapon, weapon);
 }
@@ -530,7 +714,10 @@ function finalizeSample(rounds: number): TournamentPerformanceSample {
   return { rounds };
 }
 
-function finalizeOpening(value: MutableOpening, rounds: number): TournamentPerformanceOpeningSummary {
+function finalizeOpening(
+  value: MutableOpening,
+  rounds: number,
+): TournamentPerformanceOpeningSummary {
   const attempts = value.firstKills + value.firstDeaths;
   return {
     firstKills: value.firstKills,
@@ -543,11 +730,17 @@ function finalizeOpening(value: MutableOpening, rounds: number): TournamentPerfo
     roundWinsAfterWinningOpeningDuel: value.roundWinsAfterWinningOpeningDuel,
     winRateAfterWinningOpeningDuel: rate(value.roundWinsAfterWinningOpeningDuel, value.firstKills),
     roundWinsAfterLosingOpeningDuel: value.roundWinsAfterLosingOpeningDuel,
-    comebackRateAfterLosingOpeningDuel: rate(value.roundWinsAfterLosingOpeningDuel, value.firstDeaths),
+    comebackRateAfterLosingOpeningDuel: rate(
+      value.roundWinsAfterLosingOpeningDuel,
+      value.firstDeaths,
+    ),
   };
 }
 
-function finalizeOpeningConversion(value: MutableOpeningConversion, rounds: number): TournamentPerformanceOpeningConversionSummary {
+function finalizeOpeningConversion(
+  value: MutableOpeningConversion,
+  rounds: number,
+): TournamentPerformanceOpeningConversionSummary {
   const roundsWithOpening = value.roundsWithOpening.size;
   return {
     openingRounds: rounds,
@@ -576,14 +769,19 @@ function finalizeClutch(value: MutableClutch, rounds: number): TournamentPerform
     wins: value.wins,
     winRate: rate(value.wins, value.attempts),
     frequency: rate(value.attempts, rounds),
-    byOpponentCount: Object.fromEntries(CLUTCH_KEYS.map((key) => {
-      const split = value.byOpponentCount[key];
-      return [key, rate(split.successes, split.attempts)];
-    })) as TournamentPerformanceClutchSummary["byOpponentCount"],
+    byOpponentCount: Object.fromEntries(
+      CLUTCH_KEYS.map((key) => {
+        const split = value.byOpponentCount[key];
+        return [key, rate(split.successes, split.attempts)];
+      }),
+    ) as TournamentPerformanceClutchSummary['byOpponentCount'],
   };
 }
 
-function finalizeUtility(value: MutableUtility, rounds: number): TournamentPerformanceUtilitySummary {
+function finalizeUtility(
+  value: MutableUtility,
+  rounds: number,
+): TournamentPerformanceUtilitySummary {
   const netBlindSeconds = value.enemyBlindSeconds - value.teamBlindSeconds;
   return {
     ...value,
@@ -658,7 +856,11 @@ function finalizeTeamSlice(value: MutableSharedSlice): TournamentPerformanceTeam
   };
 }
 
-function entityRef(entityKey: string, labels: TournamentEntityLabels | undefined, kind: "teams" | "players") {
+function entityRef(
+  entityKey: string,
+  labels: TournamentEntityLabels | undefined,
+  kind: 'teams' | 'players',
+) {
   return { entityKey, displayName: labels?.[kind]?.[entityKey] ?? entityKey };
 }
 
@@ -670,7 +872,11 @@ function weaponSort(left: MutableWeapon, right: MutableWeapon): number {
   return right.kills - left.kills || lexicalCompare(left.weapon, right.weapon);
 }
 
-function finalizeWeapon(value: MutableWeapon, totalKills: number, rounds: number): TournamentPerformanceWeaponSummary {
+function finalizeWeapon(
+  value: MutableWeapon,
+  totalKills: number,
+  rounds: number,
+): TournamentPerformanceWeaponSummary {
   return {
     weapon: value.weapon,
     kills: value.kills,
@@ -685,16 +891,37 @@ function roundIdentity(mapKey: string, roundSeq: number): string {
   return `${mapKey}\u0000${roundSeq}`;
 }
 
-function sortedPlayerRounds(rows: readonly TournamentPerformancePlayerRoundFact[]): TournamentPerformancePlayerRoundFact[] {
-  return [...rows].sort((a, b) => a.roundSeq - b.roundSeq || lexicalCompare(a.playerEntityKey, b.playerEntityKey));
+function sortedPlayerRounds(
+  rows: readonly TournamentPerformancePlayerRoundFact[],
+): TournamentPerformancePlayerRoundFact[] {
+  return [...rows].sort(
+    (a, b) => a.roundSeq - b.roundSeq || lexicalCompare(a.playerEntityKey, b.playerEntityKey),
+  );
 }
 
-function sortedObjectives(rows: readonly TournamentPerformanceObjectiveFact[]): TournamentPerformanceObjectiveFact[] {
-  return [...rows].sort((a, b) => a.roundSeq - b.roundSeq || lexicalCompare(a.type, b.type) || lexicalCompare(a.teamEntityKey ?? "", b.teamEntityKey ?? "") || lexicalCompare(a.playerEntityKey ?? "", b.playerEntityKey ?? ""));
+function sortedObjectives(
+  rows: readonly TournamentPerformanceObjectiveFact[],
+): TournamentPerformanceObjectiveFact[] {
+  return [...rows].sort(
+    (a, b) =>
+      a.roundSeq - b.roundSeq ||
+      lexicalCompare(a.type, b.type) ||
+      lexicalCompare(a.teamEntityKey ?? '', b.teamEntityKey ?? '') ||
+      lexicalCompare(a.playerEntityKey ?? '', b.playerEntityKey ?? ''),
+  );
 }
 
-function sortedWeapons(rows: readonly TournamentPerformancePlayerWeaponFact[]): TournamentPerformancePlayerWeaponFact[] {
-  return [...rows].sort((a, b) => lexicalCompare(a.playerEntityKey, b.playerEntityKey) || lexicalCompare(a.weapon, b.weapon) || lexicalCompare(a.teamEntityKey, b.teamEntityKey) || a.kills - b.kills || a.headshotKills - b.headshotKills);
+function sortedWeapons(
+  rows: readonly TournamentPerformancePlayerWeaponFact[],
+): TournamentPerformancePlayerWeaponFact[] {
+  return [...rows].sort(
+    (a, b) =>
+      lexicalCompare(a.playerEntityKey, b.playerEntityKey) ||
+      lexicalCompare(a.weapon, b.weapon) ||
+      lexicalCompare(a.teamEntityKey, b.teamEntityKey) ||
+      a.kills - b.kills ||
+      a.headshotKills - b.headshotKills,
+  );
 }
 
 function zeroPerformanceModel(): TournamentPerformanceAnalytics {
@@ -732,16 +959,19 @@ export function buildTournamentPerformanceAnalytics(
   const matchKeys = new Set<string>();
   let semanticProfile: string | null = null;
   const analysisVersions = new Set<string>();
-  const validated = facts.map((mapFacts) => {
-    const validation = validateMapFacts(mapFacts);
-    if (mapKeys.has(mapFacts.mapKey)) invalid(mapFacts.mapKey, "mapKey", "duplicate mapKey");
-    mapKeys.add(mapFacts.mapKey);
-    matchKeys.add(mapFacts.matchKey);
-    if (semanticProfile === null) semanticProfile = mapFacts.semanticProfile;
-    else if (semanticProfile !== mapFacts.semanticProfile) invalid(mapFacts.mapKey, "semanticProfile", `mixed profile; expected ${semanticProfile}`);
-    analysisVersions.add(mapFacts.analysisVersion);
-    return { mapFacts, validation };
-  }).sort((a, b) => lexicalCompare(a.mapFacts.mapKey, b.mapFacts.mapKey));
+  const validated = facts
+    .map((mapFacts) => {
+      const validation = validateMapFacts(mapFacts);
+      if (mapKeys.has(mapFacts.mapKey)) invalid(mapFacts.mapKey, 'mapKey', 'duplicate mapKey');
+      mapKeys.add(mapFacts.mapKey);
+      matchKeys.add(mapFacts.matchKey);
+      if (semanticProfile === null) semanticProfile = mapFacts.semanticProfile;
+      else if (semanticProfile !== mapFacts.semanticProfile)
+        invalid(mapFacts.mapKey, 'semanticProfile', `mixed profile; expected ${semanticProfile}`);
+      analysisVersions.add(mapFacts.analysisVersion);
+      return { mapFacts, validation };
+    })
+    .sort((a, b) => lexicalCompare(a.mapFacts.mapKey, b.mapFacts.mapKey));
 
   const global = emptySharedSlice();
   const globalOpening = emptyOpeningConversion();
@@ -820,9 +1050,12 @@ export function buildTournamentPerformanceAnalytics(
       const totalKills = [...value.weapons.values()].reduce((sum, row) => sum + row.kills, 0);
       const weapons: TournamentPerformancePlayerWeaponSummary[] = [...value.weapons.values()]
         .sort(weaponSort)
-        .map((row) => ({ ...finalizeWeapon(row, totalKills, value.slices.overall.roundKeys.size), teamEntityKeys: [...row.teamEntityKeys].sort(lexicalCompare) }));
+        .map((row) => ({
+          ...finalizeWeapon(row, totalKills, value.slices.overall.roundKeys.size),
+          teamEntityKeys: [...row.teamEntityKeys].sort(lexicalCompare),
+        }));
       return {
-        player: entityRef(playerEntityKey, options.labels, "players"),
+        player: entityRef(playerEntityKey, options.labels, 'players'),
         teamEntityKeys: [...value.teamEntityKeys].sort(lexicalCompare),
         matchCount: value.matchKeys.size,
         mapCount: value.mapKeys.size,
@@ -841,7 +1074,7 @@ export function buildTournamentPerformanceAnalytics(
       const rounds = value.slices.overall.roundKeys.size;
       const totalKills = [...value.weapons.values()].reduce((sum, row) => sum + row.kills, 0);
       return {
-        team: entityRef(teamEntityKey, options.labels, "teams"),
+        team: entityRef(teamEntityKey, options.labels, 'teams'),
         matchCount: value.matchKeys.size,
         mapCount: value.mapKeys.size,
         roundCount: rounds,
@@ -850,7 +1083,9 @@ export function buildTournamentPerformanceAnalytics(
           t: finalizeTeamSlice(value.slices.t),
           ct: finalizeTeamSlice(value.slices.ct),
         },
-        weapons: [...value.weapons.values()].sort(weaponSort).map((row) => finalizeWeapon(row, totalKills, rounds)),
+        weapons: [...value.weapons.values()]
+          .sort(weaponSort)
+          .map((row) => finalizeWeapon(row, totalKills, rounds)),
       };
     });
 
@@ -872,10 +1107,19 @@ export function buildTournamentPerformanceAnalytics(
   const globalWeaponRows: TournamentPerformanceGlobalWeaponSummary[] = [...globalWeapons.values()]
     .sort(weaponSort)
     .map((row) => {
-      const topPlayer = [...row.players.entries()].sort(([left, leftKills], [right, rightKills]) => rightKills - leftKills || lexicalCompare(left, right))[0];
+      const topPlayer = [...row.players.entries()].sort(
+        ([left, leftKills], [right, rightKills]) =>
+          rightKills - leftKills || lexicalCompare(left, right),
+      )[0];
       return {
-        ...finalizeWeapon(row, [...globalWeapons.values()].reduce((sum, weapon) => sum + weapon.kills, 0), global.roundKeys.size),
-        topPlayer: topPlayer ? { ...entityRef(topPlayer[0], options.labels, "players"), kills: topPlayer[1] } : null,
+        ...finalizeWeapon(
+          row,
+          [...globalWeapons.values()].reduce((sum, weapon) => sum + weapon.kills, 0),
+          global.roundKeys.size,
+        ),
+        topPlayer: topPlayer
+          ? { ...entityRef(topPlayer[0], options.labels, 'players'), kills: topPlayer[1] }
+          : null,
       };
     });
 

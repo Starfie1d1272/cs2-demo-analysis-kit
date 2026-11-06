@@ -15,10 +15,16 @@ export function desktopNoticeAssets(includeSimpleheat = false) {
   }
   if (includeSimpleheat) {
     const source = readFileSync(new URL('./licenses/simpleheat.LICENSE', import.meta.url), 'utf8');
-    assert.equal(createHash('sha256').update(source).digest('hex'), '756d6c334c9289a7b8e563cad0be32ab425cd35303d491789ab1adb9fbcef847');
+    assert.equal(
+      createHash('sha256').update(source).digest('hex'),
+      '756d6c334c9289a7b8e563cad0be32ab425cd35303d491789ab1adb9fbcef847',
+    );
     assert.ok(notice.includes(source));
     assets.push({ fileName: 'simpleheat.LICENSE', source });
   }
-  assets.push({ fileName: 'upstream-license-provenance.json', source: JSON.stringify(bundledDependencies, null, 2) + '\n' });
+  assets.push({
+    fileName: 'upstream-license-provenance.json',
+    source: JSON.stringify(bundledDependencies, null, 2) + '\n',
+  });
   return assets;
 }

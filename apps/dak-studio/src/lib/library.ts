@@ -1,23 +1,28 @@
-import { withAnalysisQueryInvalidation } from "./queries/query-cache";
-import { withLibraryCommit } from "./library-commit";
-import { getMapNav } from "@cs2dak/map-assets";
-import { withImportCheckpoint } from "./import-persistence";
-import { deleteMatchRows, settleWrites } from "./storage/match-rows";
-import { reportDiagnostic, withWorkerFallback } from "./worker-diagnostics";
-import { normalizeDiagnostic, type SafeDiagnostic } from "@cs2dak/rivalhub-upload";
-import { loadDemoManifestFromZip, loadDemoPackageFromZip as loadRawDemoPackage, type DemoPackageLoadOptions, type DemoPackageLoadProfile } from "@cs2dak/demo-io";
-import { buildMatchRadarField } from "@cs2dak/tactics";
-import { buildRadarFieldGrid } from "@cs2dak/maps";
-import type { DemoPackage } from "@cs2dak/contract";
-import type { RadarField } from "@cs2dak/tactics";
-import { buildMatchRecords, type MatchRecords } from "./match-records";
-import { getFactsStore } from "./facts-store";
-import { getDerivedCacheStore } from "./derived-cache";
-import { CALLOUT_GRID_URLS, loadStudioCalloutGrid } from "./callout-grid";
-import { metaFromPackage, type DemoMeta } from "./demo-meta";
-import { getStorage } from "./storage";
-import { loadTriLookup, loadMapTri } from "./tri";
-import { currentBuiltWith, isAnalysisStale } from "./analysis-manifest";
+import { withAnalysisQueryInvalidation } from './queries/query-cache';
+import { withLibraryCommit } from './library-commit';
+import { getMapNav } from '@cs2dak/map-assets';
+import { withImportCheckpoint } from './import-persistence';
+import { deleteMatchRows, settleWrites } from './storage/match-rows';
+import { reportDiagnostic, withWorkerFallback } from './worker-diagnostics';
+import { normalizeDiagnostic, type SafeDiagnostic } from '@cs2dak/rivalhub-upload';
+import {
+  loadDemoManifestFromZip,
+  loadDemoPackageFromZip as loadRawDemoPackage,
+  type DemoPackageLoadOptions,
+  type DemoPackageLoadProfile,
+} from '@cs2dak/demo-io';
+import { buildMatchRadarField } from '@cs2dak/tactics';
+import { buildRadarFieldGrid } from '@cs2dak/maps';
+import type { DemoPackage } from '@cs2dak/contract';
+import type { RadarField } from '@cs2dak/tactics';
+import { buildMatchRecords, type MatchRecords } from './match-records';
+import { getFactsStore } from './facts-store';
+import { getDerivedCacheStore } from './derived-cache';
+import { CALLOUT_GRID_URLS, loadStudioCalloutGrid } from './callout-grid';
+import { metaFromPackage, type DemoMeta } from './demo-meta';
+import { getStorage } from './storage';
+import { loadTriLookup, loadMapTri } from './tri';
+import { currentBuiltWith, isAnalysisStale } from './analysis-manifest';
 
 /**
  * DAK Studio 本地 Demo 库。
@@ -28,23 +33,28 @@ import { currentBuiltWith, isAnalysisStale } from "./analysis-manifest";
  *   DemoPackage 只在比赛工作台/逐场证据需要时从 ZIP 懒加载。
  */
 
-import { matchIdForEntry, type StudioDemoEntry } from "./demo-entry";
+import { matchIdForEntry, type StudioDemoEntry } from './demo-entry';
 
-function loadDemoPackageFromZip(buffer: ArrayBuffer, options: DemoPackageLoadOptions = {}): Promise<DemoPackage> {
-  return loadRawDemoPackage(buffer, { ...options, onDiagnostic: diagnostic => {
-    void reportDiagnostic(normalizeDiagnostic(diagnostic));
-  } });
+function loadDemoPackageFromZip(
+  buffer: ArrayBuffer,
+  options: DemoPackageLoadOptions = {},
+): Promise<DemoPackage> {
+  return loadRawDemoPackage(buffer, {
+    ...options,
+    onDiagnostic: (diagnostic) => {
+      void reportDiagnostic(normalizeDiagnostic(diagnostic));
+    },
+  });
 }
-
 
 function normalizeTags(tags: string[]): string[] {
   return [...new Set(tags.map((tag) => tag.trim()).filter(Boolean))];
 }
 
 // ── 存储命名空间（经 StorageAdapter 接缝，后端可换） ──
-const demoMeta = getStorage().records("demos"); // StudioDemoEntry by id
-const demoBlobs = getStorage().blobs("demos"); // ZIP 原始字节 by id
-const retiredMatchIds = getStorage().records("analysis:retired-match-ids");
+const demoMeta = getStorage().records('demos'); // StudioDemoEntry by id
+const demoBlobs = getStorage().blobs('demos'); // ZIP 原始字节 by id
+const retiredMatchIds = getStorage().records('analysis:retired-match-ids');
 
 interface DemoIdentityIndex {
   /** Indexes are intentionally identifiers only; metadata is always read fresh. */
@@ -70,14 +80,18 @@ function normalizeEntry(entry: StudioDemoEntry): StudioDemoEntry {
     fileName: entry.fileName,
     analysisMatchId: entry.analysisMatchId,
     importedAt: entry.importedAt,
-    demoSha256: typeof entry.demoSha256 === "string" ? entry.demoSha256.toLowerCase() : null,
+    demoSha256: typeof entry.demoSha256 === 'string' ? entry.demoSha256.toLowerCase() : null,
     tags: entry.tags ?? [],
     sourceDemPath: entry.sourceDemPath ?? null,
     builtWith: entry.builtWith,
     sourceRevision: entry.sourceRevision,
     pendingCommit: entry.pendingCommit,
     sizeBytes: entry.sizeBytes,
-    meta: { ...entry.meta, serverName: entry.meta.serverName ?? null, matchDate: entry.meta.matchDate ?? null }
+    meta: {
+      ...entry.meta,
+      serverName: entry.meta.serverName ?? null,
+      matchDate: entry.meta.matchDate ?? null,
+    },
   };
 }
 
@@ -85,7 +99,10 @@ function addToIdentityIndex(index: DemoIdentityIndex, entry: StudioDemoEntry): v
   const previousDemoSha256 = index.byId.get(entry.id);
   if (previousDemoSha256) {
     const previousRows = index.byDemoSha256.get(previousDemoSha256) ?? [];
-    index.byDemoSha256.set(previousDemoSha256, previousRows.filter((row) => row !== entry.id));
+    index.byDemoSha256.set(
+      previousDemoSha256,
+      previousRows.filter((row) => row !== entry.id),
+    );
   }
   index.byId.set(entry.id, entry.demoSha256);
   if (entry.demoSha256) {
@@ -112,7 +129,8 @@ async function buildDemoIdentityIndex(): Promise<DemoIdentityIndex> {
             normalized = await withLibraryCommit([`entry:${entry.id}`], async () => {
               const current = await demoMeta.get<StudioDemoEntry>(entry.id);
               const currentBuffer = await demoBlobs.get(entry.id);
-              if (!current || !currentBuffer || await sha256Hex(currentBuffer) !== originalHash) return entry;
+              if (!current || !currentBuffer || (await sha256Hex(currentBuffer)) !== originalHash)
+                return entry;
               const latest = normalizeEntry(current);
               if (latest.demoSha256) return latest;
               const next = { ...latest, demoSha256 };
@@ -121,7 +139,9 @@ async function buildDemoIdentityIndex(): Promise<DemoIdentityIndex> {
             });
           }
         } catch (error) {
-          index.errors.push(`${entry.fileName}：${error instanceof Error ? error.message : String(error)}`);
+          index.errors.push(
+            `${entry.fileName}：${error instanceof Error ? error.message : String(error)}`,
+          );
         }
       }
     }
@@ -134,15 +154,18 @@ async function ensureDemoIdentityIndex(): Promise<DemoIdentityIndex> {
   if (identityIndex) return identityIndex;
   if (!identityIndexPromise) {
     const generation = identityIndexGeneration;
-    const pending = buildDemoIdentityIndex().then((index) => {
-      if (generation !== identityIndexGeneration) return ensureDemoIdentityIndex();
-      identityIndex = index;
-      identityIndexPromise = null;
-      return index;
-    }, (error) => {
-      if (generation === identityIndexGeneration) identityIndexPromise = null;
-      throw error;
-    });
+    const pending = buildDemoIdentityIndex().then(
+      (index) => {
+        if (generation !== identityIndexGeneration) return ensureDemoIdentityIndex();
+        identityIndex = index;
+        identityIndexPromise = null;
+        return index;
+      },
+      (error) => {
+        if (generation === identityIndexGeneration) identityIndexPromise = null;
+        throw error;
+      },
+    );
     identityIndexPromise = pending;
   }
   return identityIndexPromise;
@@ -154,17 +177,25 @@ export async function findDemoEntryBySha256(sha256: string): Promise<StudioDemoE
   if (!normalizedSha256) return null;
   const index = await ensureDemoIdentityIndex();
   const entries = await Promise.all(
-    (index.byDemoSha256.get(normalizedSha256) ?? []).map((entryId) => demoMeta.get<StudioDemoEntry>(entryId))
+    (index.byDemoSha256.get(normalizedSha256) ?? []).map((entryId) =>
+      demoMeta.get<StudioDemoEntry>(entryId),
+    ),
   );
-  return entries
-    .filter((entry): entry is StudioDemoEntry => entry != null)
-    .map(normalizeEntry)
-    .filter((entry) => entry.demoSha256 === normalizedSha256)
-    .sort((a, b) => b.importedAt - a.importedAt || a.id.localeCompare(b.id))[0] ?? null;
+  return (
+    entries
+      .filter((entry): entry is StudioDemoEntry => entry != null)
+      .map(normalizeEntry)
+      .filter((entry) => entry.demoSha256 === normalizedSha256)
+      .sort((a, b) => b.importedAt - a.importedAt || a.id.localeCompare(b.id))[0] ?? null
+  );
 }
 
 /** 维护入口使用：强制重扫历史条目并回填缺失的 raw Demo hash。 */
-export async function backfillDemoIdentities(): Promise<{ entries: StudioDemoEntry[]; backfilled: number; errors: string[] }> {
+export async function backfillDemoIdentities(): Promise<{
+  entries: StudioDemoEntry[];
+  backfilled: number;
+  errors: string[];
+}> {
   await isolateLegacyProjectionAliases();
   const before = await demoMeta.getAll<StudioDemoEntry>();
   const missingBefore = before.filter((entry) => !entry.demoSha256).length;
@@ -179,7 +210,9 @@ export async function backfillDemoIdentities(): Promise<{ entries: StudioDemoEnt
   };
 }
 
-export async function loadStoredDemoManifest(id: string): Promise<Awaited<ReturnType<typeof loadDemoManifestFromZip>> | null> {
+export async function loadStoredDemoManifest(
+  id: string,
+): Promise<Awaited<ReturnType<typeof loadDemoManifestFromZip>> | null> {
   const buffer = await demoBlobs.get(id);
   return buffer ? loadDemoManifestFromZip(buffer) : null;
 }
@@ -199,18 +232,22 @@ export async function removeDemoStorageOnly(id: string): Promise<void> {
     identityIndex.byId.delete(id);
     if (previousDemoSha256) {
       const rows = identityIndex.byDemoSha256.get(previousDemoSha256) ?? [];
-      identityIndex.byDemoSha256.set(previousDemoSha256, rows.filter((row) => row !== id));
+      identityIndex.byDemoSha256.set(
+        previousDemoSha256,
+        rows.filter((row) => row !== id),
+      );
     }
   }
 }
 
 /** 删除某条 Demo 的 facts/derived 投影；调用方负责确认 matchId 不与 survivor 共享。 */
 export async function removeDemoAnalysis(matchId: string): Promise<void> {
-  if ((await demoMeta.getAll<StudioDemoEntry>()).some(row => matchIdForEntry(row) === matchId)) return;
+  if ((await demoMeta.getAll<StudioDemoEntry>()).some((row) => matchIdForEntry(row) === matchId))
+    return;
   await settleWrites([
     getFactsStore().deleteMatchFacts(matchId),
     getDerivedCacheStore().deleteMatch(matchId),
-    deleteMatchRows(getStorage().records("facts:cohort_rows"), matchId),
+    deleteMatchRows(getStorage().records('facts:cohort_rows'), matchId),
   ]);
 }
 
@@ -224,7 +261,7 @@ async function persistAnalysis(data: MatchRecords): Promise<void> {
   await settleWrites([
     getFactsStore().putMatchFacts(data.facts),
     getDerivedCacheStore().putMatchDerived(data.derived),
-    deleteMatchRows(getStorage().records("facts:cohort_rows"), data.facts.matchId),
+    deleteMatchRows(getStorage().records('facts:cohort_rows'), data.facts.matchId),
   ]);
 }
 
@@ -237,31 +274,41 @@ async function hasPersistedFacts(entry: StudioDemoEntry): Promise<boolean> {
  * worker 不可用时（测试 node 环境 / 无 Worker）的主线程兜底：解析 + 榨 facts + 元数据。
  * 与 worker 路径输出等价（同一份 tri/callout → 同一 visibilityFor → 同一 MatchFacts）。
  */
-async function importOnMainThread(buffer: ArrayBuffer, matchId: string): Promise<ImportWorkerResult> {
+async function importOnMainThread(
+  buffer: ArrayBuffer,
+  matchId: string,
+): Promise<ImportWorkerResult> {
   const pkg = await loadDemoPackageFromZip(buffer);
   const [visibilityFor, calloutGrid] = await Promise.all([
     loadTriLookup([pkg.match.mapName]),
-    loadStudioCalloutGrid(pkg.match.mapName)
+    loadStudioCalloutGrid(pkg.match.mapName),
   ]);
   const data = buildMatchRecords(pkg, { matchId, visibilityFor, calloutGrid });
   return { meta: metaFromPackage(pkg), data };
 }
 
 async function sha256Hex(buffer: ArrayBuffer): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", buffer);
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const digest = await crypto.subtle.digest('SHA-256', buffer);
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 function unusedProjectionId(base: string, id: string, occupied: Set<string>): string {
   let candidate = `${base}~${id}`;
-  while (occupied.has(candidate)) candidate += "~";
+  while (occupied.has(candidate)) candidate += '~';
   return candidate;
 }
 
-async function importProjectionId(fileName: string, id: string, existing?: StudioDemoEntry, replacement?: StudioDemoEntry): Promise<string> {
+async function importProjectionId(
+  fileName: string,
+  id: string,
+  existing?: StudioDemoEntry,
+  replacement?: StudioDemoEntry,
+): Promise<string> {
   const base = existing ? matchIdForEntry(existing) : matchIdForEntry({ fileName });
-  const others = (await demoMeta.getAll<StudioDemoEntry>()).filter(row => row.id !== id && row.id !== replacement?.id);
-  const occupied = new Set([...others.map(matchIdForEntry), ...await retiredMatchIds.keys()]);
+  const others = (await demoMeta.getAll<StudioDemoEntry>()).filter(
+    (row) => row.id !== id && row.id !== replacement?.id,
+  );
+  const occupied = new Set([...others.map(matchIdForEntry), ...(await retiredMatchIds.keys())]);
   return occupied.has(base) ? unusedProjectionId(base, id, occupied) : base;
 }
 
@@ -273,32 +320,54 @@ async function isolateLegacyProjectionAliases(): Promise<void> {
   const records = await demoMeta.getAll<StudioDemoEntry>();
   const retired = new Set(await retiredMatchIds.keys());
   const groups = new Map<string, StudioDemoEntry[]>();
-  for (const entry of records) groups.set(matchIdForEntry(entry), [...(groups.get(matchIdForEntry(entry)) ?? []), entry]);
+  for (const entry of records)
+    groups.set(matchIdForEntry(entry), [...(groups.get(matchIdForEntry(entry)) ?? []), entry]);
   for (const [sharedId, aliases] of groups) {
     if (aliases.length < 2 && !retired.has(sharedId)) continue;
-    let keys = [`match:${sharedId}`, ...aliases.map(row => `entry:${row.id}`)];
+    let keys = [`match:${sharedId}`, ...aliases.map((row) => `entry:${row.id}`)];
     for (;;) {
-      const retry = await withImportLocks(keys, () => withLibraryCommit(keys, async () => {
-        const current = await demoMeta.getAll<StudioDemoEntry>();
-        const rows = current.filter(row => matchIdForEntry(row) === sharedId).sort((a, b) => a.id.localeCompare(b.id));
-        const previous = await retiredMatchIds.get<{ entryIds: string[] }>(sharedId);
-        if (!rows.length || (rows.length < 2 && !previous)) return null;
-        const occupied = new Set([...current.map(matchIdForEntry), ...await retiredMatchIds.keys()]);
-        const edits = rows.map(row => {
-          const analysisMatchId = unusedProjectionId(sharedId, row.id, occupied);
-          occupied.add(analysisMatchId);
-          return { ...row, analysisMatchId, builtWith: undefined };
-        });
-        const required = edits.flatMap(row => [`entry:${row.id}`, `match:${row.analysisMatchId}`]);
-        if (required.some(key => !keys.includes(key))) return required;
-        await withAnalysisQueryInvalidation(() => withImportCheckpoint(getStorage(), rows.map(row => row.id), [sharedId], async () => {
-          // A shared legacy match key cannot safely identify one ZIP.
-          // Reserve the ambiguous key rather than rebinding it later.
-          await retiredMatchIds.put(sharedId, { entryIds: [...new Set([...(previous?.entryIds ?? []), ...rows.map(row => row.id)])] });
-          for (const row of edits) await saveDemoEntry(row);
-        }));
-        return null;
-      }));
+      const retry = await withImportLocks(keys, () =>
+        withLibraryCommit(keys, async () => {
+          const current = await demoMeta.getAll<StudioDemoEntry>();
+          const rows = current
+            .filter((row) => matchIdForEntry(row) === sharedId)
+            .sort((a, b) => a.id.localeCompare(b.id));
+          const previous = await retiredMatchIds.get<{ entryIds: string[] }>(sharedId);
+          if (!rows.length || (rows.length < 2 && !previous)) return null;
+          const occupied = new Set([
+            ...current.map(matchIdForEntry),
+            ...(await retiredMatchIds.keys()),
+          ]);
+          const edits = rows.map((row) => {
+            const analysisMatchId = unusedProjectionId(sharedId, row.id, occupied);
+            occupied.add(analysisMatchId);
+            return { ...row, analysisMatchId, builtWith: undefined };
+          });
+          const required = edits.flatMap((row) => [
+            `entry:${row.id}`,
+            `match:${row.analysisMatchId}`,
+          ]);
+          if (required.some((key) => !keys.includes(key))) return required;
+          await withAnalysisQueryInvalidation(() =>
+            withImportCheckpoint(
+              getStorage(),
+              rows.map((row) => row.id),
+              [sharedId],
+              async () => {
+                // A shared legacy match key cannot safely identify one ZIP.
+                // Reserve the ambiguous key rather than rebinding it later.
+                await retiredMatchIds.put(sharedId, {
+                  entryIds: [
+                    ...new Set([...(previous?.entryIds ?? []), ...rows.map((row) => row.id)]),
+                  ],
+                });
+                for (const row of edits) await saveDemoEntry(row);
+              },
+            ),
+          );
+          return null;
+        }),
+      );
       if (!retry) break;
       keys = [...new Set([...keys, ...retry])];
     }
@@ -337,14 +406,15 @@ type WorkerReply = (
   | { id: number; ok: true; pkg: DemoPackage }
   | { id: number; ok: true; meta: DemoMeta; data: MatchRecords }
   | { id: number; ok: true; radarFields: RadarField[] }
-  | { id: number; ok: false; error: string; diagnostic?: SafeDiagnostic }) & { diagnostics?: SafeDiagnostic[] };
+  | { id: number; ok: false; error: string; diagnostic?: SafeDiagnostic }
+) & { diagnostics?: SafeDiagnostic[] };
 
 interface PoolTask {
-  op: "parse" | "import" | "radarField";
-  buffer: ArrayBuffer;          // 转移给 worker（转移后 detach）
+  op: 'parse' | 'import' | 'radarField';
+  buffer: ArrayBuffer; // 转移给 worker（转移后 detach）
   fallbackBuffer: ArrayBuffer | null; // worker 失败时回主线程用的副本；大包可禁用
-  matchId?: string;             // op === "import" | "radarField" 时必有
-  economy?: "gun" | "all";      // op === "radarField" 时用
+  matchId?: string; // op === "import" | "radarField" 时必有
+  economy?: 'gun' | 'all'; // op === "radarField" 时用
   profile?: DemoPackageLoadProfile; // op === "parse" 时选择 package load profile
   resolve: (result: PoolResult) => void;
   reject: (err: Error) => void;
@@ -362,27 +432,35 @@ const taskQueue: PoolTask[] = [];
 let workerSeq = 0;
 
 function settleWithFallback(task: PoolTask, error: unknown, taskId: number): void {
-  void withWorkerFallback(error, `worker.${task.op}`, task.fallbackBuffer, task.fallback, task.matchId ?? `worker-${taskId}`)
-    .then(task.resolve, task.reject);
+  void withWorkerFallback(
+    error,
+    `worker.${task.op}`,
+    task.fallbackBuffer,
+    task.fallback,
+    task.matchId ?? `worker-${taskId}`,
+  ).then(task.resolve, task.reject);
 }
 
 function makePoolWorker(): PoolWorker {
   const pw: PoolWorker = {
-    worker: new Worker(new URL("./pkg-worker.ts", import.meta.url), { type: "module" }),
+    worker: new Worker(new URL('./pkg-worker.ts', import.meta.url), { type: 'module' }),
     task: null,
-    taskId: 0
+    taskId: 0,
   };
   pw.worker.onmessage = (event: MessageEvent<WorkerReply>) => {
     if (!pw.task || event.data.id !== pw.taskId) return;
     const task = pw.task;
     pw.task = null;
     const reply = event.data;
-    if (Array.isArray(reply.diagnostics)) for (const diagnostic of reply.diagnostics.slice(0, 16)) {
-      void reportDiagnostic(normalizeDiagnostic(diagnostic, { fileId: task.matchId ?? `worker-${reply.id}` }));
-    }
+    if (Array.isArray(reply.diagnostics))
+      for (const diagnostic of reply.diagnostics.slice(0, 16)) {
+        void reportDiagnostic(
+          normalizeDiagnostic(diagnostic, { fileId: task.matchId ?? `worker-${reply.id}` }),
+        );
+      }
     if (reply.ok) {
-      if ("pkg" in reply) task.resolve(reply.pkg);
-      else if ("radarFields" in reply) task.resolve(reply.radarFields);
+      if ('pkg' in reply) task.resolve(reply.pkg);
+      else if ('radarFields' in reply) task.resolve(reply.radarFields);
       else task.resolve({ meta: reply.meta, data: reply.data });
     } else settleWithFallback(task, reply.diagnostic ?? new Error(reply.error), pw.taskId);
     dispatchTasks();
@@ -394,7 +472,12 @@ function makePoolWorker(): PoolWorker {
     pw.worker.terminate();
     const idx = workerPool.indexOf(pw);
     if (idx >= 0) workerPool.splice(idx, 1);
-    if (task) settleWithFallback(task, event.error ?? new Error(event.message || "Worker 执行失败"), pw.taskId);
+    if (task)
+      settleWithFallback(
+        task,
+        event.error ?? new Error(event.message || 'Worker 执行失败'),
+        pw.taskId,
+      );
     dispatchTasks();
   };
   workerPool.push(pw);
@@ -403,7 +486,7 @@ function makePoolWorker(): PoolWorker {
 
 /** `.tri` 静态资源根的绝对 URL（worker chunk 相对路径会歧义，主线程算好传过去保证一致）。 */
 function triBaseUrl(): string {
-  return new URL("./tris/", document.baseURI).href;
+  return new URL('./tris/', document.baseURI).href;
 }
 
 function dispatchTasks(): void {
@@ -423,11 +506,25 @@ function dispatchTasks(): void {
     idle.taskId = ++workerSeq;
     const id = idle.taskId;
     const message =
-      task.op === "parse"
-        ? { id, op: "parse", buffer: task.buffer, profile: task.profile ?? "full" }
-        : task.op === "radarField"
-          ? { id, op: "radarField", buffer: task.buffer, matchId: task.matchId, triBaseUrl: triBaseUrl(), economy: task.economy ?? "gun" }
-          : { id, op: "import", buffer: task.buffer, matchId: task.matchId, triBaseUrl: triBaseUrl(), calloutUrls: CALLOUT_GRID_URLS };
+      task.op === 'parse'
+        ? { id, op: 'parse', buffer: task.buffer, profile: task.profile ?? 'full' }
+        : task.op === 'radarField'
+          ? {
+              id,
+              op: 'radarField',
+              buffer: task.buffer,
+              matchId: task.matchId,
+              triBaseUrl: triBaseUrl(),
+              economy: task.economy ?? 'gun',
+            }
+          : {
+              id,
+              op: 'import',
+              buffer: task.buffer,
+              matchId: task.matchId,
+              triBaseUrl: triBaseUrl(),
+              calloutUrls: CALLOUT_GRID_URLS,
+            };
     try {
       idle.worker.postMessage(message, [task.buffer]);
     } catch (error) {
@@ -439,47 +536,59 @@ function dispatchTasks(): void {
   }
 }
 
-function parseZipInWorker(buffer: ArrayBuffer, keepFallback = true, profile: DemoPackageLoadProfile = "full"): Promise<DemoPackage> {
-  if (typeof Worker === "undefined") {
+function parseZipInWorker(
+  buffer: ArrayBuffer,
+  keepFallback = true,
+  profile: DemoPackageLoadProfile = 'full',
+): Promise<DemoPackage> {
+  if (typeof Worker === 'undefined') {
     return loadDemoPackageFromZip(buffer, { profile });
   }
   const fallbackBuffer = keepFallback ? buffer.slice(0) : null;
   return new Promise<DemoPackage>((resolve, reject) => {
     taskQueue.push({
-      op: "parse",
+      op: 'parse',
       buffer,
       fallbackBuffer,
       profile,
       resolve: resolve as (r: PoolResult) => void,
       reject,
-      fallback: (buf) => loadDemoPackageFromZip(buf, { profile })
+      fallback: (buf) => loadDemoPackageFromZip(buf, { profile }),
     });
     dispatchTasks();
   });
 }
 
 /** 在 worker 里解析 + 榨 facts；无 Worker / 无 document（测试 node）时回主线程兜底。 */
-function importInWorker(buffer: ArrayBuffer, matchId: string, keepFallback = true): Promise<ImportWorkerResult> {
-  if (typeof Worker === "undefined" || typeof document === "undefined") {
+function importInWorker(
+  buffer: ArrayBuffer,
+  matchId: string,
+  keepFallback = true,
+): Promise<ImportWorkerResult> {
+  if (typeof Worker === 'undefined' || typeof document === 'undefined') {
     return importOnMainThread(buffer, matchId);
   }
   const fallbackBuffer = keepFallback ? buffer.slice(0) : null;
   return new Promise<ImportWorkerResult>((resolve, reject) => {
     taskQueue.push({
-      op: "import",
+      op: 'import',
       buffer,
       fallbackBuffer,
       matchId,
       resolve: resolve as (r: PoolResult) => void,
       reject,
-      fallback: (buf) => importOnMainThread(buf, matchId)
+      fallback: (buf) => importOnMainThread(buf, matchId),
     });
     dispatchTasks();
   });
 }
 
 /** 主线程兜底算雷达场（无 Worker / node 测试）。 */
-async function radarFieldOnMainThread(buffer: ArrayBuffer, matchId: string, economy: "gun" | "all"): Promise<RadarField[]> {
+async function radarFieldOnMainThread(
+  buffer: ArrayBuffer,
+  matchId: string,
+  economy: 'gun' | 'all',
+): Promise<RadarField[]> {
   const pkg = await loadDemoPackageFromZip(buffer);
   const grid = buildRadarFieldGrid(getMapNav(pkg.match.mapName));
   if (!grid) return [];
@@ -491,21 +600,26 @@ async function radarFieldOnMainThread(buffer: ArrayBuffer, matchId: string, econ
  * 在 worker 池里算一场的雷达场贡献（[teamA, teamB]）；无 Worker 时回主线程。
  * 重活（逐 tick LOS 遍历）放 worker，与导入同池，共享 BVH 缓存、按池大小并发。
  */
-export function radarFieldInWorker(buffer: ArrayBuffer, matchId: string, economy: "gun" | "all", keepFallback = true): Promise<RadarField[]> {
-  if (typeof Worker === "undefined" || typeof document === "undefined") {
+export function radarFieldInWorker(
+  buffer: ArrayBuffer,
+  matchId: string,
+  economy: 'gun' | 'all',
+  keepFallback = true,
+): Promise<RadarField[]> {
+  if (typeof Worker === 'undefined' || typeof document === 'undefined') {
     return radarFieldOnMainThread(buffer, matchId, economy);
   }
   const fallbackBuffer = keepFallback ? buffer.slice(0) : null;
   return new Promise<RadarField[]>((resolve, reject) => {
     taskQueue.push({
-      op: "radarField",
+      op: 'radarField',
       buffer,
       fallbackBuffer,
       matchId,
       economy,
       resolve: resolve as (r: PoolResult) => void,
       reject,
-      fallback: (buf) => radarFieldOnMainThread(buf, matchId, economy)
+      fallback: (buf) => radarFieldOnMainThread(buf, matchId, economy),
     });
     dispatchTasks();
   });
@@ -543,15 +657,31 @@ export interface ImportDemoOptions {
  * 解析失败抛错（带文件名）。
  */
 function sameEntrySource(a: StudioDemoEntry, b: StudioDemoEntry): boolean {
-  return a.id === b.id && a.fileName === b.fileName && a.importedAt === b.importedAt &&
-    a.demoSha256 === b.demoSha256 && a.sourceRevision === b.sourceRevision && matchIdForEntry(a) === matchIdForEntry(b) &&
+  return (
+    a.id === b.id &&
+    a.fileName === b.fileName &&
+    a.importedAt === b.importedAt &&
+    a.demoSha256 === b.demoSha256 &&
+    a.sourceRevision === b.sourceRevision &&
+    matchIdForEntry(a) === matchIdForEntry(b) &&
     JSON.stringify(a.builtWith) === JSON.stringify(b.builtWith) &&
-    JSON.stringify(a.pendingCommit) === JSON.stringify(b.pendingCommit);
+    JSON.stringify(a.pendingCommit) === JSON.stringify(b.pendingCommit)
+  );
 }
 
 class ImportOwnershipChanged extends Error {}
 
-async function finishImport(entry: StudioDemoEntry, replacement: StudioDemoEntry | undefined, signal: AbortSignal | undefined, prepare: () => Promise<void>, base?: StudioDemoEntry, addedTags: string[] = [], writesSource = false, sourceDemPath: string | null = null, matchDate: string | null = null): Promise<StudioDemoEntry> {
+async function finishImport(
+  entry: StudioDemoEntry,
+  replacement: StudioDemoEntry | undefined,
+  signal: AbortSignal | undefined,
+  prepare: () => Promise<void>,
+  base?: StudioDemoEntry,
+  addedTags: string[] = [],
+  writesSource = false,
+  sourceDemPath: string | null = null,
+  matchDate: string | null = null,
+): Promise<StudioDemoEntry> {
   const matchId = matchIdForEntry(entry);
   const previousMatchId = replacement ? matchIdForEntry(replacement) : null;
   const ids = [...new Set([entry.id, ...(replacement ? [replacement.id] : [])])];
@@ -562,53 +692,96 @@ async function finishImport(entry: StudioDemoEntry, replacement: StudioDemoEntry
     // canonical source and projection while holding the cross-window commit lock.
     const rows = (await demoMeta.getAll<StudioDemoEntry>()).map(normalizeEntry);
     const owner = entry.demoSha256
-      ? rows.filter(row => row.demoSha256 === entry.demoSha256)
-        .sort((a, b) => b.importedAt - a.importedAt || a.id.localeCompare(b.id))[0]
+      ? rows
+          .filter((row) => row.demoSha256 === entry.demoSha256)
+          .sort((a, b) => b.importedAt - a.importedAt || a.id.localeCompare(b.id))[0]
       : undefined;
-    if ((owner && owner.id !== entry.id) ||
-        rows.some(row => row.id !== entry.id && row.id !== replacement?.id && matchIdForEntry(row) === matchId) ||
-        (await retiredMatchIds.get(matchId))) throw new ImportOwnershipChanged();
-    const stored = rows.find(row => row.id === entry.id);
+    if (
+      (owner && owner.id !== entry.id) ||
+      rows.some(
+        (row) =>
+          row.id !== entry.id && row.id !== replacement?.id && matchIdForEntry(row) === matchId,
+      ) ||
+      (await retiredMatchIds.get(matchId))
+    )
+      throw new ImportOwnershipChanged();
+    const stored = rows.find((row) => row.id === entry.id);
     const latest = stored ? normalizeEntry(stored) : undefined;
-    if (base && (!latest || !sameEntrySource(latest, normalizeEntry(base)))) throw new ImportOwnershipChanged();
+    if (base && (!latest || !sameEntrySource(latest, normalizeEntry(base))))
+      throw new ImportOwnershipChanged();
     if (!base && latest) throw new ImportOwnershipChanged();
     let currentReplacement: StudioDemoEntry | undefined;
     if (replacement && replacement.id !== entry.id) {
       const current = await demoMeta.get<StudioDemoEntry>(replacement.id);
-      if (!current || !sameEntrySource(normalizeEntry(current), normalizeEntry(replacement))) throw new ImportOwnershipChanged();
+      if (!current || !sameEntrySource(normalizeEntry(current), normalizeEntry(replacement)))
+        throw new ImportOwnershipChanged();
       currentReplacement = normalizeEntry(current);
     }
     const finalEntry = {
       ...entry,
-      tags: normalizeTags([...(latest && base ? latest.tags : []), ...(currentReplacement?.tags ?? []), ...addedTags]),
-      sourceDemPath: latest && base && latest.sourceDemPath !== base.sourceDemPath ? latest.sourceDemPath
-        : writesSource && currentReplacement && (sourceDemPath == null ||
-          (sourceDemPath === replacement?.sourceDemPath && currentReplacement.sourceDemPath !== replacement.sourceDemPath))
-          ? currentReplacement.sourceDemPath : entry.sourceDemPath,
-      meta: { ...entry.meta, matchDate: latest && base && latest.meta.matchDate !== base.meta.matchDate ? latest.meta.matchDate
-        : writesSource && currentReplacement && matchDate == null && base?.meta.matchDate == null ? currentReplacement.meta.matchDate : entry.meta.matchDate },
+      tags: normalizeTags([
+        ...(latest && base ? latest.tags : []),
+        ...(currentReplacement?.tags ?? []),
+        ...addedTags,
+      ]),
+      sourceDemPath:
+        latest && base && latest.sourceDemPath !== base.sourceDemPath
+          ? latest.sourceDemPath
+          : writesSource &&
+              currentReplacement &&
+              (sourceDemPath == null ||
+                (sourceDemPath === replacement?.sourceDemPath &&
+                  currentReplacement.sourceDemPath !== replacement.sourceDemPath))
+            ? currentReplacement.sourceDemPath
+            : entry.sourceDemPath,
+      meta: {
+        ...entry.meta,
+        matchDate:
+          latest && base && latest.meta.matchDate !== base.meta.matchDate
+            ? latest.meta.matchDate
+            : writesSource &&
+                currentReplacement &&
+                matchDate == null &&
+                base?.meta.matchDate == null
+              ? currentReplacement.meta.matchDate
+              : entry.meta.matchDate,
+      },
     };
-    const committedEntry = normalizeEntry({ ...finalEntry, ...(writesSource ? { sourceRevision: crypto.randomUUID() } : {}), pendingCommit: undefined });
+    const committedEntry = normalizeEntry({
+      ...finalEntry,
+      ...(writesSource ? { sourceRevision: crypto.randomUUID() } : {}),
+      pendingCommit: undefined,
+    });
     const marked: Array<{ id: string; prior: StudioDemoEntry }> = [];
     try {
-      if (writesSource) for (const id of ids) {
-        const prior = await markCommitPending(id);
-        if (prior) marked.push({ id, prior });
-      }
-      await withAnalysisQueryInvalidation(() => withImportCheckpoint(getStorage(), ids,
-        [...new Set([matchId, ...(previousMatchId ? [previousMatchId] : [])])], async () => {
-          signal?.throwIfAborted();
-          await prepare();
-          signal?.throwIfAborted();
-          await saveDemoEntry(committedEntry);
-          signal?.throwIfAborted();
-          if (replacement && replacement.id !== entry.id) {
-            const shared = (await demoMeta.getAll<StudioDemoEntry>()).some((row) => row.id !== replacement.id && matchIdForEntry(row) === previousMatchId);
-            await removeDemoStorageOnly(replacement.id);
-            if (previousMatchId && previousMatchId !== matchId && !shared) await removeDemoAnalysis(previousMatchId);
+      if (writesSource)
+        for (const id of ids) {
+          const prior = await markCommitPending(id);
+          if (prior) marked.push({ id, prior });
+        }
+      await withAnalysisQueryInvalidation(() =>
+        withImportCheckpoint(
+          getStorage(),
+          ids,
+          [...new Set([matchId, ...(previousMatchId ? [previousMatchId] : [])])],
+          async () => {
             signal?.throwIfAborted();
-          }
-        }));
+            await prepare();
+            signal?.throwIfAborted();
+            await saveDemoEntry(committedEntry);
+            signal?.throwIfAborted();
+            if (replacement && replacement.id !== entry.id) {
+              const shared = (await demoMeta.getAll<StudioDemoEntry>()).some(
+                (row) => row.id !== replacement.id && matchIdForEntry(row) === previousMatchId,
+              );
+              await removeDemoStorageOnly(replacement.id);
+              if (previousMatchId && previousMatchId !== matchId && !shared)
+                await removeDemoAnalysis(previousMatchId);
+              signal?.throwIfAborted();
+            }
+          },
+        ),
+      );
     } catch (error) {
       if (!hasRollbackFailure(error)) {
         for (const item of marked) await finishPending(item.id, item.prior, false).catch(() => {});
@@ -626,9 +799,17 @@ const pendingImports = new Map<string, Promise<void>>();
 
 async function withImportLocks<T>(keys: string[], operation: () => Promise<T>): Promise<T> {
   const uniqueKeys = [...new Set(keys)];
-  const pending = [...new Set(uniqueKeys.map((key) => pendingImports.get(key)).filter((job): job is Promise<void> => Boolean(job)))];
+  const pending = [
+    ...new Set(
+      uniqueKeys
+        .map((key) => pendingImports.get(key))
+        .filter((job): job is Promise<void> => Boolean(job)),
+    ),
+  ];
   let release!: () => void;
-  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
   for (const key of uniqueKeys) pendingImports.set(key, gate);
   try {
     await Promise.all(pending);
@@ -639,25 +820,46 @@ async function withImportLocks<T>(keys: string[], operation: () => Promise<T>): 
   }
 }
 
-export async function importDemoFile(file: File, options: ImportDemoOptions = {}): Promise<ImportResult> {
+export async function importDemoFile(
+  file: File,
+  options: ImportDemoOptions = {},
+): Promise<ImportResult> {
   const settings = options;
   settings.signal?.throwIfAborted();
   await isolateLegacyProjectionAliases();
   const buffer = await file.arrayBuffer();
   const id = await sha256Hex(buffer);
   let manifest;
-  try { manifest = await loadDemoManifestFromZip(buffer); }
-  catch (error) { throw new Error(`${file.name}: ${error instanceof Error ? error.message : String(error)}`, { cause: error }); }
+  try {
+    manifest = await loadDemoManifestFromZip(buffer);
+  } catch (error) {
+    throw new Error(`${file.name}: ${error instanceof Error ? error.message : String(error)}`, {
+      cause: error,
+    });
+  }
   const resolveKeys = async (): Promise<string[]> => {
-    const replacement = settings.replaceId ? await demoMeta.get<StudioDemoEntry>(settings.replaceId) : undefined;
-    const identityMatch = manifest.demo.hash ? await findDemoEntryBySha256(manifest.demo.hash) : null;
-    const existing = identityMatch ?? await demoMeta.get<StudioDemoEntry>(id);
-    const projectedId = await importProjectionId(existing?.fileName ?? file.name, existing?.id ?? id, existing, replacement);
-    return [`zip:${id}`, `match:${matchIdForEntry({ fileName: file.name })}`, `match:${projectedId}`,
+    const replacement = settings.replaceId
+      ? await demoMeta.get<StudioDemoEntry>(settings.replaceId)
+      : undefined;
+    const identityMatch = manifest.demo.hash
+      ? await findDemoEntryBySha256(manifest.demo.hash)
+      : null;
+    const existing = identityMatch ?? (await demoMeta.get<StudioDemoEntry>(id));
+    const projectedId = await importProjectionId(
+      existing?.fileName ?? file.name,
+      existing?.id ?? id,
+      existing,
+      replacement,
+    );
+    return [
+      `zip:${id}`,
+      `match:${matchIdForEntry({ fileName: file.name })}`,
+      `match:${projectedId}`,
       ...(manifest.demo.hash ? [`demo:${manifest.demo.hash.toLowerCase()}`] : []),
       ...(settings.replaceId ? [`entry:${settings.replaceId}`] : []),
       ...(replacement ? [`match:${matchIdForEntry(replacement)}`] : []),
-      ...(existing ? [`entry:${existing.id}`, `match:${matchIdForEntry(existing)}`] : [])];
+      ...(existing ? [`entry:${existing.id}`, `match:${matchIdForEntry(existing)}`] : []),
+    ];
   };
   let keys = await resolveKeys();
   for (;;) {
@@ -684,8 +886,22 @@ export async function importDemoFile(file: File, options: ImportDemoOptions = {}
   }
 }
 
-async function importDemoFileUnlocked(file: File, settings: ImportDemoOptions, input: ArrayBuffer, id: string, manifest: Awaited<ReturnType<typeof loadDemoManifestFromZip>>): Promise<ImportResult> {
-  const { tags = [], sourceDemPath = null, replaceId, lowMemory = false, matchDate = null, forceReanalyze = false, signal } = settings;
+async function importDemoFileUnlocked(
+  file: File,
+  settings: ImportDemoOptions,
+  input: ArrayBuffer,
+  id: string,
+  manifest: Awaited<ReturnType<typeof loadDemoManifestFromZip>>,
+): Promise<ImportResult> {
+  const {
+    tags = [],
+    sourceDemPath = null,
+    replaceId,
+    lowMemory = false,
+    matchDate = null,
+    forceReanalyze = false,
+    signal,
+  } = settings;
   signal?.throwIfAborted();
   // A low-memory worker may have transferred the input during an earlier attempt.
   let buffer = input.byteLength ? input : await file.arrayBuffer();
@@ -699,25 +915,39 @@ async function importDemoFileUnlocked(file: File, settings: ImportDemoOptions, i
   const existing = identityMatch ?? (existingById ? normalizeEntry(existingById) : undefined);
   // An identical completed replacement can be retried; a different file cannot
   // silently import after another queued replacement removed its target.
-  if (replaceId && !replacement && !existing) throw new Error("替换目标已不存在，请重新选择当前 Demo");
+  if (replaceId && !replacement && !existing)
+    throw new Error('替换目标已不存在，请重新选择当前 Demo');
 
-  const mergeDuplicateEntry = (current: StudioDemoEntry): StudioDemoEntry => normalizeEntry({
-    ...current,
-    demoSha256: current.demoSha256 ?? demoSha256,
-    tags: normalizeTags([...(current.tags ?? []), ...tags]),
-    sourceDemPath: sourceDemPath ?? current.sourceDemPath ?? null,
-    sizeBytes: current.sizeBytes ?? file.size,
-    // duplicate import only backfills an absent event-package date; it does not
-    // replace the survivor's canonical metadata with a new parse.
-    meta: current.meta.matchDate || !matchDate ? current.meta : { ...current.meta, matchDate },
-  });
+  const mergeDuplicateEntry = (current: StudioDemoEntry): StudioDemoEntry =>
+    normalizeEntry({
+      ...current,
+      demoSha256: current.demoSha256 ?? demoSha256,
+      tags: normalizeTags([...(current.tags ?? []), ...tags]),
+      sourceDemPath: sourceDemPath ?? current.sourceDemPath ?? null,
+      sizeBytes: current.sizeBytes ?? file.size,
+      // duplicate import only backfills an absent event-package date; it does not
+      // replace the survivor's canonical metadata with a new parse.
+      meta: current.meta.matchDate || !matchDate ? current.meta : { ...current.meta, matchDate },
+    });
 
   // raw Demo identity is the dedupe key. A current facts revision can be reused
   // without parsing the full package; repair/rebuild opts into forceReanalyze.
-  if (existing && !forceReanalyze && !isFactsStale(existing) && await hasPersistedFacts(existing)) {
+  if (
+    existing &&
+    !forceReanalyze &&
+    !isFactsStale(existing) &&
+    (await hasPersistedFacts(existing))
+  ) {
     const mergedEntry = mergeDuplicateEntry(existing);
     mergedEntry.tags = normalizeTags([...(replacement?.tags ?? []), ...mergedEntry.tags]);
-    const committedEntry = await finishImport(mergedEntry, replacement, signal, async () => undefined, existing, tags);
+    const committedEntry = await finishImport(
+      mergedEntry,
+      replacement,
+      signal,
+      async () => undefined,
+      existing,
+      tags,
+    );
     return {
       entry: committedEntry,
       duplicate: true,
@@ -728,9 +958,16 @@ async function importDemoFileUnlocked(file: File, settings: ImportDemoOptions, i
 
   // Select the final local projection key under import locks before extracting facts.
   // Raw identity still controls dedupe; distinct same-name ZIPs cannot share facts.
-  const matchId = await importProjectionId(existing?.fileName ?? file.name, existing?.id ?? id, existing, replacement);
-  const preservedSourceDemPath = sourceDemPath ?? existing?.sourceDemPath ?? replacement?.sourceDemPath ?? null;
-  const preservedMatchDate = matchDate ?? existing?.meta.matchDate ?? replacement?.meta.matchDate ?? null;
+  const matchId = await importProjectionId(
+    existing?.fileName ?? file.name,
+    existing?.id ?? id,
+    existing,
+    replacement,
+  );
+  const preservedSourceDemPath =
+    sourceDemPath ?? existing?.sourceDemPath ?? replacement?.sourceDemPath ?? null;
+  const preservedMatchDate =
+    matchDate ?? existing?.meta.matchDate ?? replacement?.meta.matchDate ?? null;
   let result: ImportWorkerResult;
   try {
     result = await importInWorker(lowMemory ? buffer : buffer.slice(0), matchId, !lowMemory);
@@ -758,20 +995,39 @@ async function importDemoFileUnlocked(file: File, settings: ImportDemoOptions, i
     entry.sourceDemPath = sourceDemPath ?? replacement.sourceDemPath ?? null;
   }
 
-  const committedEntry = await finishImport(entry, replacement, signal, async () => {
-    await persistAnalysis(data);
-    signal?.throwIfAborted();
-    await blobs.put(persistedId, buffer);
-  }, existing, tags, true, sourceDemPath, matchDate);
-  return { entry: committedEntry, duplicate: Boolean(existing), replaced: Boolean(replacement && replacement.id !== persistedId), replacedId: replacement?.id };
+  const committedEntry = await finishImport(
+    entry,
+    replacement,
+    signal,
+    async () => {
+      await persistAnalysis(data);
+      signal?.throwIfAborted();
+      await blobs.put(persistedId, buffer);
+    },
+    existing,
+    tags,
+    true,
+    sourceDemPath,
+    matchDate,
+  );
+  return {
+    entry: committedEntry,
+    duplicate: Boolean(existing),
+    replaced: Boolean(replacement && replacement.id !== persistedId),
+    replacedId: replacement?.id,
+  };
 }
 
 export function commitKeys(entry: StudioDemoEntry): string[] {
-  return [`entry:${entry.id}`, `match:${matchIdForEntry(entry)}`, ...(entry.demoSha256 ? [`demo:${entry.demoSha256}`] : [])];
+  return [
+    `entry:${entry.id}`,
+    `match:${matchIdForEntry(entry)}`,
+    ...(entry.demoSha256 ? [`demo:${entry.demoSha256}`] : []),
+  ];
 }
 
 function hasRollbackFailure(error: unknown): boolean {
-  if ((error as { code?: string } | null)?.code === "IMPORT_ROLLBACK_FAILED") return true;
+  if ((error as { code?: string } | null)?.code === 'IMPORT_ROLLBACK_FAILED') return true;
   return error instanceof AggregateError && error.errors.some(hasRollbackFailure);
 }
 
@@ -782,66 +1038,104 @@ async function markCommitPending(id: string): Promise<StudioDemoEntry | null> {
   const normalized = normalizeEntry(current);
   const token = crypto.randomUUID();
   try {
-    await saveDemoEntry({ ...normalized, builtWith: undefined, pendingCommit: { token, previousBuiltWith: normalized.pendingCommit?.previousBuiltWith ?? normalized.builtWith } });
+    await saveDemoEntry({
+      ...normalized,
+      builtWith: undefined,
+      pendingCommit: {
+        token,
+        previousBuiltWith: normalized.pendingCommit?.previousBuiltWith ?? normalized.builtWith,
+      },
+    });
   } catch (error) {
     // A bridge can fail after writing. The caller still holds the commit lock.
-    try { await saveDemoEntry(normalized); }
-    catch (restoreError) { throw Object.assign(new AggregateError([error, restoreError], "无法恢复提交前的比赛资料"), { code: "IMPORT_ROLLBACK_FAILED" }); }
+    try {
+      await saveDemoEntry(normalized);
+    } catch (restoreError) {
+      throw Object.assign(new AggregateError([error, restoreError], '无法恢复提交前的比赛资料'), {
+        code: 'IMPORT_ROLLBACK_FAILED',
+      });
+    }
     throw error;
   }
   return normalized;
 }
 
 /** Caller still holds the lock; preserve metadata edited before acquisition. */
-async function finishPending(id: string, prior: StudioDemoEntry, success: boolean): Promise<StudioDemoEntry | null> {
-  const storage = getStorage(); const ref = { namespace: "demos", key: id };
+async function finishPending(
+  id: string,
+  prior: StudioDemoEntry,
+  success: boolean,
+): Promise<StudioDemoEntry | null> {
+  const storage = getStorage();
+  const ref = { namespace: 'demos', key: id };
   for (let attempt = 0; attempt < 20; attempt++) {
     const [snapshot] = await storage.readRecords([ref]);
     if (!snapshot?.exists) return null;
     const latest = normalizeEntry(snapshot.value as StudioDemoEntry);
-    const next = { ...latest, builtWith: success ? currentBuiltWith() : prior.pendingCommit ? undefined : prior.builtWith, pendingCommit: success || !prior.pendingCommit ? undefined : prior.pendingCommit };
-    if (await storage.compareAndWriteRecords([snapshot], [{ ...ref, kind: "put", value: next }])) {
+    const next = {
+      ...latest,
+      builtWith: success ? currentBuiltWith() : prior.pendingCommit ? undefined : prior.builtWith,
+      pendingCommit: success || !prior.pendingCommit ? undefined : prior.pendingCommit,
+    };
+    if (await storage.compareAndWriteRecords([snapshot], [{ ...ref, kind: 'put', value: next }])) {
       if (identityIndex) addToIdentityIndex(identityIndex, next);
       return next;
     }
   }
-  throw new Error("比赛资料正在被修改，请重试。");
+  throw new Error('比赛资料正在被修改，请重试。');
 }
 
 /** Update user-owned metadata without overwriting a concurrent rebuild or edit. */
-async function updateUserMetadata(id: string, update: (entry: StudioDemoEntry) => StudioDemoEntry): Promise<void> {
+async function updateUserMetadata(
+  id: string,
+  update: (entry: StudioDemoEntry) => StudioDemoEntry,
+): Promise<void> {
   return withLibraryCommit([`entry:${id}`], async () => {
-  const storage = getStorage();
-  const ref = { namespace: "demos", key: id };
-  for (let attempt = 0; attempt < 20; attempt++) {
-    const [snapshot] = await storage.readRecords([ref]);
-    if (!snapshot?.exists) return;
-    const next = normalizeEntry(update(normalizeEntry(snapshot.value as StudioDemoEntry)));
-    if (await storage.compareAndWriteRecords([snapshot], [{ ...ref, kind: "put", value: next }])) {
-      if (identityIndex) addToIdentityIndex(identityIndex, next);
-      return;
+    const storage = getStorage();
+    const ref = { namespace: 'demos', key: id };
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const [snapshot] = await storage.readRecords([ref]);
+      if (!snapshot?.exists) return;
+      const next = normalizeEntry(update(normalizeEntry(snapshot.value as StudioDemoEntry)));
+      if (
+        await storage.compareAndWriteRecords([snapshot], [{ ...ref, kind: 'put', value: next }])
+      ) {
+        if (identityIndex) addToIdentityIndex(identityIndex, next);
+        return;
+      }
     }
-  }
-  throw new Error("比赛资料正在被修改，请重试。");
+    throw new Error('比赛资料正在被修改，请重试。');
   });
 }
 
 /** 更新某条 demo 的标签。 */
 export async function updateDemoTags(id: string, tags: string[]): Promise<void> {
-  await updateUserMetadata(id, entry => ({ ...entry, tags: normalizeTags(tags) }));
+  await updateUserMetadata(id, (entry) => ({ ...entry, tags: normalizeTags(tags) }));
 }
 
 /** 只更新本机原始 .dem 路径。 */
-export async function updateDemoSourcePath(id: string, sourceDemPath: string | null): Promise<void> {
-  await updateUserMetadata(id, entry => ({ ...entry, sourceDemPath }));
+export async function updateDemoSourcePath(
+  id: string,
+  sourceDemPath: string | null,
+): Promise<void> {
+  await updateUserMetadata(id, (entry) => ({ ...entry, sourceDemPath }));
 }
 
-export async function bulkUpdateTags(ids: string[], add: string[] = [], remove: string[] = []): Promise<void> {
+export async function bulkUpdateTags(
+  ids: string[],
+  add: string[] = [],
+  remove: string[] = [],
+): Promise<void> {
   const addSet = normalizeTags(add);
   const removeSet = new Set(normalizeTags(remove));
-  await Promise.all([...new Set(ids)].map(id => updateUserMetadata(id, entry => ({
-    ...entry, tags: normalizeTags([...entry.tags.filter(tag => !removeSet.has(tag)), ...addSet]),
-  }))));
+  await Promise.all(
+    [...new Set(ids)].map((id) =>
+      updateUserMetadata(id, (entry) => ({
+        ...entry,
+        tags: normalizeTags([...entry.tags.filter((tag) => !removeSet.has(tag)), ...addSet]),
+      })),
+    ),
+  );
 }
 
 export async function removeDemo(id: string): Promise<void> {
@@ -849,17 +1143,25 @@ export async function removeDemo(id: string): Promise<void> {
   const record = await demoMeta.get<StudioDemoEntry>(id);
   if (!record) return;
   const source = normalizeEntry(record);
-  await withImportLocks([`entry:${id}`, `match:${matchIdForEntry(source)}`], () => withLibraryCommit(commitKeys(source), async () => {
-    const current = await demoMeta.get<StudioDemoEntry>(id);
-    if (!current) return;
-    if (matchIdForEntry(current) !== matchIdForEntry(source) || current.demoSha256 !== source.demoSha256) throw new Error("比赛资料已变化，请重新删除。");
-    await markCommitPending(id);
-    await withAnalysisQueryInvalidation(async () => {
-      await removeDemoStorageOnly(id);
-      const shared = (await demoMeta.getAll<StudioDemoEntry>()).some(row => matchIdForEntry(row) === matchIdForEntry(current));
-      if (!shared) await removeDemoAnalysis(matchIdForEntry(current));
-    });
-  }));
+  await withImportLocks([`entry:${id}`, `match:${matchIdForEntry(source)}`], () =>
+    withLibraryCommit(commitKeys(source), async () => {
+      const current = await demoMeta.get<StudioDemoEntry>(id);
+      if (!current) return;
+      if (
+        matchIdForEntry(current) !== matchIdForEntry(source) ||
+        current.demoSha256 !== source.demoSha256
+      )
+        throw new Error('比赛资料已变化，请重新删除。');
+      await markCommitPending(id);
+      await withAnalysisQueryInvalidation(async () => {
+        await removeDemoStorageOnly(id);
+        const shared = (await demoMeta.getAll<StudioDemoEntry>()).some(
+          (row) => matchIdForEntry(row) === matchIdForEntry(current),
+        );
+        if (!shared) await removeDemoAnalysis(matchIdForEntry(current));
+      });
+    }),
+  );
 }
 
 /**
@@ -868,7 +1170,7 @@ export async function removeDemo(id: string): Promise<void> {
  */
 export async function removeDemos(
   ids: string[],
-  onProgress?: (done: number, total: number) => void
+  onProgress?: (done: number, total: number) => void,
 ): Promise<void> {
   const targets = [...new Set(ids)];
   for (let i = 0; i < targets.length; i += 1) {
@@ -883,27 +1185,40 @@ export async function removeDemos(
  */
 export async function rebuildFactsFromZip(id: string): Promise<StudioDemoEntry | null> {
   await isolateLegacyProjectionAliases();
-  const [original, buffer] = await Promise.all([demoMeta.get<StudioDemoEntry>(id), demoBlobs.get(id)]);
+  const [original, buffer] = await Promise.all([
+    demoMeta.get<StudioDemoEntry>(id),
+    demoBlobs.get(id),
+  ]);
   if (!original || !buffer) return null;
   const source = normalizeEntry(original);
   const matchId = matchIdForEntry(source);
   const sourceHash = await sha256Hex(buffer);
-  const sameSource = (entry: StudioDemoEntry) => entry.id === source.id &&
-    entry.fileName === source.fileName && entry.importedAt === source.importedAt &&
-    entry.demoSha256 === source.demoSha256 && entry.sourceRevision === source.sourceRevision && matchIdForEntry(entry) === matchId &&
+  const sameSource = (entry: StudioDemoEntry) =>
+    entry.id === source.id &&
+    entry.fileName === source.fileName &&
+    entry.importedAt === source.importedAt &&
+    entry.demoSha256 === source.demoSha256 &&
+    entry.sourceRevision === source.sourceRevision &&
+    matchIdForEntry(entry) === matchId &&
     JSON.stringify(entry.builtWith) === JSON.stringify(source.builtWith);
-  const changed = () => new Error("比赛资料或原始 ZIP 已变化，请重新重建。");
+  const changed = () => new Error('比赛资料或原始 ZIP 已变化，请重新重建。');
   const verifyZip = async () => {
     const current = await demoBlobs.get(id);
-    if (!current || await sha256Hex(current) !== sourceHash) throw changed();
+    if (!current || (await sha256Hex(current)) !== sourceHash) throw changed();
   };
   let data: MatchRecords;
-  try { ({ data } = await importInWorker(buffer.slice(0), matchId, false)); }
-  catch (error) { throw new Error(`${source.fileName}: ${error instanceof Error ? error.message : String(error)}`, { cause: error }); }
+  try {
+    ({ data } = await importInWorker(buffer.slice(0), matchId, false));
+  } catch (error) {
+    throw new Error(
+      `${source.fileName}: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
+    );
+  }
 
   return withImportLocks([`entry:${id}`, `match:${matchId}`, `zip:${sourceHash}`], () =>
     withLibraryCommit(commitKeys(source), async () => {
-      const ref = { namespace: "demos", key: id };
+      const ref = { namespace: 'demos', key: id };
       const storage = getStorage();
       await verifyZip();
       const initial = await demoMeta.get<StudioDemoEntry>(id);
@@ -915,35 +1230,55 @@ export async function rebuildFactsFromZip(id: string): Promise<StudioDemoEntry |
       if (!token) throw changed();
       let committed: StudioDemoEntry | null = null;
       try {
-        await withAnalysisQueryInvalidation(() => withImportCheckpoint(storage, [], [matchId], async () => {
-          await persistAnalysis(data);
-          for (let attempt = 0; attempt < 20; attempt++) {
-            await verifyZip();
-            const [snapshot] = await storage.readRecords([ref]);
-            if (!snapshot?.exists) throw changed();
-            const latest = normalizeEntry(snapshot.value as StudioDemoEntry);
-            if (latest.pendingCommit?.token !== token || latest.id !== source.id ||
-              latest.fileName !== source.fileName || latest.importedAt !== source.importedAt ||
-              latest.demoSha256 !== source.demoSha256 || latest.sourceRevision !== source.sourceRevision || matchIdForEntry(latest) !== matchId) throw changed();
-            const next = { ...latest, builtWith: currentBuiltWith(), pendingCommit: undefined };
-            if (await storage.compareAndWriteRecords([snapshot], [{ ...ref, kind: "put", value: next }])) {
-              committed = next;
-              if (identityIndex) addToIdentityIndex(identityIndex, next);
-              return;
+        await withAnalysisQueryInvalidation(() =>
+          withImportCheckpoint(storage, [], [matchId], async () => {
+            await persistAnalysis(data);
+            for (let attempt = 0; attempt < 20; attempt++) {
+              await verifyZip();
+              const [snapshot] = await storage.readRecords([ref]);
+              if (!snapshot?.exists) throw changed();
+              const latest = normalizeEntry(snapshot.value as StudioDemoEntry);
+              if (
+                latest.pendingCommit?.token !== token ||
+                latest.id !== source.id ||
+                latest.fileName !== source.fileName ||
+                latest.importedAt !== source.importedAt ||
+                latest.demoSha256 !== source.demoSha256 ||
+                latest.sourceRevision !== source.sourceRevision ||
+                matchIdForEntry(latest) !== matchId
+              )
+                throw changed();
+              const next = { ...latest, builtWith: currentBuiltWith(), pendingCommit: undefined };
+              if (
+                await storage.compareAndWriteRecords(
+                  [snapshot],
+                  [{ ...ref, kind: 'put', value: next }],
+                )
+              ) {
+                committed = next;
+                if (identityIndex) addToIdentityIndex(identityIndex, next);
+                return;
+              }
             }
-          }
-          throw new Error("比赛资料正在被修改，请重试。");
-        }));
+            throw new Error('比赛资料正在被修改，请重试。');
+          }),
+        );
       } catch (error) {
         // A failed rollback or changed source must remain stale for explicit retry.
         if (!committed && !hasRollbackFailure(error)) {
-          try { await verifyZip(); await finishPending(id, prior, false); } catch { /* leave stale */ }
+          try {
+            await verifyZip();
+            await finishPending(id, prior, false);
+          } catch {
+            /* leave stale */
+          }
         }
         throw error;
       }
       pkgCache.delete(id);
       return committed;
-    }));
+    }),
+  );
 }
 
 /** 取解析后的 DemoPackage：内存 → ZIP 重建。仅用于逐场证据/工作台，不作为聚合缓存。 */
@@ -952,17 +1287,22 @@ export function getDemoPackage(id: string): Promise<DemoPackage> {
   if (cached) return cached;
   const loading = (async () => {
     const buffer = await demoBlobs.get(id);
-    if (!buffer) throw new Error("demo 不存在或已被删除");
+    if (!buffer) throw new Error('demo 不存在或已被删除');
     return parseZipInWorker(buffer);
   })();
   pkgCache.set(id, loading);
-  loading.catch(() => { if (pkgCache.get(id) === loading) pkgCache.delete(id); });
+  loading.catch(() => {
+    if (pkgCache.get(id) === loading) pkgCache.delete(id);
+  });
   return loading;
 }
 
 /** 在线批量专用：从当前 ZIP File 或持久化 ZIP 解析一场，不进入 pkgCache，也不保留 worker 回退副本。 */
-export async function loadDemoPackageTransient(id: string, sourceFile?: File): Promise<DemoPackage> {
+export async function loadDemoPackageTransient(
+  id: string,
+  sourceFile?: File,
+): Promise<DemoPackage> {
   const buffer = sourceFile ? await sourceFile.arrayBuffer() : await demoBlobs.get(id);
-  if (!buffer) throw new Error("demo 不存在或已被删除");
-  return parseZipInWorker(buffer, false, "evidence");
+  if (!buffer) throw new Error('demo 不存在或已被删除');
+  return parseZipInWorker(buffer, false, 'evidence');
 }

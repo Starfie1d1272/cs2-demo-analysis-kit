@@ -1,15 +1,15 @@
-import { entryDate, matchIdForEntry, type StudioDemoEntry } from "./demo-entry.js";
+import { entryDate, matchIdForEntry, type StudioDemoEntry } from './demo-entry.js';
 
 /** 当前分析的用户目标；运行时状态，不是可保存的业务对象。 */
 export type AnalysisGoal =
-  | "explore"
-  | "personal-review"
-  | "player-analysis"
-  | "team-analysis"
-  | "event-analysis"
-  | "match-review"
-  | "own-review"
-  | "opponent-prep";
+  | 'explore'
+  | 'personal-review'
+  | 'player-analysis'
+  | 'team-analysis'
+  | 'event-analysis'
+  | 'match-review'
+  | 'own-review'
+  | 'opponent-prep';
 
 /** 只描述语料，绝不把 Team 混入其中。 */
 export interface AnalysisCorpus {
@@ -25,15 +25,15 @@ export interface AnalysisCorpus {
 }
 
 export type AnalysisFocus =
-  | { kind: "aggregate" }
-  | { kind: "self"; playerKey: string; label: string }
-  | { kind: "player"; playerKey: string; label: string; teamKey?: string; teamName?: string }
-  | { kind: "team"; teamName: string; teamKey?: string }
-  | { kind: "event"; eventId: string; label: string }
-  | { kind: "match"; entryId: string; label: string };
+  | { kind: 'aggregate' }
+  | { kind: 'self'; playerKey: string; label: string }
+  | { kind: 'player'; playerKey: string; label: string; teamKey?: string; teamName?: string }
+  | { kind: 'team'; teamName: string; teamKey?: string }
+  | { kind: 'event'; eventId: string; label: string }
+  | { kind: 'match'; entryId: string; label: string };
 
 export interface AnalysisRoleRef {
-  kind: "self" | "player" | "team";
+  kind: 'self' | 'player' | 'team';
   id: string;
   label: string;
 }
@@ -45,11 +45,11 @@ export interface AnalysisRoles {
 }
 
 export type AnalysisBaseline =
-  | { kind: "corpus"; label?: string }
-  | { kind: "event-peers"; eventId: string; label?: string }
-  | { kind: "personal-history"; playerKey: string; label?: string }
-  | { kind: "specified"; subject: AnalysisRoleRef; label?: string }
-  | { kind: "descriptive"; label?: string };
+  | { kind: 'corpus'; label?: string }
+  | { kind: 'event-peers'; eventId: string; label?: string }
+  | { kind: 'personal-history'; playerKey: string; label?: string }
+  | { kind: 'specified'; subject: AnalysisRoleRef; label?: string }
+  | { kind: 'descriptive'; label?: string };
 
 /** Studio 的唯一共同分析语义；不含 tab、tick、排序、持久化或导航状态。 */
 export interface AnalysisContext {
@@ -76,11 +76,11 @@ export const EMPTY_ANALYSIS_CORPUS: AnalysisCorpus = {
 };
 
 export const EMPTY_ANALYSIS_CONTEXT: AnalysisContext = {
-  goal: "explore",
+  goal: 'explore',
   corpus: EMPTY_ANALYSIS_CORPUS,
-  focus: { kind: "aggregate" },
+  focus: { kind: 'aggregate' },
   roles: {},
-  baseline: { kind: "descriptive" },
+  baseline: { kind: 'descriptive' },
 };
 
 function copyCorpus(corpus: AnalysisCorpus = EMPTY_ANALYSIS_CORPUS): AnalysisCorpus {
@@ -98,32 +98,33 @@ function copyCorpus(corpus: AnalysisCorpus = EMPTY_ANALYSIS_CORPUS): AnalysisCor
 
 /** 从入口/default setting 创建新的当前上下文；不会隐式保留旧上下文。 */
 export function createAnalysisContext(
-  input: Partial<AnalysisContext> & Pick<AnalysisContext, "goal">,
+  input: Partial<AnalysisContext> & Pick<AnalysisContext, 'goal'>,
 ): AnalysisContext {
   return {
     goal: input.goal,
     corpus: copyCorpus(input.corpus),
-    focus: input.focus ? { ...input.focus } : { kind: "aggregate" },
+    focus: input.focus ? { ...input.focus } : { kind: 'aggregate' },
     roles: {
       ...(input.roles?.beneficiary && { beneficiary: { ...input.roles.beneficiary } }),
       ...(input.roles?.opponent && { opponent: { ...input.roles.opponent } }),
       ...(input.roles?.comparison && { comparison: { ...input.roles.comparison } }),
     },
-    baseline: input.baseline?.kind === "specified"
-      ? { ...input.baseline, subject: { ...input.baseline.subject } }
-      : { ...(input.baseline ?? { kind: "descriptive" }) },
+    baseline:
+      input.baseline?.kind === 'specified'
+        ? { ...input.baseline, subject: { ...input.baseline.subject } }
+        : { ...(input.baseline ?? { kind: 'descriptive' }) },
   };
 }
 
 /** 专家直达与对象入口共用的最小默认值；缺少的 focus/role 仍由能力明确要求。 */
 export function createAnalysisContextPreset(
   goal: AnalysisGoal,
-  input: Omit<Partial<AnalysisContext>, "goal" | "baseline"> & { baseline?: AnalysisBaseline } = {},
+  input: Omit<Partial<AnalysisContext>, 'goal' | 'baseline'> & { baseline?: AnalysisBaseline } = {},
 ): AnalysisContext {
   return createAnalysisContext({
     ...input,
     goal,
-    baseline: input.baseline ?? (goal === "explore" ? { kind: "descriptive" } : { kind: "corpus" }),
+    baseline: input.baseline ?? (goal === 'explore' ? { kind: 'descriptive' } : { kind: 'corpus' }),
   });
 }
 
@@ -135,7 +136,10 @@ export function withAnalysisRoles(context: AnalysisContext, roles: AnalysisRoles
   return { ...context, roles: { ...roles } };
 }
 
-export function withAnalysisBaseline(context: AnalysisContext, baseline: AnalysisBaseline): AnalysisContext {
+export function withAnalysisBaseline(
+  context: AnalysisContext,
+  baseline: AnalysisBaseline,
+): AnalysisContext {
   return { ...context, baseline };
 }
 
@@ -160,28 +164,41 @@ export function resolveAnalysisCorpus(
   events: readonly AnalysisEventScope[] = [],
 ): StudioDemoEntry[] {
   const excluded = new Set(corpus.excludedEntryIds);
-  const eventEntryIds = corpus.eventIds.length > 0
-    ? new Set(events.filter((event) => corpus.eventIds.includes(event.id)).flatMap((event) => event.entryIds))
-    : null;
-  const entryIds = corpus.entrySelectionActive || corpus.entryIds.length > 0 ? new Set(corpus.entryIds) : null;
+  const eventEntryIds =
+    corpus.eventIds.length > 0
+      ? new Set(
+          events
+            .filter((event) => corpus.eventIds.includes(event.id))
+            .flatMap((event) => event.entryIds),
+        )
+      : null;
+  const entryIds =
+    corpus.entrySelectionActive || corpus.entryIds.length > 0 ? new Set(corpus.entryIds) : null;
   const matchIds = corpus.matchIds.length > 0 ? new Set(corpus.matchIds) : null;
 
   const range = corpus.dateRange;
-  if (range && ((range.from && !isCalendarDate(range.from)) || (range.to && !isCalendarDate(range.to)) || (range.from && range.to && range.from > range.to))) {
-    throw new RangeError("分析日期范围无效");
+  if (
+    range &&
+    ((range.from && !isCalendarDate(range.from)) ||
+      (range.to && !isCalendarDate(range.to)) ||
+      (range.from && range.to && range.from > range.to))
+  ) {
+    throw new RangeError('分析日期范围无效');
   }
-  return entries.filter((entry) =>
-    (!range || (() => {
-      const date = entryDate(entry);
-      if (!date || !isCalendarDate(date)) return range.includeUnknown;
-      return (!range.from || date >= range.from) && (!range.to || date <= range.to);
-    })()) &&
-    (!eventEntryIds || eventEntryIds.has(entry.id)) &&
-    (!entryIds || entryIds.has(entry.id)) &&
-    (!matchIds || matchIds.has(matchIdForEntry(entry))) &&
-    (corpus.maps.length === 0 || corpus.maps.includes(entry.meta.mapName)) &&
-    (corpus.tags.length === 0 || entry.tags.some((tag) => corpus.tags.includes(tag))) &&
-    !excluded.has(entry.id),
+  return entries.filter(
+    (entry) =>
+      (!range ||
+        (() => {
+          const date = entryDate(entry);
+          if (!date || !isCalendarDate(date)) return range.includeUnknown;
+          return (!range.from || date >= range.from) && (!range.to || date <= range.to);
+        })()) &&
+      (!eventEntryIds || eventEntryIds.has(entry.id)) &&
+      (!entryIds || entryIds.has(entry.id)) &&
+      (!matchIds || matchIds.has(matchIdForEntry(entry))) &&
+      (corpus.maps.length === 0 || corpus.maps.includes(entry.meta.mapName)) &&
+      (corpus.tags.length === 0 || entry.tags.some((tag) => corpus.tags.includes(tag))) &&
+      !excluded.has(entry.id),
   );
 }
 
@@ -193,52 +210,59 @@ export function filterCorpusEntriesByTeam(
 ): StudioDemoEntry[] {
   const normalized = teamName.trim().toLowerCase();
   const display = (name: string) => (teamRenames[name] ?? name).trim().toLowerCase();
-  return entries.filter((entry) => display(entry.meta.teamAName) === normalized || display(entry.meta.teamBName) === normalized);
+  return entries.filter(
+    (entry) =>
+      display(entry.meta.teamAName) === normalized || display(entry.meta.teamBName) === normalized,
+  );
 }
 
-export type AnalysisCapability = "player" | "team" | "event" | "match" | "coach";
+export type AnalysisCapability = 'player' | 'team' | 'event' | 'match' | 'coach';
 
 /** 当前能力缺少的必要坐标；局部筛选不应进入此判断。 */
-export function missingAnalysisCoordinates(context: AnalysisContext, capability: AnalysisCapability): string[] {
-  if (capability === "player") {
-    return context.focus.kind === "self" || context.focus.kind === "player" ? [] : ["分析选手"];
+export function missingAnalysisCoordinates(
+  context: AnalysisContext,
+  capability: AnalysisCapability,
+): string[] {
+  if (capability === 'player') {
+    return context.focus.kind === 'self' || context.focus.kind === 'player' ? [] : ['分析选手'];
   }
-  if (capability === "team") return context.focus.kind === "team" ? [] : ["分析队伍"];
-  if (capability === "event") return context.focus.kind === "event" ? [] : ["赛事"];
-  if (capability === "match") return context.focus.kind === "match" ? [] : ["比赛"];
-  if (context.goal === "opponent-prep") {
-    return [context.roles.beneficiary ? null : "我方", context.roles.opponent ? null : "对手"].filter(
-      (value): value is string => value != null,
-    );
+  if (capability === 'team') return context.focus.kind === 'team' ? [] : ['分析队伍'];
+  if (capability === 'event') return context.focus.kind === 'event' ? [] : ['赛事'];
+  if (capability === 'match') return context.focus.kind === 'match' ? [] : ['比赛'];
+  if (context.goal === 'opponent-prep') {
+    return [
+      context.roles.beneficiary ? null : '我方',
+      context.roles.opponent ? null : '对手',
+    ].filter((value): value is string => value != null);
   }
-  if (context.goal === "own-review") return context.roles.beneficiary ? [] : ["我方"];
+  if (context.goal === 'own-review') return context.roles.beneficiary ? [] : ['我方'];
   return [];
 }
 
 function focusLabel(focus: AnalysisFocus): string {
-  if (focus.kind === "aggregate") return "整体范围";
-  if (focus.kind === "team") return focus.teamName;
+  if (focus.kind === 'aggregate') return '整体范围';
+  if (focus.kind === 'team') return focus.teamName;
   return focus.label;
 }
 
 function baselineLabel(baseline: AnalysisBaseline): string {
   if (baseline.label) return baseline.label;
-  if (baseline.kind === "corpus") return "当前样本";
-  if (baseline.kind === "event-peers") return "赛事整体";
-  if (baseline.kind === "personal-history") return "个人历史";
-  if (baseline.kind === "specified") return baseline.subject.label;
-  return "仅描述";
+  if (baseline.kind === 'corpus') return '当前样本';
+  if (baseline.kind === 'event-peers') return '赛事整体';
+  if (baseline.kind === 'personal-history') return '个人历史';
+  if (baseline.kind === 'specified') return baseline.subject.label;
+  return '仅描述';
 }
 
 const GOAL_LABEL: Record<AnalysisGoal, string> = {
-  explore: "自由探索",
-  "personal-review": "个人复盘",
-  "player-analysis": "选手分析",
-  "team-analysis": "队伍分析",
-  "event-analysis": "赛事分析",
-  "match-review": "单场复盘",
-  "own-review": "己方复盘",
-  "opponent-prep": "对手备战",
+  explore: '自由探索',
+  'personal-review': '个人复盘',
+  'player-analysis': '选手分析',
+  'team-analysis': '队伍分析',
+  'event-analysis': '赛事分析',
+  'match-review': '单场复盘',
+  'own-review': '己方复盘',
+  'opponent-prep': '对手备战',
 };
 
 export interface AnalysisContextSummaryParts {
@@ -256,12 +280,15 @@ export function summarizeAnalysisContextParts(
   events: readonly AnalysisEventScope[] = [],
 ): AnalysisContextSummaryParts {
   const corpus = resolveAnalysisCorpus(entries, context.corpus, events);
-  const eventName = context.corpus.eventIds.length === 1
-    ? events.find((event) => event.id === context.corpus.eventIds[0])?.name
-    : undefined;
+  const eventName =
+    context.corpus.eventIds.length === 1
+      ? events.find((event) => event.id === context.corpus.eventIds[0])?.name
+      : undefined;
   const range = context.corpus.dateRange;
-  const dateLabel = range ? `${range.from ?? "不限"} 至 ${range.to ?? "不限"}${range.includeUnknown ? "（含未知日期）" : ""}` : null;
-  const corpusLabel = [eventName, dateLabel, `${corpus.length} 场`].filter(Boolean).join(" · ");
+  const dateLabel = range
+    ? `${range.from ?? '不限'} 至 ${range.to ?? '不限'}${range.includeUnknown ? '（含未知日期）' : ''}`
+    : null;
+  const corpusLabel = [eventName, dateLabel, `${corpus.length} 场`].filter(Boolean).join(' · ');
   const roleParts = [
     context.roles.beneficiary ? `我方：${context.roles.beneficiary.label}` : null,
     context.roles.opponent ? `对手：${context.roles.opponent.label}` : null,
@@ -270,7 +297,7 @@ export function summarizeAnalysisContextParts(
   return {
     corpus: corpusLabel,
     focus: focusLabel(context.focus),
-    roles: roleParts.length > 0 ? roleParts.join(" · ") : null,
+    roles: roleParts.length > 0 ? roleParts.join(' · ') : null,
     baseline: baselineLabel(context.baseline),
     goal: GOAL_LABEL[context.goal],
   };
@@ -283,5 +310,5 @@ export function summarizeAnalysisContext(
   events: readonly AnalysisEventScope[] = [],
 ): string {
   const summary = summarizeAnalysisContextParts(context, entries, events);
-  return [summary.focus, summary.corpus].filter(Boolean).join(" · ");
+  return [summary.focus, summary.corpus].filter(Boolean).join(' · ');
 }

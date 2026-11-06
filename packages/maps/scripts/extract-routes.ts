@@ -13,10 +13,10 @@
  *
  * 把输出里的候选链人工确认后写进 packages/map-assets/map-routes/<map>.json。
  */
-import { readFile, readdir } from "node:fs/promises";
-import { extname, join } from "node:path";
-import { loadDemoPackageFromZip } from "../../demo-io/src/index.ts";
-import { decodeDelta } from "../../contract/src/index.ts";
+import { readFile, readdir } from 'node:fs/promises';
+import { extname, join } from 'node:path';
+import { loadDemoPackageFromZip } from '../../demo-io/src/index.ts';
+import { decodeDelta } from '../../contract/src/index.ts';
 
 interface Sample {
   round: number;
@@ -29,7 +29,7 @@ interface Sample {
 }
 
 async function loadSamples(zipDir: string): Promise<Sample[]> {
-  const names = (await readdir(zipDir)).filter((n) => extname(n).toLowerCase() === ".zip");
+  const names = (await readdir(zipDir)).filter((n) => extname(n).toLowerCase() === '.zip');
   if (names.length === 0) throw new Error(`No .zip in ${zipDir}`);
   const out: Sample[] = [];
   let roundBase = 0;
@@ -49,7 +49,7 @@ async function loadSamples(zipDir: string): Promise<Sample[]> {
       for (const track of replayRound.players) {
         const player = pkg.players[track.playerIndex];
         if (!player) continue;
-        const side = player.teamKey === "teamA" ? round.teamASide : round.teamBSide;
+        const side = player.teamKey === 'teamA' ? round.teamASide : round.teamBSide;
         const xs = decodeDelta(track.x);
         const ys = decodeDelta(track.y);
         for (let i = 0; i < xs.length; i += 1) {
@@ -81,12 +81,17 @@ function main(samples: Sample[], windowSec: number, tickrate = 64): void {
   }
 
   // 1) callout 词表
-  interface Agg { n: number; t: number; sx: number; sy: number }
+  interface Agg {
+    n: number;
+    t: number;
+    sx: number;
+    sy: number;
+  }
   const agg = new Map<string, Agg>();
   for (const s of samples) {
     const a = agg.get(s.place) ?? { n: 0, t: 0, sx: 0, sy: 0 };
     a.n++;
-    if (s.side === "t") a.t++;
+    if (s.side === 't') a.t++;
     a.sx += s.x;
     a.sy += s.y;
     agg.set(s.place, a);
@@ -106,7 +111,7 @@ function main(samples: Sample[], windowSec: number, tickrate = 64): void {
   const cutoff = windowSec * tickrate;
   const byPlayer = new Map<string, Sample[]>();
   for (const s of samples) {
-    if (s.side !== "t") continue;
+    if (s.side !== 't') continue;
     if (s.tick - (minTick.get(s.round) ?? 0) > cutoff) continue;
     const key = `${s.round}:${s.steamId64}`;
     (byPlayer.get(key) ?? byPlayer.set(key, []).get(key)!).push(s);
@@ -132,15 +137,15 @@ function main(samples: Sample[], windowSec: number, tickrate = 64): void {
   }
 
   // 3) 候选动线（贪心）
-  console.log("\n# 候选动线\n");
-  const starts = [...(next.get("TSpawn")?.keys() ?? [])]
-    .sort((a, b) => (next.get("TSpawn")!.get(b) ?? 0) - (next.get("TSpawn")!.get(a) ?? 0))
+  console.log('\n# 候选动线\n');
+  const starts = [...(next.get('TSpawn')?.keys() ?? [])]
+    .sort((a, b) => (next.get('TSpawn')!.get(b) ?? 0) - (next.get('TSpawn')!.get(a) ?? 0))
     .slice(0, 5);
   for (const first of starts) {
-    const chain = ["TSpawn", first];
+    const chain = ['TSpawn', first];
     const seen = new Set(chain);
     let cur = first;
-    while (!cur.startsWith("Bombsite") && chain.length < 8) {
+    while (!cur.startsWith('Bombsite') && chain.length < 8) {
       const m = next.get(cur);
       if (!m) break;
       const nxt = [...m].sort((a, b) => b[1] - a[1]).find(([p]) => !seen.has(p));
@@ -149,27 +154,27 @@ function main(samples: Sample[], windowSec: number, tickrate = 64): void {
       seen.add(nxt[0]);
       cur = nxt[0];
     }
-    console.log(`  TSpawn → ${chain.slice(1).join(" → ")}`);
+    console.log(`  TSpawn → ${chain.slice(1).join(' → ')}`);
   }
 
   // 4) 参考：Bombsite 的前驱（哪些 callout 直接连到包点）
-  console.log("\n# 包点入度\n");
-  for (const site of ["BombsiteA", "BombsiteB"]) {
+  console.log('\n# 包点入度\n');
+  for (const site of ['BombsiteA', 'BombsiteB']) {
     const incoming = [...trans].filter(([k]) => k.endsWith(`→${site}`)).sort((a, b) => b[1] - a[1]);
     if (incoming.length === 0) continue;
     console.log(`  ${site} ←`);
     for (const [k, c] of incoming.slice(0, 5)) {
-      const src = k.split("→")[0];
+      const src = k.split('→')[0];
       console.log(`    ${src} ×${c}`);
     }
   }
 }
 
 const zipDir = process.argv[2];
-const winFlag = process.argv.indexOf("--window");
+const winFlag = process.argv.indexOf('--window');
 const windowSec = winFlag > 0 ? Number(process.argv[winFlag + 1]) : 45;
 if (!zipDir) {
-  console.error("usage: tsx extract-routes.ts <zip-dir> [--window 45]");
+  console.error('usage: tsx extract-routes.ts <zip-dir> [--window 45]');
   process.exit(1);
 }
 main(await loadSamples(zipDir), windowSec);

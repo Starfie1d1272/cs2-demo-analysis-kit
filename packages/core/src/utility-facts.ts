@@ -1,9 +1,9 @@
-import type { DemoPackage } from "@cs2dak/contract";
+import type { DemoPackage } from '@cs2dak/contract';
 import {
   buildPlayerRoundPerformanceFacts,
   type PlayerRoundPerformanceUtilityFact,
   type PlayerRoundPerformanceFacts,
-} from "./performance-facts.js";
+} from './performance-facts.js';
 
 /**
  * Backwards-compatible utility projection. Utility attribution is performed
@@ -15,7 +15,9 @@ export type PlayerRoundUtilityFact = PlayerRoundPerformanceUtilityFact & {
   steamId64: string;
 };
 
-export function toPlayerRoundUtilityFacts(performanceFacts: PlayerRoundPerformanceFacts): PlayerRoundUtilityFact[] {
+export function toPlayerRoundUtilityFacts(
+  performanceFacts: PlayerRoundPerformanceFacts,
+): PlayerRoundUtilityFact[] {
   return performanceFacts.playerRounds.map((row) => ({
     roundNumber: row.roundNumber,
     steamId64: row.steamId64,

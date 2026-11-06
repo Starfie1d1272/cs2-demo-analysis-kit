@@ -1,7 +1,7 @@
-import { z } from "zod";
-import { teamKeySchema } from "./primitives.js";
-import { accountContextAvailabilitySchema } from "./summary.js";
-import { leaderboardMetricKeySchema } from "./leaderboard.js";
+import { z } from 'zod';
+import { teamKeySchema } from './primitives.js';
+import { accountContextAvailabilitySchema } from './summary.js';
+import { leaderboardMetricKeySchema } from './leaderboard.js';
 
 /**
  * 选手赛季档案。由 @cs2dak/presentation 从 SeasonCohortBundle 中单个选手派生。
@@ -11,9 +11,9 @@ import { leaderboardMetricKeySchema } from "./leaderboard.js";
  */
 
 export const rrBreakdownEntrySchema = z.object({
-  key: z.enum(["combat", "trade", "mapControl", "clutch", "objective", "utility"]),
+  key: z.enum(['combat', 'trade', 'mapControl', 'clutch', 'objective', 'utility']),
   label: z.string(),
-  value: z.number()
+  value: z.number(),
 });
 
 /** PRISM 单根轴的展示项：行为倾向与执行效率分离，避免把角色、频率和效果混成一个分数。 */
@@ -30,7 +30,7 @@ export const playerStyleAxisSchema = z.object({
   signalCoverage: z.number().min(0).max(1),
   /** 可供当前 cohort 排名的有效选手数；不足 5 人时不展示精确 P 值。 */
   comparisonCount: z.number().int().nonnegative(),
-  status: z.enum(["ready", "partial", "unavailable", "insufficient"])
+  status: z.enum(['ready', 'partial', 'unavailable', 'insufficient']),
 });
 
 export const playerStyleSchema = z.object({
@@ -38,13 +38,13 @@ export const playerStyleSchema = z.object({
   /** 整体着色依据：RR 百分位（0–100）。 */
   rrPercentile: z.number().min(0).max(100),
   /** 八根轴，按 PRISM_AXIS_ORDER 排序。 */
-  axes: z.array(playerStyleAxisSchema)
+  axes: z.array(playerStyleAxisSchema),
 });
 
 export const playerSeasonTrendPointSchema = z.object({
   matchId: z.string(),
   rivalhubRR: z.number().nonnegative(),
-  hltvRating: z.number().nonnegative()
+  hltvRating: z.number().nonnegative(),
 });
 
 export const playerWeaponProfileEntrySchema = z.object({
@@ -57,12 +57,12 @@ export const playerWeaponProfileEntrySchema = z.object({
   noScopePercent: z.number().min(0).max(100).nullable(),
   throughSmokePercent: z.number().min(0).max(100).nullable(),
   wallbangPercent: z.number().min(0).max(100).nullable(),
-  averagePenetratedObjects: z.number().nonnegative().nullable()
+  averagePenetratedObjects: z.number().nonnegative().nullable(),
 });
 
 export const playerSeasonProfileSchema = z.object({
   /** 0.2：PRISM 轴拆分为行为倾向、执行效率，并附带信号/样本可用性。 */
-  version: z.literal("cs2-demo-analysis-kit/player-profile-0.2"),
+  version: z.literal('cs2-demo-analysis-kit/player-profile-0.2'),
   weightsVersion: z.string(),
   playerKey: z.string(),
   name: z.string(),
@@ -73,14 +73,14 @@ export const playerSeasonProfileSchema = z.object({
   confidence: z.number().min(0).max(1),
   accountContextStatus: z.object({
     buyDelta: accountContextAvailabilitySchema,
-    manState: accountContextAvailabilitySchema
+    manState: accountContextAvailabilitySchema,
   }),
   rating: z.object({
     rivalhubRR: z.number().nonnegative(),
     rivalhubRRRaw: z.number(),
     hltvRating: z.number().nonnegative(),
     hltvPercentile: z.number().min(0).max(100),
-    breakdown: z.array(rrBreakdownEntrySchema)
+    breakdown: z.array(rrBreakdownEntrySchema),
   }),
   /** 与排行榜同口径的展示指标（共享 SEASON_STAT_VIEWS 渲染列）。 */
   metrics: z.partialRecord(leaderboardMetricKeySchema, z.number().nullable()),
@@ -89,14 +89,14 @@ export const playerSeasonProfileSchema = z.object({
     wallbangKills: z.number().int().nonnegative().nullable(),
     noScopeKills: z.number().int().nonnegative().nullable(),
     throughSmokeKills: z.number().int().nonnegative().nullable(),
-    collateralKills: z.number().int().nonnegative().nullable()
+    collateralKills: z.number().int().nonnegative().nullable(),
   }),
   style: playerStyleSchema.nullable(),
   /** 每场 RR 趋势，按 matchId 升序。 */
   perMatch: z.array(playerSeasonTrendPointSchema),
   /** 相对赛季 cohort 的强项 / 弱项（按技能类指标的 cohort 百分位派生）。 */
   strengths: z.array(z.string()),
-  weaknesses: z.array(z.string())
+  weaknesses: z.array(z.string()),
 });
 
 export type RRBreakdownEntry = z.infer<typeof rrBreakdownEntrySchema>;

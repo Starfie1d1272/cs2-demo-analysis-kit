@@ -1,5 +1,5 @@
-import { fileFromNativePath, pickDemPaths } from "./dem";
-import type { RivalHubImportContext } from "./rivalhub-import";
+import { fileFromNativePath, pickDemPaths } from './dem';
+import type { RivalHubImportContext } from './rivalhub-import';
 
 /**
  * Adapter only: reuse the existing native pick_dems() path and hand path-backed

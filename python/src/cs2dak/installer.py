@@ -35,7 +35,9 @@ if getattr(sys, "frozen", False) and _config.is_file():
     MANIFEST_URL_VERSIONED = f"https://github.com/Starfie1d1272/cs2-demo-analysis-kit/releases/download/{_tag}/install-manifest.json"
     MANIFEST_URL_GITHUB_VERSIONED = MANIFEST_URL_VERSIONED
 else:
-    MANIFEST_URL_VERSIONED = f"https://dakupdate.starfie1d.top/releases/v{INSTALLER_VERSION}/install-manifest.json"
+    MANIFEST_URL_VERSIONED = (
+        f"https://dakupdate.starfie1d.top/releases/v{INSTALLER_VERSION}/install-manifest.json"
+    )
     MANIFEST_URL_GITHUB_VERSIONED = f"https://github.com/Starfie1d1272/cs2-demo-analysis-kit/releases/download/v{INSTALLER_VERSION}/install-manifest.json"
 
 USER_AGENT = f"DAK-Studio-Installer/{INSTALLER_VERSION}"
@@ -55,9 +57,14 @@ def fmt_mb(n: int) -> str:
     return f"{n / 1024 / 1024:.0f} MB"
 
 
-def download_with_progress(url: str, dest: str, expected_sha256: str | None = None,
-                          expected_size: int | None = None,
-                          on_progress=None, should_cancel=None) -> None:
+def download_with_progress(
+    url: str,
+    dest: str,
+    expected_sha256: str | None = None,
+    expected_size: int | None = None,
+    on_progress=None,
+    should_cancel=None,
+) -> None:
     """单文件下载；镜像 fallback 由调用方遍历 urls[]。"""
     check_cancel(should_cancel)
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
@@ -80,6 +87,7 @@ def download_with_progress(url: str, dest: str, expected_sha256: str | None = No
             # sha256 校验
             if expected_sha256:
                 import hashlib
+
                 actual = hashlib.sha256()
                 with open(part, "rb") as f:
                     while True:
@@ -137,9 +145,17 @@ class SimpleInstaller:
         # 头
         header = ttk.Frame(self.root, style="Panel.TFrame")
         header.pack(fill="x", padx=28, pady=(24, 12))
-        ttk.Label(header, text="DAK Studio", style="Title.TLabel").pack(anchor="w", padx=18, pady=(16, 2))
-        ttk.Label(header, text="本地 demo 工作台安装器", style="Subtitle.TLabel").pack(anchor="w", padx=18)
-        ttk.Label(header, text=f"安装器 v{INSTALLER_VERSION} · 从官方镜像下载运行时、赛事包和地图数据", style="Muted.TLabel").pack(anchor="w", padx=18, pady=(8, 16))
+        ttk.Label(header, text="DAK Studio", style="Title.TLabel").pack(
+            anchor="w", padx=18, pady=(16, 2)
+        )
+        ttk.Label(header, text="本地 demo 工作台安装器", style="Subtitle.TLabel").pack(
+            anchor="w", padx=18
+        )
+        ttk.Label(
+            header,
+            text=f"安装器 v{INSTALLER_VERSION} · 从官方镜像下载运行时、赛事包和地图数据",
+            style="Muted.TLabel",
+        ).pack(anchor="w", padx=18, pady=(8, 16))
 
         # 目录选择
         dir_frame = ttk.Frame(self.root, style="App.TFrame")
@@ -147,7 +163,9 @@ class SimpleInstaller:
         ttk.Label(dir_frame, text="安装目录", style="Label.TLabel").pack(anchor="w")
         path_row = ttk.Frame(dir_frame, style="App.TFrame")
         path_row.pack(fill="x", pady=(6, 0))
-        ttk.Entry(path_row, textvariable=self.install_dir, width=54).pack(side="left", fill="x", expand=True, padx=(0, 8))
+        ttk.Entry(path_row, textvariable=self.install_dir, width=54).pack(
+            side="left", fill="x", expand=True, padx=(0, 8)
+        )
         ttk.Button(path_row, text="浏览…", command=self._pick_dir).pack(side="left")
 
         # 状态/进度区域
@@ -157,10 +175,20 @@ class SimpleInstaller:
 
         status_frame = ttk.Frame(self.root, style="Panel.TFrame")
         status_frame.pack(fill="x", padx=28, pady=(14, 8))
-        ttk.Label(status_frame, textvariable=self.status_var, style="Status.TLabel", wraplength=560, justify="left").pack(anchor="w", padx=18, pady=(16, 8))
-        self.progress_bar = ttk.Progressbar(status_frame, variable=self.progress_var, maximum=100, length=560)
+        ttk.Label(
+            status_frame,
+            textvariable=self.status_var,
+            style="Status.TLabel",
+            wraplength=560,
+            justify="left",
+        ).pack(anchor="w", padx=18, pady=(16, 8))
+        self.progress_bar = ttk.Progressbar(
+            status_frame, variable=self.progress_var, maximum=100, length=560
+        )
         self.progress_bar.pack(fill="x", padx=18)
-        ttk.Label(status_frame, textvariable=self.detail_var, style="Muted.TLabel", wraplength=560).pack(anchor="w", padx=18, pady=(8, 16))
+        ttk.Label(
+            status_frame, textvariable=self.detail_var, style="Muted.TLabel", wraplength=560
+        ).pack(anchor="w", padx=18, pady=(8, 16))
 
         # 按钮
         btn_frame = ttk.Frame(self.root, style="App.TFrame")
@@ -169,7 +197,9 @@ class SimpleInstaller:
         self.start_btn.pack(side="left", padx=(0, 8))
         self.cancel_btn = ttk.Button(btn_frame, text="取消", command=self._cancel, state="disabled")
         self.cancel_btn.pack(side="left", padx=8)
-        self.launch_btn = ttk.Button(btn_frame, text="启动 DAK Studio", command=self._launch, state="disabled")
+        self.launch_btn = ttk.Button(
+            btn_frame, text="启动 DAK Studio", command=self._launch, state="disabled"
+        )
         self.launch_btn.pack(side="right")
 
         # 默认安装目录
@@ -199,7 +229,14 @@ class SimpleInstaller:
         style.configure("Label.TLabel", background=bg, foreground=text, font=("", 10, "bold"))
         style.configure("Status.TLabel", background=panel, foreground=text)
         style.configure("TButton", padding=(12, 6))
-        style.configure("Horizontal.TProgressbar", troughcolor="#0b1118", background=accent, bordercolor="#0b1118", lightcolor=accent, darkcolor=accent)
+        style.configure(
+            "Horizontal.TProgressbar",
+            troughcolor="#0b1118",
+            background=accent,
+            bordercolor="#0b1118",
+            lightcolor=accent,
+            darkcolor=accent,
+        )
 
     def _pick_dir(self):
         path = tkinter.filedialog.askdirectory(title="选择 DAK Studio 安装目录")
@@ -246,7 +283,11 @@ class SimpleInstaller:
             app_version = manifest.get("appVersion", INSTALLER_VERSION)
             events = manifest.get("bundledEvents", [])
             tris = manifest.get("requiredTris", {})
-            total_size = runtime["size"] + sum(e["size"] for e in events) + sum(t["size"] for t in tris.values())
+            total_size = (
+                runtime["size"]
+                + sum(e["size"] for e in events)
+                + sum(t["size"] for t in tris.values())
+            )
 
             # Show summary
             summary = (
@@ -259,7 +300,9 @@ class SimpleInstaller:
             )
             self.root.after(0, lambda: self.status_var.set(f"准备下载：\n{summary}"))
 
-            if not tkinter.messagebox.askyesno("确认安装", f"将从网络下载以下内容到 {install_dir}：\n\n{summary}\n\n继续？"):
+            if not tkinter.messagebox.askyesno(
+                "确认安装", f"将从网络下载以下内容到 {install_dir}：\n\n{summary}\n\n继续？"
+            ):
                 self._update("已取消", 0)
                 self.root.after(0, lambda: self._set_ui_state(installing=False, done=False))
                 return
@@ -268,7 +311,9 @@ class SimpleInstaller:
 
             # 2. Download runtime
             self._update("下载运行时…", 10)
-            staging_dir = tempfile.mkdtemp(prefix=".dak-installer-", dir=str(Path(install_dir).parent))
+            staging_dir = tempfile.mkdtemp(
+                prefix=".dak-installer-", dir=str(Path(install_dir).parent)
+            )
             runtime_dest = os.path.join(staging_dir, runtime["name"])
             self._download_asset(runtime, runtime_dest, "运行时")
 
@@ -289,7 +334,10 @@ class SimpleInstaller:
             os.makedirs(bundled_dir, exist_ok=True)
             for idx, evt in enumerate(events):
                 check_cancel(lambda: self.cancelled)
-                self._update(f"下载赛事包 {idx + 1}/{len(events)}：{evt['slug']}…", 55 + int(20 * idx / max(len(events), 1)))
+                self._update(
+                    f"下载赛事包 {idx + 1}/{len(events)}：{evt['slug']}…",
+                    55 + int(20 * idx / max(len(events), 1)),
+                )
                 dest = os.path.join(bundled_dir, f"{evt['slug']}.zip")
                 self._download_asset(evt, dest, evt["slug"])
 
@@ -298,10 +346,16 @@ class SimpleInstaller:
             events_manifest = {
                 "version": "cs2-demo-analysis-kit/events-manifest-1.0",
                 "events": [
-                    {"slug": e["slug"], "name": e.get("name", e["slug"]), "size": e["size"],
-                     "sha256": e["sha256"], "urls": e["urls"], "packageVersion": "cs2-demo-analysis-kit/event-package-1.0"}
+                    {
+                        "slug": e["slug"],
+                        "name": e.get("name", e["slug"]),
+                        "size": e["size"],
+                        "sha256": e["sha256"],
+                        "urls": e["urls"],
+                        "packageVersion": "cs2-demo-analysis-kit/event-package-1.0",
+                    }
                     for e in events
-                ]
+                ],
             }
             with open(os.path.join(bundled_dir, "manifest.json"), "w", encoding="utf-8") as f:
                 json.dump(events_manifest, f, ensure_ascii=False, indent=2)
@@ -312,7 +366,10 @@ class SimpleInstaller:
             tri_count = len(tris)
             for idx, (map_name, entry) in enumerate(tris.items()):
                 check_cancel(lambda: self.cancelled)
-                self._update(f"下载地图数据 {idx + 1}/{tri_count}：{map_name}…", 75 + int(20 * idx / max(tri_count, 1)))
+                self._update(
+                    f"下载地图数据 {idx + 1}/{tri_count}：{map_name}…",
+                    75 + int(20 * idx / max(tri_count, 1)),
+                )
                 dest = os.path.join(tris_dir, entry.get("name", f"{map_name}.tri"))
                 self._download_asset(entry, dest, map_name)
 
@@ -328,18 +385,27 @@ class SimpleInstaller:
             # 7. Create shortcuts (Windows only) — use resolved app_root exe
             if sys.platform == "win32" and self._launch_exe:
                 self._update("创建快捷方式…", 97)
-                start_menu = os.path.join(os.environ.get("APPDATA", ""), "Microsoft", "Windows", "Start Menu", "Programs")
+                start_menu = os.path.join(
+                    os.environ.get("APPDATA", ""), "Microsoft", "Windows", "Start Menu", "Programs"
+                )
                 shortcut_dir = os.path.join(start_menu, "DAK Studio")
                 os.makedirs(shortcut_dir, exist_ok=True)
-                create_shortcut(self._launch_exe, os.path.join(shortcut_dir, "DAK Studio.lnk"), "DAK Studio 战术分析工作台")
+                create_shortcut(
+                    self._launch_exe,
+                    os.path.join(shortcut_dir, "DAK Studio.lnk"),
+                    "DAK Studio 战术分析工作台",
+                )
 
             # Done
             self._update("安装完成！", 100)
             self.root.after(0, lambda: self._set_ui_state(installing=False, done=True))
 
         except InstallCancelled:
-            message = ("安装已中断；安装目录可能保留已写入文件，未回滚。可重新运行安装器补齐资源。"
-                       if destination_started else "已取消安装，可重新开始")
+            message = (
+                "安装已中断；安装目录可能保留已写入文件，未回滚。可重新运行安装器补齐资源。"
+                if destination_started
+                else "已取消安装，可重新开始"
+            )
             self._update(message, 0)
             self.root.after(0, lambda: self._set_ui_state(installing=False, done=False))
         except Exception as exc:
@@ -369,7 +435,9 @@ class SimpleInstaller:
                     manifest = json.loads(resp.read().decode("utf-8"))
                     check_cancel(lambda: self.cancelled)
                     if manifest.get("appVersion") != INSTALLER_VERSION:
-                        raise RuntimeError("安装清单版本与本安装器不一致；请使用对应版本安装器，原资料未修改")
+                        raise RuntimeError(
+                            "安装清单版本与本安装器不一致；请使用对应版本安装器，原资料未修改"
+                        )
                     return manifest
             except InstallCancelled:
                 raise
@@ -388,6 +456,7 @@ class SimpleInstaller:
         # 跳过已存在且 hash 匹配的文件
         if os.path.isfile(dest) and expected_sha256:
             import hashlib
+
             h = hashlib.sha256()
             with open(dest, "rb") as f:
                 while True:
@@ -407,11 +476,16 @@ class SimpleInstaller:
         for index, url in enumerate(urls):
             check_cancel(lambda: self.cancelled)
             try:
+
                 def _progress(dl, total):
                     if total > 0:
-                        self.root.after(0, lambda: self.detail_var.set(
-                            f"  {label}：{dl / 1024 / 1024:.1f}/{total / 1024 / 1024:.1f} MB"
-                        ))
+                        self.root.after(
+                            0,
+                            lambda: self.detail_var.set(
+                                f"  {label}：{dl / 1024 / 1024:.1f}/{total / 1024 / 1024:.1f} MB"
+                            ),
+                        )
+
                 download_with_progress(
                     url,
                     dest,
@@ -432,7 +506,9 @@ class SimpleInstaller:
     @staticmethod
     def _extract_runtime(zip_path: str, install_dir: str) -> str:
         """把 runtime app root 内容安装到用户选择的目录并返回 app root。"""
-        target_exe = updater.install_runtime_archive(Path(zip_path), Path(install_dir), "dak-studio.exe")
+        target_exe = updater.install_runtime_archive(
+            Path(zip_path), Path(install_dir), "dak-studio.exe"
+        )
         return str(target_exe.parent)
 
     @staticmethod

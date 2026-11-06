@@ -19,7 +19,7 @@ declare const __APP_VERSION__: string;
 
 export const APP_VERSION = __APP_VERSION__;
 
-const OWNER_REPO = "Starfie1d1272/cs2-demo-analysis-kit";
+const OWNER_REPO = 'Starfie1d1272/cs2-demo-analysis-kit';
 export const RELEASES_PAGE = `https://github.com/${OWNER_REPO}/releases/latest`;
 const RELEASES_LATEST_API = `https://api.github.com/repos/${OWNER_REPO}/releases/latest`;
 
@@ -29,15 +29,15 @@ const RELEASES_LATEST_API = `https://api.github.com/repos/${OWNER_REPO}/releases
  * docs/design/auto-update.md。manifest 固定挂在 `releases/latest.json`，
  * 二进制资产路径由发版 CI（gen-update-manifest.mjs）写入 manifest 的 asset.urls。
  */
-export const R2_BASE = "https://dakupdate.starfie1d.top";
+export const R2_BASE = 'https://dakupdate.starfie1d.top';
 
 /** manifest 在 GitHub Release 上的稳定地址（权威源/兜底）。 */
 const MANIFEST_CANONICAL_STABLE = `https://github.com/${OWNER_REPO}/releases/latest/download/latest-v2.json`;
 
-export type UpdateChannel = "stable" | "beta";
+export type UpdateChannel = 'stable' | 'beta';
 
 export function updateManifestPath(channel: UpdateChannel): string {
-  return channel === "beta" ? "releases/beta/latest.json" : "releases/latest-v2.json";
+  return channel === 'beta' ? 'releases/beta/latest.json' : 'releases/latest-v2.json';
 }
 
 /**
@@ -46,19 +46,19 @@ export function updateManifestPath(channel: UpdateChannel): string {
  * 长期可靠分发走上面的 R2（自建）。顺序即优先级；空串代表直连 github.com。
  */
 export const MANIFEST_MIRRORS: readonly string[] = [
-  "", // 直连（海外/能直连的网络）
-  "https://ghfast.top/",
-  "https://gh-proxy.com/",
-  "https://ghproxy.net/"
+  '', // 直连（海外/能直连的网络）
+  'https://ghfast.top/',
+  'https://gh-proxy.com/',
+  'https://ghproxy.net/',
 ];
 
 /**
  * manifest 拉取来源（完整 URL），顺序即优先级：
  *   R2（自建，国内可达）→ GitHub 直连 → ghproxy×3。
  */
-export function manifestSources(channel: UpdateChannel = "stable"): string[] {
+export function manifestSources(channel: UpdateChannel = 'stable'): string[] {
   const r2 = `${R2_BASE}/${updateManifestPath(channel)}`;
-  if (channel === "beta") return [r2];
+  if (channel === 'beta') return [r2];
   return [r2, ...MANIFEST_MIRRORS.map((prefix) => withMirror(prefix, MANIFEST_CANONICAL_STABLE))];
 }
 
@@ -66,7 +66,7 @@ export function manifestSources(channel: UpdateChannel = "stable"): string[] {
 const FETCH_TIMEOUT_MS = 8000;
 
 export interface UpdateAsset {
-  kind?: "runtime" | "web";
+  kind?: 'runtime' | 'web';
   /** 文件名，如 dak-studio-windows-0.7.0.zip */
   name: string;
   /** 字节数（用于进度条与完整性粗校验）。 */
@@ -83,7 +83,7 @@ export interface UpdateManifest {
   notes?: string;
   publishedAt?: string;
   /** 平台 → 资产。当前只发 Windows。 */
-  assets: Partial<Record<"windows" | "macos" | "web", UpdateAsset>>;
+  assets: Partial<Record<'windows' | 'macos' | 'web', UpdateAsset>>;
 }
 
 export interface UpdateInfo {
@@ -97,8 +97,8 @@ export interface UpdateInfo {
 
 /** a < b 时返回 true（仅比较 X.Y.Z 数字段，预发布后缀忽略）。 */
 export function semverLess(a: string, b: string): boolean {
-  const pa = a.split(".").map((n) => parseInt(n, 10) || 0);
-  const pb = b.split(".").map((n) => parseInt(n, 10) || 0);
+  const pa = a.split('.').map((n) => parseInt(n, 10) || 0);
+  const pb = b.split('.').map((n) => parseInt(n, 10) || 0);
   for (let i = 0; i < 3; i++) {
     if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) < (pb[i] ?? 0);
   }
@@ -108,40 +108,40 @@ export function semverLess(a: string, b: string): boolean {
 /** 把 github.com 原始 URL 套上镜像前缀。空前缀即直连。 */
 export function withMirror(prefix: string, rawUrl: string): string {
   if (!prefix) return rawUrl;
-  return prefix.endsWith("/") ? prefix + rawUrl : `${prefix}/${rawUrl}`;
+  return prefix.endsWith('/') ? prefix + rawUrl : `${prefix}/${rawUrl}`;
 }
 
 /** 解析 + 最小校验 manifest；结构不符返回 null。 */
 export function parseManifest(raw: unknown): UpdateManifest | null {
-  if (!raw || typeof raw !== "object") return null;
+  if (!raw || typeof raw !== 'object') return null;
   const m = raw as Record<string, unknown>;
-  const version = typeof m.version === "string" ? m.version.replace(/^v/, "") : "";
+  const version = typeof m.version === 'string' ? m.version.replace(/^v/, '') : '';
   if (!/^\d+\.\d+\.\d+/.test(version)) return null;
   const assetsRaw = (m.assets ?? {}) as Record<string, unknown>;
-  const assets: UpdateManifest["assets"] = {};
-  for (const key of ["windows", "macos", "web"] as const) {
+  const assets: UpdateManifest['assets'] = {};
+  for (const key of ['windows', 'macos', 'web'] as const) {
     const a = assetsRaw[key] as Record<string, unknown> | undefined;
     if (
       a &&
-      typeof a.name === "string" &&
-      typeof a.sha256 === "string" &&
+      typeof a.name === 'string' &&
+      typeof a.sha256 === 'string' &&
       Array.isArray(a.urls) &&
-      a.urls.every((u) => typeof u === "string")
+      a.urls.every((u) => typeof u === 'string')
     ) {
       assets[key] = {
-        kind: key === "web" ? "web" : "runtime",
+        kind: key === 'web' ? 'web' : 'runtime',
         name: a.name,
-        size: typeof a.size === "number" ? a.size : 0,
+        size: typeof a.size === 'number' ? a.size : 0,
         sha256: a.sha256.toLowerCase(),
-        urls: a.urls as string[]
+        urls: a.urls as string[],
       };
     }
   }
   return {
     version,
-    notes: typeof m.notes === "string" ? m.notes : undefined,
-    publishedAt: typeof m.publishedAt === "string" ? m.publishedAt : undefined,
-    assets
+    notes: typeof m.notes === 'string' ? m.notes : undefined,
+    publishedAt: typeof m.publishedAt === 'string' ? m.publishedAt : undefined,
+    assets,
   };
 }
 
@@ -149,7 +149,10 @@ async function fetchJson(url: string): Promise<unknown | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, { signal: controller.signal, headers: { Accept: "application/json" } });
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { Accept: 'application/json' },
+    });
     if (!res.ok) return null;
     return await res.json();
   } catch {
@@ -160,7 +163,7 @@ async function fetchJson(url: string): Promise<unknown | null> {
 }
 
 /** 依次尝试各来源拉取并解析 manifest，第一份成功的即返回。 */
-async function fetchManifest(channel: UpdateChannel = "stable"): Promise<UpdateManifest | null> {
+async function fetchManifest(channel: UpdateChannel = 'stable'): Promise<UpdateManifest | null> {
   for (const url of manifestSources(channel)) {
     const raw = await fetchJson(url);
     const manifest = parseManifest(raw);
@@ -170,11 +173,11 @@ async function fetchManifest(channel: UpdateChannel = "stable"): Promise<UpdateM
 }
 
 /** 当前平台对应的资产 key。桌面壳目前只发 Windows。 */
-function currentPlatform(): "windows" | "macos" | null {
-  if (typeof navigator === "undefined") return null;
+function currentPlatform(): 'windows' | 'macos' | null {
+  if (typeof navigator === 'undefined') return null;
   const ua = navigator.userAgent.toLowerCase();
-  if (ua.includes("win")) return "windows";
-  if (ua.includes("mac")) return "macos";
+  if (ua.includes('win')) return 'windows';
+  if (ua.includes('mac')) return 'macos';
   return null;
 }
 
@@ -185,10 +188,12 @@ function currentPlatform(): "windows" | "macos" | null {
  * 本函数供 dev/浏览器模式及桥失败的降级使用。
  */
 export async function checkForUpdate(): Promise<UpdateInfo | null> {
-  return checkForUpdateOnChannel("stable");
+  return checkForUpdateOnChannel('stable');
 }
 
-export async function checkForUpdateOnChannel(channel: UpdateChannel = "stable"): Promise<UpdateInfo | null> {
+export async function checkForUpdateOnChannel(
+  channel: UpdateChannel = 'stable',
+): Promise<UpdateInfo | null> {
   const manifest = await fetchManifest(channel);
   if (manifest) {
     if (!semverLess(APP_VERSION, manifest.version)) return null;
@@ -196,7 +201,7 @@ export async function checkForUpdateOnChannel(channel: UpdateChannel = "stable")
     const asset = manifest.assets.web ?? (platform ? manifest.assets[platform] : undefined);
     return { latest: manifest.version, url: RELEASES_PAGE, notes: manifest.notes, asset };
   }
-  if (channel === "beta") throw new Error("无法读取测试版更新信息");
+  if (channel === 'beta') throw new Error('无法读取测试版更新信息');
   // 所有镜像都失败 → 退回 GitHub API（直连成功的网络仍可用）。
   return checkViaGitHubApi();
 }
@@ -207,10 +212,10 @@ export async function checkForUpdateOnChannel(channel: UpdateChannel = "stable")
  */
 async function checkViaGitHubApi(): Promise<UpdateInfo | null> {
   const raw = await fetchJson(RELEASES_LATEST_API);
-  if (!raw || typeof raw !== "object") throw new Error("无法读取更新信息");
+  if (!raw || typeof raw !== 'object') throw new Error('无法读取更新信息');
   const data = raw as { tag_name?: string; html_url?: string };
-  const latest = (data.tag_name ?? "").replace(/^v/, "");
-  if (!latest) throw new Error("更新信息缺少版本号");
+  const latest = (data.tag_name ?? '').replace(/^v/, '');
+  if (!latest) throw new Error('更新信息缺少版本号');
   if (!semverLess(APP_VERSION, latest)) return null;
   return { latest, url: data.html_url ?? RELEASES_PAGE };
 }

@@ -6,9 +6,9 @@
  * bridge + SQLite/文件系统 适配器；浏览器/dev 仍走 IndexedDB。
  */
 
-import { createIdbAdapter } from "./idb-adapter";
-import { createPywebviewAdapter, getPywebviewStorageApi } from "./pywebview-adapter";
-import type { AtomicStorageAdapter } from "./types";
+import { createIdbAdapter } from './idb-adapter';
+import { createPywebviewAdapter, getPywebviewStorageApi } from './pywebview-adapter';
+import type { AtomicStorageAdapter } from './types';
 
 let adapter: AtomicStorageAdapter | null = null;
 let nativeApiForAdapter: ReturnType<typeof getPywebviewStorageApi> = null;
@@ -26,4 +26,4 @@ export function getNativeStorageApiForCurrentAdapter(): ReturnType<typeof getPyw
   return nativeApiForAdapter;
 }
 
-export type { StorageAdapter, RecordStore, BlobStore } from "./types";
+export type { StorageAdapter, RecordStore, BlobStore } from './types';

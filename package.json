@@ -41,15 +41,20 @@
     "check:package-boundaries": "node --test scripts/package-boundaries.test.mjs",
     "check:package-consumers": "node scripts/public-package-smoke.mjs",
     "build:packages": "pnpm -r --filter \"./packages/**\" --if-present build",
-    "check:release": "pnpm check:release-policy && pnpm check:package-boundaries && pnpm build:serial && pnpm test:all && pnpm typecheck && pnpm check:package-consumers && node scripts/maps-package-smoke.mjs"
+    "check:release": "pnpm check:release-policy && pnpm check:package-boundaries && pnpm build:serial && pnpm test:all && pnpm typecheck && pnpm check:package-consumers && node scripts/maps-package-smoke.mjs",
+    "format": "prettier --write \"{apps,packages,scripts}/**/*.{ts,tsx,js,mjs,cjs}\" --ignore-unknown",
+    "format:check": "prettier --check \"{apps,packages,scripts}/**/*.{ts,tsx,js,mjs,cjs}\" --ignore-unknown",
+    "lint:baseline": "biome lint apps packages scripts --only=suspicious/noDebugger --only=correctness/noUnreachable --only=suspicious/noDuplicateParameters --only=suspicious/noDuplicateObjectKeys --diagnostic-level=error"
   },
   "devDependencies": {
     "@babel/parser": "^8.0.7",
+    "@biomejs/biome": "^2.6.5",
     "@changesets/cli": "^3.0.3",
     "@types/node": "^26.6.4",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "esbuild": "0.28.2",
+    "prettier": "^3.9.10",
     "typescript": "^7.0.2",
     "vitest": "^5.0.3"
   },

@@ -1,4 +1,5 @@
 """Windows uploader preflight and diagnostics; no CLR/WebView imports here."""
+
 from __future__ import annotations
 
 import ctypes
@@ -32,11 +33,13 @@ def windows_runtimes() -> dict:
             return None
 
     return {
-        "netfx_release": read(winreg.HKEY_LOCAL_MACHINE, NETFX_KEY, "Release",
-                              winreg.KEY_WOW64_32KEY),
+        "netfx_release": read(
+            winreg.HKEY_LOCAL_MACHINE, NETFX_KEY, "Release", winreg.KEY_WOW64_32KEY
+        ),
         "webview2_user": read(winreg.HKEY_CURRENT_USER, WEBVIEW_KEY, "pv", 0),
-        "webview2_machine": read(winreg.HKEY_LOCAL_MACHINE, WEBVIEW_KEY, "pv",
-                                 winreg.KEY_WOW64_32KEY),
+        "webview2_machine": read(
+            winreg.HKEY_LOCAL_MACHINE, WEBVIEW_KEY, "pv", winreg.KEY_WOW64_32KEY
+        ),
     }
 
 
@@ -55,6 +58,7 @@ def load_windows_runtime():
     # pywebview 6.2.1 catches its first CLR import failure and retries coreclr,
     # hiding the original netfx error. Load the supported runtime here first.
     from pythonnet import load
+
     load("netfx")
 
 
@@ -62,12 +66,14 @@ def setup_logging(userdata: Path, logger: logging.Logger) -> Path:
     """Prefer existing userdata log; preserve evidence even if that directory is unwritable."""
     try:
         userdata.mkdir(parents=True, exist_ok=True)
-        handler = RotatingFileHandler(userdata / "uploader.log", maxBytes=1024 * 1024,
-                                      backupCount=2, encoding="utf-8")
+        handler = RotatingFileHandler(
+            userdata / "uploader.log", maxBytes=1024 * 1024, backupCount=2, encoding="utf-8"
+        )
     except OSError:
         fallback = Path(tempfile.mkdtemp(prefix="rivalhub-uploader-startup-"))
-        handler = RotatingFileHandler(fallback / "uploader.log", maxBytes=1024 * 1024,
-                                      backupCount=2, encoding="utf-8")
+        handler = RotatingFileHandler(
+            fallback / "uploader.log", maxBytes=1024 * 1024, backupCount=2, encoding="utf-8"
+        )
     handler.setFormatter(SafeFormatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
@@ -77,9 +83,15 @@ def setup_logging(userdata: Path, logger: logging.Logger) -> Path:
 
 
 def log_environment(logger: logging.Logger):
-    logger.info("startup python=%s windows=%s machine=%s executable=%s cwd=%s frozen=%s",
-                sys.version, platform.platform(), platform.machine(), sys.executable,
-                Path.cwd(), getattr(sys, "frozen", False))
+    logger.info(
+        "startup python=%s windows=%s machine=%s executable=%s cwd=%s frozen=%s",
+        sys.version,
+        platform.platform(),
+        platform.machine(),
+        sys.executable,
+        Path.cwd(),
+        getattr(sys, "frozen", False),
+    )
     logger.info("tls openssl=%s tls13=%s", ssl.OPENSSL_VERSION, ssl.HAS_TLSv1_3)
     for package in ("cs2dak", "pywebview", "pythonnet", "clr-loader"):
         try:
@@ -113,9 +125,11 @@ def log_environment(logger: logging.Logger):
 
 
 def show_failure(logfile: Path, detail: str = ""):
-    message = ("RivalHub Demo Uploader 启动失败。\n" + detail + "\n\n"
-               f"诊断日志：{logfile}\n"
-               "请保留日志并反馈；可重运行官方安装器修复应用文件。请勿单独移动内部 EXE。")
+    message = (
+        "RivalHub Demo Uploader 启动失败。\n" + detail + "\n\n"
+        f"诊断日志：{logfile}\n"
+        "请保留日志并反馈；可重运行官方安装器修复应用文件。请勿单独移动内部 EXE。"
+    )
     if sys.platform == "win32":
         ctypes.windll.user32.MessageBoxW(None, message, "RivalHub Demo Uploader", 0x10)
     elif sys.stderr is not None:

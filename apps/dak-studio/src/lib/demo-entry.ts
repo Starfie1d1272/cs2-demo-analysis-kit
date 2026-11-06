@@ -1,5 +1,5 @@
-import type { DemoMeta } from "./demo-meta";
-import type { BuiltWith } from "./analysis-manifest";
+import type { DemoMeta } from './demo-meta';
+import type { BuiltWith } from './analysis-manifest';
 
 export interface StudioDemoEntry {
   id: string;
@@ -25,8 +25,10 @@ export interface StudioDemoEntry {
 }
 
 /** Local projection identity; historical noncolliding filenames retain their original key. */
-export function matchIdForEntry(entry: Pick<StudioDemoEntry, "fileName" | "analysisMatchId">): string {
-  return entry.analysisMatchId ?? entry.fileName.replace(/\.zip$/i, "");
+export function matchIdForEntry(
+  entry: Pick<StudioDemoEntry, 'fileName' | 'analysisMatchId'>,
+): string {
+  return entry.analysisMatchId ?? entry.fileName.replace(/\.zip$/i, '');
 }
 
 /** 从 exporter 命名（YYYY-MM-DD_map_A-vs-B_x-y.zip）提取比赛日期；不匹配时返回 null。 */
@@ -36,7 +38,7 @@ export function matchDateFromFileName(fileName: string): string | null {
 }
 
 /** 比赛日期统一收口：优先文件名，不命中则 fallback 到 meta.matchDate（事件包导入写入）。 */
-export function entryDate(entry: Pick<StudioDemoEntry, "fileName" | "meta">): string | null {
+export function entryDate(entry: Pick<StudioDemoEntry, 'fileName' | 'meta'>): string | null {
   return matchDateFromFileName(entry.fileName) ?? entry.meta.matchDate ?? null;
 }
 
@@ -46,6 +48,8 @@ export function formatMatchLabel(entry: StudioDemoEntry): string {
   return [
     entry.meta.mapName,
     date,
-    `${entry.meta.teamAName} ${entry.meta.teamAScore}:${entry.meta.teamBScore} ${entry.meta.teamBName}`
-  ].filter(Boolean).join(" · ");
+    `${entry.meta.teamAName} ${entry.meta.teamAScore}:${entry.meta.teamBScore} ${entry.meta.teamBName}`,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 }

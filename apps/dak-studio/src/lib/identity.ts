@@ -1,4 +1,4 @@
-import type { PlayerIdentityMap } from "@cs2dak/cohort";
+import type { PlayerIdentityMap } from '@cs2dak/cohort';
 
 export interface IdentityMapping {
   /** 稳定 key，默认取主 steamId64：steam:${id} */
@@ -20,7 +20,7 @@ export function applyMerge(
   current: IdentityStoreState,
   primarySteamId: string,
   secondarySteamIds: string[],
-  displayName: string
+  displayName: string,
 ): IdentityStoreState {
   const allSteamIds = [primarySteamId, ...secondarySteamIds];
   const mergedSet = new Set(allSteamIds);
@@ -33,7 +33,7 @@ export function applyMerge(
     playerKey: `steam:${primarySteamId}`,
     displayName,
     steamIds: finalSteamIds,
-    updatedAt: Date.now()
+    updatedAt: Date.now(),
   };
   return { ...current, version: current.version + 1, mappings: [...kept, merged] };
 }
@@ -42,15 +42,17 @@ export function applyMerge(
 export function applySplit(
   current: IdentityStoreState,
   playerKey: string,
-  steamIdsToSplit: string[]
+  steamIdsToSplit: string[],
 ): IdentityStoreState {
   const splitSet = new Set(steamIdsToSplit);
-  const mappings = current.mappings.map((m) => {
-    if (m.playerKey !== playerKey) return m;
-    const remaining = m.steamIds.filter((id) => !splitSet.has(id));
-    if (remaining.length === 0) return null;
-    return { ...m, steamIds: remaining, updatedAt: Date.now() };
-  }).filter((m): m is IdentityMapping => m !== null);
+  const mappings = current.mappings
+    .map((m) => {
+      if (m.playerKey !== playerKey) return m;
+      const remaining = m.steamIds.filter((id) => !splitSet.has(id));
+      if (remaining.length === 0) return null;
+      return { ...m, steamIds: remaining, updatedAt: Date.now() };
+    })
+    .filter((m): m is IdentityMapping => m !== null);
   return { ...current, version: current.version + 1, mappings };
 }
 
@@ -58,22 +60,34 @@ export function applySplit(
 export function applyRename(
   current: IdentityStoreState,
   playerKey: string,
-  newDisplayName: string
+  newDisplayName: string,
 ): IdentityStoreState {
   const mappings = current.mappings.map((m) =>
-    m.playerKey === playerKey ? { ...m, displayName: newDisplayName, updatedAt: Date.now() } : m
+    m.playerKey === playerKey ? { ...m, displayName: newDisplayName, updatedAt: Date.now() } : m,
   );
-  if (!mappings.some(m => m.playerKey === playerKey)) {
-    if (!playerKey.startsWith("steam:") || !playerKey.slice(6)) throw new Error("无法重命名没有 Steam 身份的选手");
-    mappings.push({ playerKey, steamIds: [playerKey.slice(6)], displayName: newDisplayName, updatedAt: Date.now() });
+  if (!mappings.some((m) => m.playerKey === playerKey)) {
+    if (!playerKey.startsWith('steam:') || !playerKey.slice(6))
+      throw new Error('无法重命名没有 Steam 身份的选手');
+    mappings.push({
+      playerKey,
+      steamIds: [playerKey.slice(6)],
+      displayName: newDisplayName,
+      updatedAt: Date.now(),
+    });
   }
   return { ...current, version: current.version + 1, mappings };
 }
 
-export interface TeamRenameChange { originalName: string; displayName: string }
+export interface TeamRenameChange {
+  originalName: string;
+  displayName: string;
+}
 
 /** 将一次队伍操作中的全部映射作为一个身份版本处理。 */
-export function applyTeamRenames(current: IdentityStoreState, changes: TeamRenameChange[]): IdentityStoreState {
+export function applyTeamRenames(
+  current: IdentityStoreState,
+  changes: TeamRenameChange[],
+): IdentityStoreState {
   const teamRenames = { ...current.teamRenames };
   for (const { originalName, displayName } of changes) {
     if (displayName.trim()) teamRenames[originalName] = displayName.trim();

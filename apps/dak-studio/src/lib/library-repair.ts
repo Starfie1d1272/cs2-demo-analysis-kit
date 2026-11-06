@@ -1,6 +1,6 @@
-import { withLibraryCommit } from "./library-commit";
-import { getStorage } from "./storage";
-import { withAnalysisQueryInvalidation } from "./queries/query-cache";
+import { withLibraryCommit } from './library-commit';
+import { getStorage } from './storage';
+import { withAnalysisQueryInvalidation } from './queries/query-cache';
 import {
   backfillDemoIdentities,
   commitKeys,
@@ -8,9 +8,9 @@ import {
   removeDemoAnalysis,
   removeDemoStorageOnly,
   saveDemoEntry,
-} from "./library";
-import { matchIdForEntry, type StudioDemoEntry } from "./demo-entry";
-import { replaceDemoEntryReferences as replaceSeriesEntryReferences } from "./series";
+} from './library';
+import { matchIdForEntry, type StudioDemoEntry } from './demo-entry';
+import { replaceDemoEntryReferences as replaceSeriesEntryReferences } from './series';
 
 export interface LibraryIdentityRepairResult {
   backfilled: number;
@@ -50,12 +50,22 @@ export async function repairDemoIdentityAndDuplicates(): Promise<LibraryIdentity
     const ordered = [...rows].sort(byLatestImport);
     const survivor = ordered[0]!;
     const duplicates = ordered.slice(1);
-    const latestSource = ordered.find((entry) => entry.sourceDemPath)?.sourceDemPath ?? survivor.sourceDemPath ?? null;
+    const latestSource =
+      ordered.find((entry) => entry.sourceDemPath)?.sourceDemPath ?? survivor.sourceDemPath ?? null;
     const mergedTags = [...new Set(ordered.flatMap((entry) => entry.tags ?? []))];
     await withLibraryCommit(commitKeys(survivor), async () => {
-      const current = await getStorage().records("demos").get<StudioDemoEntry>(survivor.id);
-      if (!current || current.demoSha256 !== survivor.demoSha256 || matchIdForEntry(current) !== matchIdForEntry(survivor)) throw new Error("比赛资料已变化，请重新修复。");
-      await saveDemoEntry({ ...current, tags: [...new Set([...(current.tags ?? []), ...mergedTags])], sourceDemPath: current.sourceDemPath ?? latestSource });
+      const current = await getStorage().records('demos').get<StudioDemoEntry>(survivor.id);
+      if (
+        !current ||
+        current.demoSha256 !== survivor.demoSha256 ||
+        matchIdForEntry(current) !== matchIdForEntry(survivor)
+      )
+        throw new Error('比赛资料已变化，请重新修复。');
+      await saveDemoEntry({
+        ...current,
+        tags: [...new Set([...(current.tags ?? []), ...mergedTags])],
+        sourceDemPath: current.sourceDemPath ?? latestSource,
+      });
     });
     for (const duplicate of duplicates) {
       replacements.set(duplicate.id, survivor.id);
@@ -63,19 +73,30 @@ export async function repairDemoIdentityAndDuplicates(): Promise<LibraryIdentity
     }
   }
 
-  const rewiredSeries = replacements.size > 0
-    ? await replaceSeriesEntryReferences(replacements)
-    : 0;
+  const rewiredSeries =
+    replacements.size > 0 ? await replaceSeriesEntryReferences(replacements) : 0;
   // Series/Event references are rewritten before any duplicate storage is
   // deleted, so a failed rewrite cannot leave records pointing at missing IDs.
   for (const { duplicate, survivor } of duplicateEntries) {
     await withLibraryCommit([...commitKeys(duplicate), ...commitKeys(survivor)], async () => {
-      const records = getStorage().records("demos");
-      const [current, currentSurvivor] = await Promise.all([records.get<StudioDemoEntry>(duplicate.id), records.get<StudioDemoEntry>(survivor.id)]);
-      if (!current || !currentSurvivor || current.demoSha256 !== duplicate.demoSha256 || currentSurvivor.demoSha256 !== survivor.demoSha256 || matchIdForEntry(current) !== matchIdForEntry(duplicate) || matchIdForEntry(currentSurvivor) !== matchIdForEntry(survivor)) throw new Error("比赛资料已变化，请重新修复。");
+      const records = getStorage().records('demos');
+      const [current, currentSurvivor] = await Promise.all([
+        records.get<StudioDemoEntry>(duplicate.id),
+        records.get<StudioDemoEntry>(survivor.id),
+      ]);
+      if (
+        !current ||
+        !currentSurvivor ||
+        current.demoSha256 !== duplicate.demoSha256 ||
+        currentSurvivor.demoSha256 !== survivor.demoSha256 ||
+        matchIdForEntry(current) !== matchIdForEntry(duplicate) ||
+        matchIdForEntry(currentSurvivor) !== matchIdForEntry(survivor)
+      )
+        throw new Error('比赛资料已变化，请重新修复。');
       await withAnalysisQueryInvalidation(async () => {
         await removeDemoStorageOnly(duplicate.id);
-        if (matchIdForEntry(duplicate) !== matchIdForEntry(survivor)) await removeDemoAnalysis(matchIdForEntry(duplicate));
+        if (matchIdForEntry(duplicate) !== matchIdForEntry(survivor))
+          await removeDemoAnalysis(matchIdForEntry(duplicate));
       });
       removed += 1;
     });
@@ -84,9 +105,12 @@ export async function repairDemoIdentityAndDuplicates(): Promise<LibraryIdentity
   // last so a duplicate with the same fileName cannot erase the survivor facts.
   for (const survivorId of new Set(replacements.values())) {
     try {
-      if (!await rebuildFactsFromZip(survivorId)) errors.push(`${survivorId}：survivor ZIP 缺失，无法重建 facts`);
+      if (!(await rebuildFactsFromZip(survivorId)))
+        errors.push(`${survivorId}：survivor ZIP 缺失，无法重建 facts`);
     } catch (error) {
-      errors.push(`${survivorId}：重建 survivor facts 失败：${error instanceof Error ? error.message : String(error)}`);
+      errors.push(
+        `${survivorId}：重建 survivor facts 失败：${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 

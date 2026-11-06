@@ -1,13 +1,23 @@
-import { extractPlayerMatchInsightFacts, buildPlayerSeasonInsightsFromFacts } from "./player-insight-facts.js";
-import type { MatchBuyQuality, BuyQualityRow } from "@cs2dak/presentation";
-import type { DemoPackage, EvidenceRef, TeamKey } from "@cs2dak/contract";
-import type { MatchWorkspaceModel } from "@cs2dak/presentation";
-import { aggregatePlayerRoundPerformanceFacts, buildPlayerRoundPerformanceFacts, type PlayerRoundPerformanceFact, type PlayerRoundPerformanceFacts, type PlayerRoundPerformanceUtilityFact, type TournamentIdentity } from "@cs2dak/core";
-import { derivePlayerMechanics, type PlayerMechanicsFact } from "@cs2dak/tactics";
-import type { TriangleBvh } from "@cs2dak/maps";
-import { round } from "./season-metrics.js";
-import { displayWeaponName } from "@cs2dak/presentation";
-import { normalizeWeapon } from "./workspace-utils.js";
+import {
+  extractPlayerMatchInsightFacts,
+  buildPlayerSeasonInsightsFromFacts,
+} from './player-insight-facts.js';
+import type { MatchBuyQuality, BuyQualityRow } from '@cs2dak/presentation';
+import type { DemoPackage, EvidenceRef, TeamKey } from '@cs2dak/contract';
+import type { MatchWorkspaceModel } from '@cs2dak/presentation';
+import {
+  aggregatePlayerRoundPerformanceFacts,
+  buildPlayerRoundPerformanceFacts,
+  type PlayerRoundPerformanceFact,
+  type PlayerRoundPerformanceFacts,
+  type PlayerRoundPerformanceUtilityFact,
+  type TournamentIdentity,
+} from '@cs2dak/core';
+import { derivePlayerMechanics, type PlayerMechanicsFact } from '@cs2dak/tactics';
+import type { TriangleBvh } from '@cs2dak/maps';
+import { round } from './season-metrics.js';
+import { displayWeaponName } from '@cs2dak/presentation';
+import { normalizeWeapon } from './workspace-utils.js';
 
 /**
  * v0.3 洞察派生：个人趋势 / Flash Value / Mistake Review / Buy Quality /
@@ -163,7 +173,7 @@ export interface PlayerFlashSummary {
   bestEnemyFlashes: EnemyFlashIncident[];
 }
 
-export type UtilityDamageKind = "he" | "fire";
+export type UtilityDamageKind = 'he' | 'fire';
 
 export interface UtilityValueRow {
   id: string;
@@ -205,7 +215,7 @@ export interface UtilityValueSummary {
 
 const DEATH_EARLY_SECONDS = 25; // 1:55 -> 1:30
 const DEATH_LATE_SECONDS = 55; // 1:30 -> 1:00；之后为 1:00 后
-const LOW_BUY_TYPES = new Set(["eco", "semi", "force"]);
+const LOW_BUY_TYPES = new Set(['eco', 'semi', 'force']);
 const MAX_EVIDENCE = 10;
 /** 最佳闪光候选集容量：因 netSeconds ≤ enemySeconds，按敌方秒数取 Top-N 必含净收益 Top。 */
 const MAX_BEST_FLASH = 15;
@@ -215,11 +225,11 @@ function tickrateOf(pkg: DemoPackage): number {
 }
 
 function isHeDamageWeapon(weapon: string): boolean {
-  return normalizeWeapon(weapon) === "hegrenade";
+  return normalizeWeapon(weapon) === 'hegrenade';
 }
 
 function isFireDamageWeapon(weapon: string): boolean {
-  return ["inferno", "molotov", "incgrenade", "incendiary"].includes(normalizeWeapon(weapon));
+  return ['inferno', 'molotov', 'incgrenade', 'incendiary'].includes(normalizeWeapon(weapon));
 }
 
 function utilityRow(id: string, name: string): UtilityValueRow {
@@ -252,7 +262,8 @@ function finalizeUtilityRow(row: UtilityValueRow): UtilityValueRow {
     ...row,
     enemyBlindSecondsRaw,
     enemyBlindSeconds: round(enemyBlindSecondsRaw, 1),
-    enemyBlindSecondsPerFlash: row.flashesThrown > 0 ? round(enemyBlindSecondsRaw / row.flashesThrown, 2) : null,
+    enemyBlindSecondsPerFlash:
+      row.flashesThrown > 0 ? round(enemyBlindSecondsRaw / row.flashesThrown, 2) : null,
     enemyBlindSecondsPerRound: row.rounds > 0 ? round(enemyBlindSecondsRaw / row.rounds, 2) : null,
     flashAssistsPerRound: row.rounds > 0 ? round(row.flashAssists / row.rounds, 3) : null,
     heDamagePerThrow: row.heThrows > 0 ? round(row.heDamage / row.heThrows, 2) : null,
@@ -266,12 +277,12 @@ function finalizeUtilityRow(row: UtilityValueRow): UtilityValueRow {
 export function buildUtilityValueSummary(
   demos: SeasonInsightsDemo[],
   players: PlayerFlashSummaryInput[],
-  options: { teamRenames?: Record<string, string> } = {}
+  options: { teamRenames?: Record<string, string> } = {},
 ): UtilityValueSummary {
   const bySteamId = new Map<string, PlayerFlashSummaryInput>();
   const playerRows = new Map<string, UtilityValueRow>();
   const teamRows = new Map<string, UtilityValueRow>();
-  const bestFlashes: UtilityValueSummary["bestFlashes"] = [];
+  const bestFlashes: UtilityValueSummary['bestFlashes'] = [];
   const damageEvidence = new Map<string, UtilityDamageEvidence & { victims: Set<string> }>();
 
   for (const player of players) {
@@ -280,7 +291,8 @@ export function buildUtilityValueSummary(
   }
 
   const teamName = (pkg: DemoPackage, teamKey: TeamKey): string => {
-    const raw = teamKey === "teamA" ? (pkg.match.teamA.name ?? "Team A") : (pkg.match.teamB.name ?? "Team B");
+    const raw =
+      teamKey === 'teamA' ? (pkg.match.teamA.name ?? 'Team A') : (pkg.match.teamB.name ?? 'Team B');
     return options.teamRenames?.[raw] ?? raw;
   };
   const ensureTeam = (pkg: DemoPackage, teamKey: TeamKey) => {
@@ -293,7 +305,7 @@ export function buildUtilityValueSummary(
   for (const demo of demos) {
     const { matchId, pkg } = demo;
     const performanceFacts = performanceFactsFor(demo);
-    for (const key of ["teamA", "teamB"] as const) {
+    for (const key of ['teamA', 'teamB'] as const) {
       ensureTeam(pkg, key).rounds += pkg.rounds.length;
     }
 
@@ -324,7 +336,15 @@ export function buildUtilityValueSummary(
       }
     }
 
-    type FlashCell = { playerKey: string; playerName: string; roundNumber: number; tick: number; victims: Set<string>; enemySeconds: number; teamSeconds: number };
+    type FlashCell = {
+      playerKey: string;
+      playerName: string;
+      roundNumber: number;
+      tick: number;
+      victims: Set<string>;
+      enemySeconds: number;
+      teamSeconds: number;
+    };
     const flashCells = new Map<string, FlashCell>();
     for (const blind of pkg.blinds) {
       const flasher = pkg.players[blind.flasherIndex];
@@ -333,7 +353,7 @@ export function buildUtilityValueSummary(
       const player = bySteamId.get(flasher.steamId64);
       const key = `${player?.playerKey ?? `team:${flasher.teamKey}`}:${blind.flashId ?? `${blind.roundNumber}-${Math.round(blind.tick / 16)}`}`;
       const cell = flashCells.get(key) ?? {
-        playerKey: player?.playerKey ?? "",
+        playerKey: player?.playerKey ?? '',
         playerName: player?.name ?? flasher.name,
         roundNumber: blind.roundNumber,
         tick: blind.tick,
@@ -358,8 +378,8 @@ export function buildUtilityValueSummary(
         matchId,
         roundNumber: cell.roundNumber,
         tick: cell.tick,
-        reason: "该闪光造成的敌方致盲时间位于当前样本前列",
-        role: "example",
+        reason: '该闪光造成的敌方致盲时间位于当前样本前列',
+        role: 'example',
         victimCount: cell.victims.size,
         enemySeconds: round(cell.enemySeconds, 2),
         teamSeconds: round(cell.teamSeconds, 2),
@@ -372,19 +392,23 @@ export function buildUtilityValueSummary(
       const attacker = pkg.players[damage.attackerIndex];
       const victim = pkg.players[damage.victimIndex];
       if (!attacker || !victim || attacker.teamKey === victim.teamKey) continue;
-      const kind: UtilityDamageKind | null = isHeDamageWeapon(damage.weapon) ? "he" : isFireDamageWeapon(damage.weapon) ? "fire" : null;
+      const kind: UtilityDamageKind | null = isHeDamageWeapon(damage.weapon)
+        ? 'he'
+        : isFireDamageWeapon(damage.weapon)
+          ? 'fire'
+          : null;
       if (!kind || damage.healthDamage <= 0) continue;
       const player = bySteamId.get(attacker.steamId64);
       if (player) {
-        const bucket = kind === "he" ? Math.round(damage.tick / 16) : damage.roundNumber;
+        const bucket = kind === 'he' ? Math.round(damage.tick / 16) : damage.roundNumber;
         const key = `${kind}:${matchId}:${damage.roundNumber}:${player.playerKey}:${bucket}`;
         const cell = damageEvidence.get(key) ?? {
           kind,
           matchId,
           roundNumber: damage.roundNumber,
           tick: damage.tick,
-          reason: `${kind === "he" ? "HE 手雷" : "火焰"}伤害事件位于当前样本前列`,
-          role: "example",
+          reason: `${kind === 'he' ? 'HE 手雷' : '火焰'}伤害事件位于当前样本前列`,
+          role: 'example',
           playerId: player.playerKey,
           playerName: player.name,
           victimCount: 0,
@@ -403,11 +427,23 @@ export function buildUtilityValueSummary(
   return {
     players: [...playerRows.values()]
       .map(finalizeUtilityRow)
-      .sort((a, b) => (b.heDamagePerRound ?? 0) + (b.fireDamagePerRound ?? 0) - ((a.heDamagePerRound ?? 0) + (a.fireDamagePerRound ?? 0))),
+      .sort(
+        (a, b) =>
+          (b.heDamagePerRound ?? 0) +
+          (b.fireDamagePerRound ?? 0) -
+          ((a.heDamagePerRound ?? 0) + (a.fireDamagePerRound ?? 0)),
+      ),
     teams: [...teamRows.values()]
       .map(finalizeUtilityRow)
-      .sort((a, b) => (b.heDamagePerRound ?? 0) + (b.fireDamagePerRound ?? 0) - ((a.heDamagePerRound ?? 0) + (a.fireDamagePerRound ?? 0))),
-    bestFlashes: bestFlashes.sort((a, b) => b.enemySeconds - a.enemySeconds).slice(0, MAX_BEST_FLASH),
+      .sort(
+        (a, b) =>
+          (b.heDamagePerRound ?? 0) +
+          (b.fireDamagePerRound ?? 0) -
+          ((a.heDamagePerRound ?? 0) + (a.fireDamagePerRound ?? 0)),
+      ),
+    bestFlashes: bestFlashes
+      .sort((a, b) => b.enemySeconds - a.enemySeconds)
+      .slice(0, MAX_BEST_FLASH),
     bestDamageRounds: [...damageEvidence.values()]
       .sort((a, b) => b.damage - a.damage)
       .slice(0, MAX_EVIDENCE)
@@ -430,27 +466,44 @@ function addUtilityRow(target: UtilityValueRow, source: UtilityValueRow): void {
 function sortUtilityRows(rows: UtilityValueRow[]): UtilityValueRow[] {
   return rows
     .map(finalizeUtilityRow)
-    .sort((a, b) => (b.heDamagePerRound ?? 0) + (b.fireDamagePerRound ?? 0) - ((a.heDamagePerRound ?? 0) + (a.fireDamagePerRound ?? 0)));
+    .sort(
+      (a, b) =>
+        (b.heDamagePerRound ?? 0) +
+        (b.fireDamagePerRound ?? 0) -
+        ((a.heDamagePerRound ?? 0) + (a.fireDamagePerRound ?? 0)),
+    );
 }
 
 /** Project one observed side from per-player facts before merging matches. */
-export function selectUtilityValueSide(summary: UtilityValueSummary, steamIds: string[], teamKey: string, teamName: string, rounds: number): UtilityValueSummary {
-  const ids = new Set(steamIds.map(id => `steam:${id}`));
-  const players = summary.players.filter(row => ids.has(row.id));
+export function selectUtilityValueSide(
+  summary: UtilityValueSummary,
+  steamIds: string[],
+  teamKey: string,
+  teamName: string,
+  rounds: number,
+): UtilityValueSummary {
+  const ids = new Set(steamIds.map((id) => `steam:${id}`));
+  const players = summary.players.filter((row) => ids.has(row.id));
   const team = utilityRow(teamKey, teamName);
   for (const player of players) addUtilityRow(team, player);
   team.rounds = rounds;
   return {
     players,
     teams: [finalizeUtilityRow(team)],
-    bestFlashes: summary.bestFlashes.filter(row => row.playerId != null && ids.has(row.playerId)),
-    bestDamageRounds: summary.bestDamageRounds.filter(row => row.playerId != null && ids.has(row.playerId)),
+    bestFlashes: summary.bestFlashes.filter((row) => row.playerId != null && ids.has(row.playerId)),
+    bestDamageRounds: summary.bestDamageRounds.filter(
+      (row) => row.playerId != null && ids.has(row.playerId),
+    ),
   };
 }
 
 export function mergeUtilityValueSummaries(
   summaries: UtilityValueSummary[],
-  options: { players?: PlayerFlashSummaryInput[]; teamRenames?: Record<string, string>; teamIdentity?: "id" } = {}
+  options: {
+    players?: PlayerFlashSummaryInput[];
+    teamRenames?: Record<string, string>;
+    teamIdentity?: 'id';
+  } = {},
 ): UtilityValueSummary {
   const playerRows = new Map<string, UtilityValueRow>();
   const playerTargetBySource = new Map<string, PlayerFlashSummaryInput>();
@@ -464,7 +517,9 @@ export function mergeUtilityValueSummaries(
   const teamRows = new Map<string, UtilityValueRow>();
 
   const ensurePlayer = (row: UtilityValueRow): UtilityValueRow | null => {
-    const target = options.players ? playerTargetBySource.get(row.id) : { playerKey: row.id, name: row.name, steamIds: [] };
+    const target = options.players
+      ? playerTargetBySource.get(row.id)
+      : { playerKey: row.id, name: row.name, steamIds: [] };
     if (!target) return null;
     const existing = playerRows.get(target.playerKey) ?? utilityRow(target.playerKey, target.name);
     playerRows.set(target.playerKey, existing);
@@ -472,19 +527,21 @@ export function mergeUtilityValueSummaries(
   };
   const ensureTeam = (row: UtilityValueRow): UtilityValueRow => {
     const name = options.teamRenames?.[row.name] ?? row.name;
-    const key = options.teamIdentity === "id" ? row.id : name;
+    const key = options.teamIdentity === 'id' ? row.id : name;
     const existing = teamRows.get(key) ?? utilityRow(key, name);
     teamRows.set(key, existing);
     return existing;
   };
 
-  const keepPlayerEvidence = <T extends { playerId?: string; playerName: string }>(row: T): T | null => {
+  const keepPlayerEvidence = <T extends { playerId?: string; playerName: string }>(
+    row: T,
+  ): T | null => {
     if (!options.players) return row;
     const target = row.playerId ? playerTargetBySource.get(row.playerId) : null;
     return target ? { ...row, playerId: target.playerKey, playerName: target.name } : null;
   };
 
-  const bestFlashes: UtilityValueSummary["bestFlashes"] = [];
+  const bestFlashes: UtilityValueSummary['bestFlashes'] = [];
   const bestDamageRounds: UtilityDamageEvidence[] = [];
 
   for (const summary of summaries) {
@@ -506,19 +563,29 @@ export function mergeUtilityValueSummaries(
   return {
     players: sortUtilityRows([...playerRows.values()]),
     teams: sortUtilityRows([...teamRows.values()]),
-    bestFlashes: bestFlashes.sort((a, b) => b.enemySeconds - a.enemySeconds).slice(0, MAX_BEST_FLASH),
+    bestFlashes: bestFlashes
+      .sort((a, b) => b.enemySeconds - a.enemySeconds)
+      .slice(0, MAX_BEST_FLASH),
     bestDamageRounds: bestDamageRounds.sort((a, b) => b.damage - a.damage).slice(0, MAX_EVIDENCE),
   };
 }
 
 /** 单选手跨场洞察。steamIds 来自 PlayerSeasonProfile（cohort 已做身份归并）。 */
-export function buildPlayerSeasonInsights(demos: SeasonInsightsDemo[], steamIds: string[]): PlayerSeasonInsights {
-  return buildPlayerSeasonInsightsFromFacts(demos.flatMap(extractPlayerMatchInsightFacts), { steamIds, orderedMatchIds: demos.map(demo => demo.matchId) });
+export function buildPlayerSeasonInsights(
+  demos: SeasonInsightsDemo[],
+  steamIds: string[],
+): PlayerSeasonInsights {
+  return buildPlayerSeasonInsightsFromFacts(demos.flatMap(extractPlayerMatchInsightFacts), {
+    steamIds,
+    orderedMatchIds: demos.map((demo) => demo.matchId),
+  });
 }
 
 function avg(values: Array<number | null>): number | null {
   const nums = values.filter((value): value is number => value != null);
-  return nums.length > 0 ? round(nums.reduce((sum, value) => sum + value, 0) / nums.length, 1) : null;
+  return nums.length > 0
+    ? round(nums.reduce((sum, value) => sum + value, 0) / nums.length, 1)
+    : null;
 }
 
 function medianNumber(values: Array<number | null>): number | null {
@@ -528,12 +595,18 @@ function medianNumber(values: Array<number | null>): number | null {
   return nums.length % 2 === 0 ? round((nums[mid - 1]! + nums[mid]!) / 2, 1) : round(nums[mid]!, 1);
 }
 
-function percentileLabel(value: number | null, values: Array<number | null>, lowerIsBetter = false): string | null {
+function percentileLabel(
+  value: number | null,
+  values: Array<number | null>,
+  lowerIsBetter = false,
+): string | null {
   if (value == null) return null;
   const nums = values.filter((candidate): candidate is number => candidate != null);
   if (nums.length === 0) return null;
-  const better = nums.filter((candidate) => lowerIsBetter ? candidate <= value : candidate >= value).length;
-  return `当前范围前 ${Math.max(1, Math.round(better / nums.length * 100))}%`;
+  const better = nums.filter((candidate) =>
+    lowerIsBetter ? candidate <= value : candidate >= value,
+  ).length;
+  return `当前范围前 ${Math.max(1, Math.round((better / nums.length) * 100))}%`;
 }
 
 // 武器卡按真实武器名统计（区分 m4a1_silencer / m4a4），展示层取击杀数前 6，其余并入「其他」
@@ -544,8 +617,8 @@ function weaponBucket(weapon: string): string {
 }
 
 function weaponBucketLabel(bucket: string): string {
-  if (bucket === "all") return "全部武器";
-  if (bucket === "other") return "其他";
+  if (bucket === 'all') return '全部武器';
+  if (bucket === 'other') return '其他';
   return displayWeaponName(bucket);
 }
 
@@ -557,10 +630,10 @@ export interface MechanicsProfileOptions {
 export function buildPlayerMechanicsProfile(
   demos: SeasonInsightsDemo[],
   steamIds: string[],
-  options: MechanicsProfileOptions = {}
+  options: MechanicsProfileOptions = {},
 ): PlayerMechanicsProfile {
   const perMatchRows = demos.map(({ pkg }) =>
-    derivePlayerMechanics(pkg, { visibility: options.visibilityFor?.(pkg.match.mapName) ?? null })
+    derivePlayerMechanics(pkg, { visibility: options.visibilityFor?.(pkg.match.mapName) ?? null }),
   );
   return buildPlayerMechanicsProfileFromRows(perMatchRows, steamIds, demos.length);
 }
@@ -573,25 +646,48 @@ export function buildPlayerMechanicsProfile(
 export function buildPlayerMechanicsProfileFromRows(
   perMatchRows: PlayerMechanicsFact[][],
   steamIds: string[],
-  matchCount: number
+  matchCount: number,
 ): PlayerMechanicsProfile {
   const ids = new Set(steamIds);
-  const byBucket = new Map<string, {
-    kills: number;
-    first: Array<number | null>;
-    spray: Array<number | null>;
-    counter: Array<number | null>;
-    oneTap: Array<number | null>;
-    reaction: Array<number | null>;
-    preaim: Array<number | null>;
-    ttk: Array<number | null>;
-    headshot: number;
-    headshotTotal: number;
-  }>();
-  const allRows: Array<{ bucket: string; first: number | null; spray: number | null; counter: number | null; oneTap: number | null; reaction: number | null; preaim: number | null; ttk: number | null }> = [];
+  const byBucket = new Map<
+    string,
+    {
+      kills: number;
+      first: Array<number | null>;
+      spray: Array<number | null>;
+      counter: Array<number | null>;
+      oneTap: Array<number | null>;
+      reaction: Array<number | null>;
+      preaim: Array<number | null>;
+      ttk: Array<number | null>;
+      headshot: number;
+      headshotTotal: number;
+    }
+  >();
+  const allRows: Array<{
+    bucket: string;
+    first: number | null;
+    spray: number | null;
+    counter: number | null;
+    oneTap: number | null;
+    reaction: number | null;
+    preaim: number | null;
+    ttk: number | null;
+  }> = [];
 
   const get = (bucket: string) => {
-    const current = byBucket.get(bucket) ?? { kills: 0, first: [], spray: [], counter: [], oneTap: [], reaction: [], preaim: [], ttk: [], headshot: 0, headshotTotal: 0 };
+    const current = byBucket.get(bucket) ?? {
+      kills: 0,
+      first: [],
+      spray: [],
+      counter: [],
+      oneTap: [],
+      reaction: [],
+      preaim: [],
+      ttk: [],
+      headshot: 0,
+      headshotTotal: 0,
+    };
     byBucket.set(bucket, current);
     return current;
   };
@@ -619,12 +715,15 @@ export function buildPlayerMechanicsProfileFromRows(
         oneTap: row.oneTap.value,
         reaction: row.reaction.value,
         preaim,
-        ttk: row.ttk.value
+        ttk: row.ttk.value,
       });
     }
   }
 
-  const toProfile = (bucket: string, cell: ReturnType<typeof get>): PlayerMechanicsWeaponProfile => {
+  const toProfile = (
+    bucket: string,
+    cell: ReturnType<typeof get>,
+  ): PlayerMechanicsWeaponProfile => {
     const first = avg(cell.first);
     const spray = avg(cell.spray);
     const ttk = medianNumber(cell.ttk);
@@ -643,21 +742,48 @@ export function buildPlayerMechanicsProfileFromRows(
       oneTapRatePercent: oneTap,
       visualReactionMs: reaction,
       preaimErrorDegrees: preaim,
-      headshotPercent: cell.headshotTotal > 0 ? Math.round((cell.headshot / cell.headshotTotal) * 1000) / 10 : null,
+      headshotPercent:
+        cell.headshotTotal > 0
+          ? Math.round((cell.headshot / cell.headshotTotal) * 1000) / 10
+          : null,
       killsPerMatch: matchCount > 0 ? Math.round((cell.kills / matchCount) * 10) / 10 : null,
       percentile: {
-        firstShotAccuracy: percentileLabel(first, allRows.map((row) => row.first)),
-        sprayAccuracy: percentileLabel(spray, allRows.map((row) => row.spray)),
-        medianTtk: percentileLabel(ttk, allRows.map((row) => row.ttk), true),
-        counterStrafe: percentileLabel(counter, allRows.map((row) => row.counter)),
-        oneTapRate: percentileLabel(oneTap, allRows.map((row) => row.oneTap)),
-        visualReaction: percentileLabel(reaction, allRows.map((row) => row.reaction), true),
-        preaimError: percentileLabel(preaim, allRows.map((row) => row.preaim), true)
-      }
+        firstShotAccuracy: percentileLabel(
+          first,
+          allRows.map((row) => row.first),
+        ),
+        sprayAccuracy: percentileLabel(
+          spray,
+          allRows.map((row) => row.spray),
+        ),
+        medianTtk: percentileLabel(
+          ttk,
+          allRows.map((row) => row.ttk),
+          true,
+        ),
+        counterStrafe: percentileLabel(
+          counter,
+          allRows.map((row) => row.counter),
+        ),
+        oneTapRate: percentileLabel(
+          oneTap,
+          allRows.map((row) => row.oneTap),
+        ),
+        visualReaction: percentileLabel(
+          reaction,
+          allRows.map((row) => row.reaction),
+          true,
+        ),
+        preaimError: percentileLabel(
+          preaim,
+          allRows.map((row) => row.preaim),
+          true,
+        ),
+      },
     };
   };
 
-  const overall = toProfile("all", {
+  const overall = toProfile('all', {
     kills: [...byBucket.values()].reduce((sum, row) => sum + row.kills, 0),
     first: [...byBucket.values()].flatMap((row) => row.first),
     spray: [...byBucket.values()].flatMap((row) => row.spray),
@@ -667,33 +793,37 @@ export function buildPlayerMechanicsProfileFromRows(
     preaim: [...byBucket.values()].flatMap((row) => row.preaim),
     ttk: [...byBucket.values()].flatMap((row) => row.ttk),
     headshot: [...byBucket.values()].reduce((sum, row) => sum + row.headshot, 0),
-    headshotTotal: [...byBucket.values()].reduce((sum, row) => sum + row.headshotTotal, 0)
+    headshotTotal: [...byBucket.values()].reduce((sum, row) => sum + row.headshotTotal, 0),
   });
   // 击杀数前 6 把武器单列，其余合并为「其他」（样本数组直接拼接，口径与单桶一致）
-  const ranked = [...byBucket.entries()].sort((a, b) => b[1].kills - a[1].kills || a[0].localeCompare(b[0]));
+  const ranked = [...byBucket.entries()].sort(
+    (a, b) => b[1].kills - a[1].kills || a[0].localeCompare(b[0]),
+  );
   const top = ranked.slice(0, MECHANICS_TOP_WEAPONS);
   const rest = ranked.slice(MECHANICS_TOP_WEAPONS);
   const weapons = top.map(([bucket, cell]) => toProfile(bucket, cell));
   if (rest.length > 0) {
-    weapons.push(toProfile("other", {
-      kills: rest.reduce((sum, [, cell]) => sum + cell.kills, 0),
-      first: rest.flatMap(([, cell]) => cell.first),
-      spray: rest.flatMap(([, cell]) => cell.spray),
-      counter: rest.flatMap(([, cell]) => cell.counter),
-      oneTap: rest.flatMap(([, cell]) => cell.oneTap),
-      reaction: rest.flatMap(([, cell]) => cell.reaction),
-      preaim: rest.flatMap(([, cell]) => cell.preaim),
-      ttk: rest.flatMap(([, cell]) => cell.ttk),
-      headshot: rest.reduce((sum, [, cell]) => sum + cell.headshot, 0),
-      headshotTotal: rest.reduce((sum, [, cell]) => sum + cell.headshotTotal, 0)
-    }));
+    weapons.push(
+      toProfile('other', {
+        kills: rest.reduce((sum, [, cell]) => sum + cell.kills, 0),
+        first: rest.flatMap(([, cell]) => cell.first),
+        spray: rest.flatMap(([, cell]) => cell.spray),
+        counter: rest.flatMap(([, cell]) => cell.counter),
+        oneTap: rest.flatMap(([, cell]) => cell.oneTap),
+        reaction: rest.flatMap(([, cell]) => cell.reaction),
+        preaim: rest.flatMap(([, cell]) => cell.preaim),
+        ttk: rest.flatMap(([, cell]) => cell.ttk),
+        headshot: rest.reduce((sum, [, cell]) => sum + cell.headshot, 0),
+        headshotTotal: rest.reduce((sum, [, cell]) => sum + cell.headshotTotal, 0),
+      }),
+    );
   }
   return { overall, weapons };
 }
 
 export function buildPlayerWeaponStats(
   demos: SeasonInsightsDemo[],
-  steamIds: string[]
+  steamIds: string[],
 ): PlayerWeaponStat[] {
   const ids = new Set(steamIds);
   const rows = new Map<string, { weapon: string; kills: number; headshots: number }>();
@@ -721,27 +851,30 @@ export function buildPlayerWeaponStats(
       label: displayWeaponName(row.weapon),
       kills: row.kills,
       headshotPercent: row.kills > 0 ? round((row.headshots / row.kills) * 100, 1) : null,
-      killsPerMatch: round(row.kills / denominator, 2)
+      killsPerMatch: round(row.kills / denominator, 2),
     }))
     .sort((a, b) => b.kills - a.kills || a.label.localeCompare(b.label));
 }
 
 export function buildPlayerFlashSummaries(
   demos: SeasonInsightsDemo[],
-  players: PlayerFlashSummaryInput[]
+  players: PlayerFlashSummaryInput[],
 ): PlayerFlashSummary[] {
   const bySteamId = new Map<string, PlayerFlashSummaryInput>();
-  const rows = new Map<string, {
-    playerKey: string;
-    name: string;
-    flashesThrown: number;
-    enemyBlindSeconds: number;
-    teamBlindSeconds: number;
-    enemyBlindVictims: number;
-    flashAssists: number;
-    teamFlashes: TeamFlashIncident[];
-    enemyFlashes: EnemyFlashIncident[];
-  }>();
+  const rows = new Map<
+    string,
+    {
+      playerKey: string;
+      name: string;
+      flashesThrown: number;
+      enemyBlindSeconds: number;
+      teamBlindSeconds: number;
+      enemyBlindVictims: number;
+      flashAssists: number;
+      teamFlashes: TeamFlashIncident[];
+      enemyFlashes: EnemyFlashIncident[];
+    }
+  >();
 
   for (const player of players) {
     rows.set(player.playerKey, {
@@ -753,7 +886,7 @@ export function buildPlayerFlashSummaries(
       enemyBlindVictims: 0,
       flashAssists: 0,
       teamFlashes: [],
-      enemyFlashes: []
+      enemyFlashes: [],
     });
     for (const steamId of player.steamIds) bySteamId.set(steamId, player);
   }
@@ -773,7 +906,13 @@ export function buildPlayerFlashSummaries(
       row.flashAssists += utility.flashAssists;
     }
 
-    type FlashCell = { playerKey: string; roundNumber: number; tick: number; victims: Set<string>; seconds: number };
+    type FlashCell = {
+      playerKey: string;
+      roundNumber: number;
+      tick: number;
+      victims: Set<string>;
+      seconds: number;
+    };
     const grouped = new Map<string, FlashCell>();
     const enemyGrouped = new Map<string, FlashCell>();
     for (const blind of pkg.blinds) {
@@ -789,10 +928,10 @@ export function buildPlayerFlashSummaries(
           roundNumber: blind.roundNumber,
           tick: blind.tick,
           victims: new Set<string>(),
-          seconds: 0
+          seconds: 0,
         };
         cell.tick = Math.min(cell.tick, blind.tick);
-        cell.victims.add(pkg.players[blind.flashedIndex]?.steamId64 ?? "");
+        cell.victims.add(pkg.players[blind.flashedIndex]?.steamId64 ?? '');
         cell.seconds += blind.durationSeconds;
         map.set(key, cell);
       };
@@ -808,10 +947,10 @@ export function buildPlayerFlashSummaries(
         matchId,
         roundNumber: cell.roundNumber,
         tick: cell.tick,
-        reason: "该闪光误盲队友的时长位于当前样本前列",
-        role: "example",
+        reason: '该闪光误盲队友的时长位于当前样本前列',
+        role: 'example',
         victimCount: cell.victims.size,
-        totalSeconds: round(cell.seconds, 2)
+        totalSeconds: round(cell.seconds, 2),
       });
     }
     for (const [key, cell] of enemyGrouped) {
@@ -820,12 +959,12 @@ export function buildPlayerFlashSummaries(
         matchId,
         roundNumber: cell.roundNumber,
         tick: cell.tick,
-        reason: "该闪光造成的敌方致盲时间位于当前样本前列",
-        role: "example",
+        reason: '该闪光造成的敌方致盲时间位于当前样本前列',
+        role: 'example',
         victimCount: cell.victims.size,
         enemySeconds: round(cell.seconds, 2),
         teamSeconds: round(teamSeconds, 2),
-        netSeconds: round(cell.seconds - teamSeconds, 2)
+        netSeconds: round(cell.seconds - teamSeconds, 2),
       });
     }
   }
@@ -840,49 +979,53 @@ export function buildPlayerFlashSummaries(
       enemyBlindSeconds: round(row.enemyBlindSeconds, 1),
       teamBlindSeconds: round(row.teamBlindSeconds, 1),
       enemyBlindVictims: row.enemyBlindVictims,
-      enemySecondsPerFlash: row.flashesThrown > 0 ? round(row.enemyBlindSeconds / row.flashesThrown, 2) : null,
-      netSecondsPerFlash: row.flashesThrown > 0
-        ? round((row.enemyBlindSeconds - row.teamBlindSeconds) / row.flashesThrown, 2)
-        : null,
+      enemySecondsPerFlash:
+        row.flashesThrown > 0 ? round(row.enemyBlindSeconds / row.flashesThrown, 2) : null,
+      netSecondsPerFlash:
+        row.flashesThrown > 0
+          ? round((row.enemyBlindSeconds - row.teamBlindSeconds) / row.flashesThrown, 2)
+          : null,
       flashAssists: row.flashAssists,
       worstTeamFlashes: row.teamFlashes.slice(0, MAX_EVIDENCE),
-      bestEnemyFlashes: row.enemyFlashes.slice(0, MAX_BEST_FLASH)
+      bestEnemyFlashes: row.enemyFlashes.slice(0, MAX_BEST_FLASH),
     };
   });
 }
 
 // ── Buy Quality（单场，比赛工作台经济页用）──────────────────────────────────
 
-const ECONOMY_ORDER = ["pistol", "eco", "semi", "force", "full"] as const;
+const ECONOMY_ORDER = ['pistol', 'eco', 'semi', 'force', 'full'] as const;
 const ECONOMY_LABEL: Record<string, string> = {
-  pistol: "手枪局",
-  eco: "Eco",
-  semi: "半起",
-  force: "强起",
-  full: "长枪局"
+  pistol: '手枪局',
+  eco: 'Eco',
+  semi: '半起',
+  force: '强起',
+  full: '长枪局',
 };
 
-export function buildMatchBuyQuality(economy: MatchWorkspaceModel["economy"]): MatchBuyQuality {
-  const rowsFor = (teamKey: "teamA" | "teamB"): BuyQualityRow[] =>
+export function buildMatchBuyQuality(economy: MatchWorkspaceModel['economy']): MatchBuyQuality {
+  const rowsFor = (teamKey: 'teamA' | 'teamB'): BuyQualityRow[] =>
     ECONOMY_ORDER.map((type) => {
-      const rounds = economy.filter((p) => (teamKey === "teamA" ? p.teamAEconomy : p.teamBEconomy) === type);
+      const rounds = economy.filter(
+        (p) => (teamKey === 'teamA' ? p.teamAEconomy : p.teamBEconomy) === type,
+      );
       const wins = rounds.filter((p) => p.winnerTeamKey === teamKey).length;
       return {
         economy: type,
         label: ECONOMY_LABEL[type],
         rounds: rounds.length,
         wins,
-        winRatePercent: rounds.length > 0 ? round((wins / rounds.length) * 100, 1) : null
+        winRatePercent: rounds.length > 0 ? round((wins / rounds.length) * 100, 1) : null,
       };
     }).filter((row) => row.rounds > 0);
 
-  const conversionFor = (teamKey: "teamA" | "teamB") => {
+  const conversionFor = (teamKey: 'teamA' | 'teamB') => {
     const ordered = [...economy].sort((a, b) => a.roundNumber - b.roundNumber);
     let rounds = 0;
     let wins = 0;
     for (let i = 0; i < ordered.length - 1; i += 1) {
       const cur = ordered[i]!;
-      const isPistol = (teamKey === "teamA" ? cur.teamAEconomy : cur.teamBEconomy) === "pistol";
+      const isPistol = (teamKey === 'teamA' ? cur.teamAEconomy : cur.teamBEconomy) === 'pistol';
       if (!isPistol || cur.winnerTeamKey !== teamKey) continue;
       rounds += 1;
       if (ordered[i + 1]!.winnerTeamKey === teamKey) wins += 1;
@@ -891,8 +1034,8 @@ export function buildMatchBuyQuality(economy: MatchWorkspaceModel["economy"]): M
   };
 
   return {
-    teamA: rowsFor("teamA"),
-    teamB: rowsFor("teamB"),
-    conversion: { teamA: conversionFor("teamA"), teamB: conversionFor("teamB") }
+    teamA: rowsFor('teamA'),
+    teamB: rowsFor('teamB'),
+    conversion: { teamA: conversionFor('teamA'), teamB: conversionFor('teamB') },
   };
 }

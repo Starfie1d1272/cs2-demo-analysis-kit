@@ -8,9 +8,15 @@
  *
  * This replaces the previous DOM-span approach which could not render true density.
  */
-import type { DemoViewModel, GrenadeType, HeatmapPoint, Side, TeamKey } from "@cs2dak/presentation";
-import { getMapCalibration, worldToRadar, hasLowerLevel, levelAt, type MapLevel } from "@cs2dak/maps/calibration";
-import { useEffect, useMemo, useRef, useState } from "react";
+import type { DemoViewModel, GrenadeType, HeatmapPoint, Side, TeamKey } from '@cs2dak/presentation';
+import {
+  getMapCalibration,
+  worldToRadar,
+  hasLowerLevel,
+  levelAt,
+  type MapLevel,
+} from '@cs2dak/maps/calibration';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 // ── HeatmapRenderer (adapted from simpleheat / CS Demo Manager, BSD-2-Clause) ─
 
@@ -21,12 +27,12 @@ class HeatmapRenderer {
   private radius = 0;
 
   constructor(canvas: HTMLCanvasElement) {
-    this.ctx = canvas.getContext("2d", { willReadFrequently: true }) as CanvasRenderingContext2D;
-    this.stamp = document.createElement("canvas");
+    this.ctx = canvas.getContext('2d', { willReadFrequently: true }) as CanvasRenderingContext2D;
+    this.stamp = document.createElement('canvas');
   }
 
   setRadius(r: number, blur = 15) {
-    const ctx = this.stamp.getContext("2d") as CanvasRenderingContext2D;
+    const ctx = this.stamp.getContext('2d') as CanvasRenderingContext2D;
     this.radius = r + blur;
     this.stamp.width = this.radius * 2;
     this.stamp.height = this.radius * 2;
@@ -34,7 +40,7 @@ class HeatmapRenderer {
     // Draw the circle off-canvas; only its shadow falls within bounds.
     ctx.shadowOffsetX = ctx.shadowOffsetY = this.radius * 2;
     ctx.shadowBlur = blur;
-    ctx.shadowColor = "black";
+    ctx.shadowColor = 'black';
     ctx.beginPath();
     ctx.arc(-this.radius, -this.radius, r, 0, Math.PI * 2, true);
     ctx.closePath();
@@ -42,10 +48,10 @@ class HeatmapRenderer {
   }
 
   setGradient(stops: Record<number, string>) {
-    const canvas = document.createElement("canvas");
+    const canvas = document.createElement('canvas');
     canvas.width = 1;
     canvas.height = 256;
-    const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
+    const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
     const grad = ctx.createLinearGradient(0, 0, 0, 256);
     for (const [stop, color] of Object.entries(stops)) {
       grad.addColorStop(Number(stop), color);
@@ -77,7 +83,7 @@ class HeatmapRenderer {
     for (let i = 0; i < pixels.length; i += 4) {
       const j = pixels[i + 3] * 4;
       if (j) {
-        pixels[i]     = gradient[j];
+        pixels[i] = gradient[j];
         pixels[i + 1] = gradient[j + 1];
         pixels[i + 2] = gradient[j + 2];
         pixels[i + 3] = pixels[i + 3] * alpha;
@@ -92,52 +98,52 @@ const CANVAS_SIZE = 1024;
 
 // Classic heat-map gradient, matching CS Demo Manager's default palette.
 const HEAT_GRADIENT: Record<number, string> = {
-  0.4: "blue",
-  0.6: "cyan",
-  0.7: "lime",
-  0.8: "yellow",
-  1.0: "red",
+  0.4: 'blue',
+  0.6: 'cyan',
+  0.7: 'lime',
+  0.8: 'yellow',
+  1.0: 'red',
 };
 
-type HeatmapMode = HeatmapPoint["kind"];
+type HeatmapMode = HeatmapPoint['kind'];
 
 const MODE_LABELS: Record<HeatmapMode, string> = {
-  death:   "死亡位置",
-  kill:    "击杀位置",
-  grenade: "道具落点",
+  death: '死亡位置',
+  kill: '击杀位置',
+  grenade: '道具落点',
 };
 
 const LEGEND_COLORS: Record<HeatmapMode, string> = {
-  death:   "var(--dak-danger)",
-  kill:    "var(--dak-ok)",
-  grenade: "var(--dak-warn)",
+  death: 'var(--dak-danger)',
+  kill: 'var(--dak-ok)',
+  grenade: 'var(--dak-warn)',
 };
 
 // ── Grenade filter ────────────────────────────────────────────────────────────
 
 // Exclude "incendiary" from the user-facing filter — it is grouped with "molotov"
 // (CT side fires incendiary, T side fires molotov; they are the same weapon class).
-type GrenadeFilter = "all" | Exclude<GrenadeType, "incendiary">;
+type GrenadeFilter = 'all' | Exclude<GrenadeType, 'incendiary'>;
 
 const GRENADE_FILTER_OPTIONS: Array<{ value: GrenadeFilter; label: string }> = [
-  { value: "all",       label: "全部" },
-  { value: "flashbang", label: "闪光" },
-  { value: "smoke",     label: "烟雾" },
-  { value: "hegrenade", label: "手雷" },
-  { value: "molotov",   label: "燃烧" },
-  { value: "decoy",     label: "诱饵" },
+  { value: 'all', label: '全部' },
+  { value: 'flashbang', label: '闪光' },
+  { value: 'smoke', label: '烟雾' },
+  { value: 'hegrenade', label: '手雷' },
+  { value: 'molotov', label: '燃烧' },
+  { value: 'decoy', label: '诱饵' },
 ];
 
 function matchesGrenadeFilter(grenadeType: GrenadeType | null, filter: GrenadeFilter): boolean {
-  if (filter === "all") return true;
-  if (filter === "molotov") return grenadeType === "molotov" || grenadeType === "incendiary";
+  if (filter === 'all') return true;
+  if (filter === 'molotov') return grenadeType === 'molotov' || grenadeType === 'incendiary';
   return grenadeType === filter;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export interface HeatmapCanvasProps {
-  map: DemoViewModel["map"];
+  map: DemoViewModel['map'];
   points: HeatmapPoint[];
   /** Player roster for per-player filtering. When omitted the filter UI is hidden. */
   players?: Array<{ steamId64: string; name: string; teamKey: TeamKey }>;
@@ -145,13 +151,19 @@ export interface HeatmapCanvasProps {
   onModeChange?: (mode: HeatmapMode) => void;
 }
 
-export function HeatmapCanvas({ map, points, players, mode: controlledMode, onModeChange }: HeatmapCanvasProps) {
-  const [internalMode, setInternalMode] = useState<HeatmapMode>("death");
+export function HeatmapCanvas({
+  map,
+  points,
+  players,
+  mode: controlledMode,
+  onModeChange,
+}: HeatmapCanvasProps) {
+  const [internalMode, setInternalMode] = useState<HeatmapMode>('death');
   const [radius, setRadius] = useState(25);
-  const [blur, setBlur]     = useState(15);
+  const [blur, setBlur] = useState(15);
   const [opacity, setOpacity] = useState(0.72);
-  const [grenadeFilter, setGrenadeFilter] = useState<GrenadeFilter>("all");
-  const [sideFilter, setSideFilter] = useState<Side | "all">("all");
+  const [grenadeFilter, setGrenadeFilter] = useState<GrenadeFilter>('all');
+  const [sideFilter, setSideFilter] = useState<Side | 'all'>('all');
   // Empty set = all players shown.
   const [selectedSteamIds, setSelectedSteamIds] = useState<ReadonlySet<string>>(new Set());
 
@@ -174,13 +186,16 @@ export function HeatmapCanvas({ map, points, players, mode: controlledMode, onMo
   const calibration = getMapCalibration(map.name);
   // de_nuke / de_vertigo 双层：按 z 高度把点位拆到上下层分别渲染
   const dualLevel = !!(calibration && hasLowerLevel(calibration) && map.lowerRadarImageUrl);
-  const [level, setLevel] = useState<MapLevel>("upper");
+  const [level, setLevel] = useState<MapLevel>('upper');
 
-  const counts = useMemo(() => ({
-    death:   points.filter((p) => p.kind === "death").length,
-    kill:    points.filter((p) => p.kind === "kill").length,
-    grenade: points.filter((p) => p.kind === "grenade").length,
-  }), [points]);
+  const counts = useMemo(
+    () => ({
+      death: points.filter((p) => p.kind === 'death').length,
+      kill: points.filter((p) => p.kind === 'kill').length,
+      grenade: points.filter((p) => p.kind === 'grenade').length,
+    }),
+    [points],
+  );
 
   const scaledPoints = useMemo<Array<[number, number]>>(() => {
     if (!calibration) return [];
@@ -189,19 +204,22 @@ export function HeatmapCanvas({ map, points, players, mode: controlledMode, onMo
       .filter((p) => {
         if (p.x === 0 && p.y === 0) return false;
         if (p.kind !== mode) return false;
-        if (sideFilter !== "all" && p.side !== sideFilter) return false;
-        if (mode === "grenade" && !matchesGrenadeFilter(p.grenadeType, grenadeFilter)) return false;
-        if (selectedSteamIds.size > 0 && p.steamId64 && !selectedSteamIds.has(p.steamId64)) return false;
+        if (sideFilter !== 'all' && p.side !== sideFilter) return false;
+        if (mode === 'grenade' && !matchesGrenadeFilter(p.grenadeType, grenadeFilter)) return false;
+        if (selectedSteamIds.size > 0 && p.steamId64 && !selectedSteamIds.has(p.steamId64))
+          return false;
         if (dualLevel && levelAt(p.z, cal) !== level) return false;
         return true;
       })
       .flatMap((p) => {
         const radar = worldToRadar(p, cal);
         if (radar.outOfBounds) return [];
-        return [[
-          (radar.x / cal.radarSize) * CANVAS_SIZE,
-          (radar.y / cal.radarSize) * CANVAS_SIZE,
-        ] as [number, number]];
+        return [
+          [(radar.x / cal.radarSize) * CANVAS_SIZE, (radar.y / cal.radarSize) * CANVAS_SIZE] as [
+            number,
+            number,
+          ],
+        ];
       });
   }, [points, mode, sideFilter, grenadeFilter, selectedSteamIds, calibration, dualLevel, level]);
 
@@ -217,7 +235,7 @@ export function HeatmapCanvas({ map, points, players, mode: controlledMode, onMo
     if (!canvas) return;
 
     // Always set dimensions; resetting width also clears the canvas.
-    canvas.width  = CANVAS_SIZE;
+    canvas.width = CANVAS_SIZE;
     canvas.height = CANVAS_SIZE;
 
     if (!calibration || scaledPoints.length === 0) return;
@@ -241,7 +259,7 @@ export function HeatmapCanvas({ map, points, players, mode: controlledMode, onMo
               type="button"
               role="radio"
               aria-checked={mode === kind}
-              className={mode === kind ? "dak-mode dak-mode-active" : "dak-mode"}
+              className={mode === kind ? 'dak-mode dak-mode-active' : 'dak-mode'}
               onClick={() => setMode(kind)}
             >
               {MODE_LABELS[kind]} <span>{counts[kind]}</span>
@@ -249,37 +267,37 @@ export function HeatmapCanvas({ map, points, players, mode: controlledMode, onMo
           ))}
           {dualLevel && (
             <div className="dak-heatmap-side-filter" role="radiogroup" aria-label="地图层级">
-              {(["upper", "lower"] as const).map((nextLevel) => (
+              {(['upper', 'lower'] as const).map((nextLevel) => (
                 <button
                   key={nextLevel}
                   type="button"
                   role="radio"
                   aria-checked={level === nextLevel}
-                  className={level === nextLevel ? "dak-sf-chip dak-sf-chip-active" : "dak-sf-chip"}
+                  className={level === nextLevel ? 'dak-sf-chip dak-sf-chip-active' : 'dak-sf-chip'}
                   onClick={() => setLevel(nextLevel)}
                 >
-                  {nextLevel === "upper" ? "上层" : "下层"}
+                  {nextLevel === 'upper' ? '上层' : '下层'}
                 </button>
               ))}
             </div>
           )}
           <div className="dak-heatmap-side-filter" role="radiogroup" aria-label="阵营">
-            {(["all", "ct", "t"] as const).map((s) => (
+            {(['all', 'ct', 't'] as const).map((s) => (
               <button
                 key={s}
                 type="button"
                 role="radio"
                 aria-checked={sideFilter === s}
-                className={sideFilter === s ? "dak-sf-chip dak-sf-chip-active" : "dak-sf-chip"}
+                className={sideFilter === s ? 'dak-sf-chip dak-sf-chip-active' : 'dak-sf-chip'}
                 onClick={() => setSideFilter(s)}
               >
-                {s === "all" ? "全部" : s.toUpperCase()}
+                {s === 'all' ? '全部' : s.toUpperCase()}
               </button>
             ))}
           </div>
         </div>
 
-        {mode === "grenade" && (
+        {mode === 'grenade' && (
           <div className="dak-heatmap-grenade-filter" role="radiogroup" aria-label="道具类型">
             {GRENADE_FILTER_OPTIONS.map(({ value, label }) => (
               <button
@@ -287,7 +305,9 @@ export function HeatmapCanvas({ map, points, players, mode: controlledMode, onMo
                 type="button"
                 role="radio"
                 aria-checked={grenadeFilter === value}
-                className={grenadeFilter === value ? "dak-gf-chip dak-gf-chip-active" : "dak-gf-chip"}
+                className={
+                  grenadeFilter === value ? 'dak-gf-chip dak-gf-chip-active' : 'dak-gf-chip'
+                }
                 onClick={() => setGrenadeFilter(value)}
               >
                 {label}
@@ -300,7 +320,11 @@ export function HeatmapCanvas({ map, points, players, mode: controlledMode, onMo
           <div className="dak-heatmap-player-filter" aria-label="按选手筛选">
             <button
               type="button"
-              className={selectedSteamIds.size === 0 ? "dak-pf-chip dak-pf-all dak-pf-chip-active" : "dak-pf-chip dak-pf-all"}
+              className={
+                selectedSteamIds.size === 0
+                  ? 'dak-pf-chip dak-pf-all dak-pf-chip-active'
+                  : 'dak-pf-chip dak-pf-all'
+              }
               onClick={() => setSelectedSteamIds(new Set())}
             >
               全部选手
@@ -310,10 +334,12 @@ export function HeatmapCanvas({ map, points, players, mode: controlledMode, onMo
                 key={p.steamId64}
                 type="button"
                 className={[
-                  "dak-pf-chip",
+                  'dak-pf-chip',
                   `dak-pf-chip-${p.teamKey}`,
-                  selectedSteamIds.has(p.steamId64) ? "dak-pf-chip-active" : "",
-                ].join(" ").trim()}
+                  selectedSteamIds.has(p.steamId64) ? 'dak-pf-chip-active' : '',
+                ]
+                  .join(' ')
+                  .trim()}
                 onClick={() => togglePlayer(p.steamId64)}
               >
                 {p.name}
@@ -327,14 +353,16 @@ export function HeatmapCanvas({ map, points, players, mode: controlledMode, onMo
       <div
         className="dak-heatmap"
         style={(() => {
-          const url = dualLevel && level === "lower" ? map.lowerRadarImageUrl : map.radarImageUrl;
+          const url = dualLevel && level === 'lower' ? map.lowerRadarImageUrl : map.radarImageUrl;
           return url ? { backgroundImage: `url(${url})` } : undefined;
         })()}
       >
         {!map.radarImageUrl && <SchematicRadar mapName={map.name} />}
         <canvas ref={canvasRef} className="dak-heatmap-canvas" aria-hidden="true" />
         {!calibration && <div className="dak-heatmap-empty">该地图暂无雷达标定</div>}
-        {calibration && !hasData && <div className="dak-heatmap-empty">当前筛选条件下暂无位置数据</div>}
+        {calibration && !hasData && (
+          <div className="dak-heatmap-empty">当前筛选条件下暂无位置数据</div>
+        )}
         <div className="dak-heatmap-legend">
           <span>
             <i style={{ background: LEGEND_COLORS[mode] }} />
@@ -350,9 +378,36 @@ export function HeatmapCanvas({ map, points, players, mode: controlledMode, onMo
 
       {/* ── Tuning sliders (outside the radar image) ── */}
       <div className="dak-heatmap-tuning" aria-label="热力图参数">
-        <label>半径 <input type="range" min={10} max={60} value={radius} onChange={(e) => setRadius(Number(e.target.value))} /></label>
-        <label>虚化 <input type="range" min={2}  max={30} value={blur}   onChange={(e) => setBlur(Number(e.target.value))} /></label>
-        <label>强度 <input type="range" min={20} max={100} value={Math.round(opacity * 100)} onChange={(e) => setOpacity(Number(e.target.value) / 100)} /></label>
+        <label>
+          半径{' '}
+          <input
+            type="range"
+            min={10}
+            max={60}
+            value={radius}
+            onChange={(e) => setRadius(Number(e.target.value))}
+          />
+        </label>
+        <label>
+          虚化{' '}
+          <input
+            type="range"
+            min={2}
+            max={30}
+            value={blur}
+            onChange={(e) => setBlur(Number(e.target.value))}
+          />
+        </label>
+        <label>
+          强度{' '}
+          <input
+            type="range"
+            min={20}
+            max={100}
+            value={Math.round(opacity * 100)}
+            onChange={(e) => setOpacity(Number(e.target.value) / 100)}
+          />
+        </label>
       </div>
     </div>
   );

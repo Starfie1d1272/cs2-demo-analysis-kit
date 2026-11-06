@@ -1,5 +1,5 @@
-import { decodeDelta, type DemoPackage, type Side, type TeamKey } from "@cs2dak/contract";
-import { calloutNear, type CalloutGrid, type Vec3 } from "@cs2dak/maps";
+import { decodeDelta, type DemoPackage, type Side, type TeamKey } from '@cs2dak/contract';
+import { calloutNear, type CalloutGrid, type Vec3 } from '@cs2dak/maps';
 
 /**
  * A short-lived decoded replay round shared by replay-derived fact extractors.
@@ -19,7 +19,7 @@ export interface ReplayRoundTrack {
 }
 
 export interface ReplayRoundContext {
-  round: DemoPackage["rounds"][number];
+  round: DemoPackage['rounds'][number];
   startTick: number;
   tickStep: number;
   frameCount: number;
@@ -30,7 +30,7 @@ export interface ReplayRoundContext {
 
 export function createReplayRoundContext(
   pkg: DemoPackage,
-  round: DemoPackage["rounds"][number],
+  round: DemoPackage['rounds'][number],
 ): ReplayRoundContext | null {
   const replayRound = pkg.replay?.rounds.find((row) => row.roundNumber === round.roundNumber);
   if (!pkg.replay || !replayRound) return null;
@@ -45,7 +45,8 @@ export function createReplayRoundContext(
     tracks: replayRound.players.map((track) => {
       const player = pkg.players[track.playerIndex];
       const teamKey = player?.teamKey ?? null;
-      const side = teamKey === "teamA" ? round.teamASide : teamKey === "teamB" ? round.teamBSide : null;
+      const side =
+        teamKey === 'teamA' ? round.teamASide : teamKey === 'teamB' ? round.teamBSide : null;
       return {
         playerIndex: track.playerIndex,
         teamKey,
@@ -88,9 +89,18 @@ export function replayCalloutAt(
   const place = context.placeDict[track.place[frameIndex] ?? -1] ?? null;
   if (place) return place;
   if (!grid) return null;
-  return calloutNear(grid, replayPointAt(track, frameIndex), { horizontalRadius: 20, verticalRadius: 40 })?.callout ?? null;
+  return (
+    calloutNear(grid, replayPointAt(track, frameIndex), {
+      horizontalRadius: 20,
+      verticalRadius: 40,
+    })?.callout ?? null
+  );
 }
 
-export function replayWeaponAt(context: ReplayRoundContext, track: ReplayRoundTrack, frameIndex: number): string | null {
+export function replayWeaponAt(
+  context: ReplayRoundContext,
+  track: ReplayRoundTrack,
+  frameIndex: number,
+): string | null {
   return context.weaponDict[track.weapon[frameIndex] ?? -1] ?? null;
 }

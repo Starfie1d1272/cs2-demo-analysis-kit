@@ -1,4 +1,4 @@
-import type { DemoPackage } from "@cs2dak/contract";
+import type { DemoPackage } from '@cs2dak/contract';
 
 /**
  * Demo 元数据：与 facts 一样可在 worker 内从 DemoPackage 计算，
@@ -24,8 +24,8 @@ export interface DemoMeta {
 export function metaFromPackage(pkg: DemoPackage): DemoMeta {
   return {
     mapName: pkg.match.mapName,
-    teamAName: pkg.match.teamA.name ?? "Team A",
-    teamBName: pkg.match.teamB.name ?? "Team B",
+    teamAName: pkg.match.teamA.name ?? 'Team A',
+    teamBName: pkg.match.teamB.name ?? 'Team B',
     teamAScore: pkg.match.teamA.score,
     teamBScore: pkg.match.teamB.score,
     roundCount: pkg.rounds.length,

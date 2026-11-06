@@ -1,6 +1,6 @@
-import type { PlayerStyle } from "@cs2dak/presentation";
-import type { PlayerSeasonInsights } from "@cs2dak/analytics";
-import { formatMatchLabel, type StudioDemoEntry } from "../lib/demo-entry";
+import type { PlayerStyle } from '@cs2dak/presentation';
+import type { PlayerSeasonInsights } from '@cs2dak/analytics';
+import { formatMatchLabel, type StudioDemoEntry } from '../lib/demo-entry';
 
 /**
  * 选手档案共享展示组件：个人实验室与「我的主页」复用同一套渲染，
@@ -15,27 +15,35 @@ export function FingerprintRadar({ style }: { style: PlayerStyle }) {
   const radius = size / 2 - 34;
   const point = (index: number, fraction: number) => {
     const angle = (Math.PI * 2 * index) / axes.length - Math.PI / 2;
-    return [center + Math.cos(angle) * radius * fraction, center + Math.sin(angle) * radius * fraction] as const;
+    return [
+      center + Math.cos(angle) * radius * fraction,
+      center + Math.sin(angle) * radius * fraction,
+    ] as const;
   };
-  const ringPath = (fraction: number) =>
-    axes.map((_, i) => point(i, fraction).join(",")).join(" ");
-  const pathFor = (field: "involvementPercentile" | "efficiencyPercentile"): string | null => {
+  const ringPath = (fraction: number) => axes.map((_, i) => point(i, fraction).join(',')).join(' ');
+  const pathFor = (field: 'involvementPercentile' | 'efficiencyPercentile'): string | null => {
     const points = axes.map((axis, i) => {
       const value = axis[field];
-      return value == null ? null : point(i, Math.max(0.04, value / 100)).join(",");
+      return value == null ? null : point(i, Math.max(0.04, value / 100)).join(',');
     });
-    return points.every((value): value is string => value != null) ? points.join(" ") : null;
+    return points.every((value): value is string => value != null) ? points.join(' ') : null;
   };
-  const involvementPath = pathFor("involvementPercentile");
-  const efficiencyPath = pathFor("efficiencyPercentile");
+  const involvementPath = pathFor('involvementPercentile');
+  const efficiencyPath = pathFor('efficiencyPercentile');
   const hasCompleteFingerprint = involvementPath != null && efficiencyPath != null;
-  const rrTone = rrPercentile >= 75 ? "high" : rrPercentile >= 40 ? "mid" : "low";
+  const rrTone = rrPercentile >= 75 ? 'high' : rrPercentile >= 40 ? 'mid' : 'low';
 
   return (
     <div className={`stu-prism-radar stu-prism-radar-${rrTone}`}>
-      <svg viewBox={`0 0 ${size} ${size}`} className="stu-radar" role="img" aria-label={hasCompleteFingerprint
-        ? `PRISM 八维打法画像，RR 样本内 P${rrPercentile.toFixed(0)}`
-        : `PRISM 八维打法画像部分可用，RR 样本内 P${rrPercentile.toFixed(0)}`}
+      <svg
+        viewBox={`0 0 ${size} ${size}`}
+        className="stu-radar"
+        role="img"
+        aria-label={
+          hasCompleteFingerprint
+            ? `PRISM 八维打法画像，RR 样本内 P${rrPercentile.toFixed(0)}`
+            : `PRISM 八维打法画像部分可用，RR 样本内 P${rrPercentile.toFixed(0)}`
+        }
       >
         {[0.25, 0.5, 0.75, 1].map((fraction) => (
           <polygon key={fraction} className="stu-radar-ring" points={ringPath(fraction)} />
@@ -62,38 +70,60 @@ export function FingerprintRadar({ style }: { style: PlayerStyle }) {
         {axes.map((axis, i) => {
           const [x, y] = point(i, 1.16);
           return (
-            <text key={axis.key} className={axis.status === "ready" ? "stu-radar-label" : "stu-radar-label stu-radar-label-muted"} x={x} y={y} textAnchor="middle" dominantBaseline="middle">
+            <text
+              key={axis.key}
+              className={
+                axis.status === 'ready'
+                  ? 'stu-radar-label'
+                  : 'stu-radar-label stu-radar-label-muted'
+              }
+              x={x}
+              y={y}
+              textAnchor="middle"
+              dominantBaseline="middle"
+            >
               {axis.label}
             </text>
           );
         })}
       </svg>
       <div className="stu-prism-legend" aria-label="图例">
-        <span><i className="stu-prism-key stu-prism-key-involvement" />行为倾向</span>
-        <span><i className="stu-prism-key stu-prism-key-efficiency" />执行效率</span>
+        <span>
+          <i className="stu-prism-key stu-prism-key-involvement" />
+          行为倾向
+        </span>
+        <span>
+          <i className="stu-prism-key stu-prism-key-efficiency" />
+          执行效率
+        </span>
         <b>RR · 样本内 P{rrPercentile.toFixed(0)}</b>
-        {!hasCompleteFingerprint && <span className="stu-prism-legend-partial">部分信号不绘制闭合画像</span>}
+        {!hasCompleteFingerprint && (
+          <span className="stu-prism-legend-partial">部分信号不绘制闭合画像</span>
+        )}
       </div>
     </div>
   );
 }
 
 export const TREND_METRICS = [
-  { key: "adr", label: "ADR", format: (v: number) => v.toFixed(1) },
-  { key: "kast", label: "KAST%", format: (v: number) => v.toFixed(1) },
-  { key: "fkMinusFd", label: "首杀差(FK-FD)", format: (v: number) => v.toFixed(0) },
-  { key: "utilityDamagePerRound", label: "Util/R", format: (v: number) => v.toFixed(2) }
+  { key: 'adr', label: 'ADR', format: (v: number) => v.toFixed(1) },
+  { key: 'kast', label: 'KAST%', format: (v: number) => v.toFixed(1) },
+  { key: 'fkMinusFd', label: '首杀差(FK-FD)', format: (v: number) => v.toFixed(0) },
+  { key: 'utilityDamagePerRound', label: 'Util/R', format: (v: number) => v.toFixed(2) },
 ] as const;
-export type TrendMetricKey = (typeof TREND_METRICS)[number]["key"];
+export type TrendMetricKey = (typeof TREND_METRICS)[number]['key'];
 
 /** 个人趋势柱状图，指标可切换；点击柱进入对应比赛。 */
 export function TrendChart({
   trend,
   entryByMatchId,
-  onOpenMatch, metric, onMetricChange
+  onOpenMatch,
+  metric,
+  onMetricChange,
 }: {
-  metric: TrendMetricKey; onMetricChange: (metric: TrendMetricKey) => void;
-  trend: PlayerSeasonInsights["trend"];
+  metric: TrendMetricKey;
+  onMetricChange: (metric: TrendMetricKey) => void;
+  trend: PlayerSeasonInsights['trend'];
   entryByMatchId: Map<string, StudioDemoEntry>;
   onOpenMatch: (entryId: string) => void;
 }) {
@@ -113,7 +143,7 @@ export function TrendChart({
             type="button"
             role="radio"
             aria-checked={metric === m.key}
-            className={metric === m.key ? "stu-subtab stu-subtab-active" : "stu-subtab"}
+            className={metric === m.key ? 'stu-subtab stu-subtab-active' : 'stu-subtab'}
             onClick={() => onMetricChange(m.key)}
           >
             {m.label}
@@ -144,7 +174,9 @@ export function TrendChart({
         })}
       </div>
       <div className="stu-trend-range stu-dim">
-        <small>{spec.label}：{spec.format(min)} – {spec.format(max)} · {trend.length} 场</small>
+        <small>
+          {spec.label}：{spec.format(min)} – {spec.format(max)} · {trend.length} 场
+        </small>
       </div>
     </div>
   );

@@ -7,17 +7,22 @@
  *
  * 复用 dak-heatmap-* 设计语言与 worldToRadar / 双层处理，与 HeatmapCanvas 视觉一致。
  */
-import type { RadarFieldView } from "@cs2dak/presentation";
-import { RADAR_FIELD_MODES, radarModeFrame, type RadarFieldMode, type RadarFieldCanvasState } from "@cs2dak/presentation/radar-field";
+import type { RadarFieldView } from '@cs2dak/presentation';
+import {
+  RADAR_FIELD_MODES,
+  radarModeFrame,
+  type RadarFieldMode,
+  type RadarFieldCanvasState,
+} from '@cs2dak/presentation/radar-field';
 import {
   getMapCalibration,
   worldToRadar,
   hasLowerLevel,
   levelAt,
   type MapLevel,
-} from "@cs2dak/maps/calibration";
-import { Pause, Play } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+} from '@cs2dak/maps/calibration';
+import { Pause, Play } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
 const CANVAS_SIZE = 1024;
 const PLAYBACK_INTERVAL_MS = 250;
@@ -25,24 +30,27 @@ const MIN_VISIBLE_MAG = 0.005;
 const MIN_VISIBLE_PRESENCE_MAG = 0.003;
 
 type Band = [number, string];
-type BandKind = "screen" | "aim" | "presence" | "sound" | "contested";
+type BandKind = 'screen' | 'aim' | 'presence' | 'sound' | 'contested';
 
 // 按去 0 后的真实 decile 分档；低频边界是控图的主要信息。
 const BAND_COLORS = [
-  "34,47,86",
-  "42,67,115",
-  "48,91,145",
-  "50,118,165",
-  "48,145,176",
-  "64,170,170",
-  "103,188,146",
-  "166,195,104",
-  "220,174,82",
-  "245,128,86",
+  '34,47,86',
+  '42,67,115',
+  '48,91,145',
+  '50,118,165',
+  '48,145,176',
+  '64,170,170',
+  '103,188,146',
+  '166,195,104',
+  '220,174,82',
+  '245,128,86',
 ] as const;
 
 function band(...limits: number[]): Band[] {
-  return limits.map((limit, index) => [limit, BAND_COLORS[Math.min(index, BAND_COLORS.length - 1)]!]);
+  return limits.map((limit, index) => [
+    limit,
+    BAND_COLORS[Math.min(index, BAND_COLORS.length - 1)]!,
+  ]);
 }
 
 const SCREEN_BANDS = band(0.005, 0.011, 0.017, 0.027, 0.04, 0.057, 0.08, 0.114, 0.176, 1.01);
@@ -108,15 +116,15 @@ const MAP_BANDS: Partial<Record<string, Partial<Record<BandKind, Band[]>>>> = {
     contested: band(0.003, 0.006, 0.01, 0.015, 0.021, 0.029, 0.039, 0.053, 0.077, 1.01),
   },
 };
-const DIFF_POS_RGB = "255,90,114"; // --dak-danger
-const DIFF_NEG_RGB = "73,182,255"; // --dak-accent-b
+const DIFF_POS_RGB = '255,90,114'; // --dak-danger
+const DIFF_NEG_RGB = '73,182,255'; // --dak-accent-b
 
 function bandKind(mode: RadarFieldMode): BandKind {
-  if (mode === "ctAim" || mode === "tAim") return "aim";
-  if (mode === "ctPres" || mode === "tPres") return "presence";
-  if (mode === "ctSound" || mode === "tSound") return "sound";
-  if (mode === "contested") return "contested";
-  return "screen";
+  if (mode === 'ctAim' || mode === 'tAim') return 'aim';
+  if (mode === 'ctPres' || mode === 'tPres') return 'presence';
+  if (mode === 'ctSound' || mode === 'tSound') return 'sound';
+  if (mode === 'contested') return 'contested';
+  return 'screen';
 }
 
 function bandsForMode(mapName: string, mode: RadarFieldMode): Band[] {
@@ -127,16 +135,16 @@ function bandsForMode(mapName: string, mode: RadarFieldMode): Band[] {
 function heatBand(mapName: string, mode: RadarFieldMode, mag: number): string {
   const bands = bandsForMode(mapName, mode);
   for (const [hi, rgb] of bands) if (mag <= hi) return rgb;
-  return "255,102,54";
+  return '255,102,54';
 }
 
 function minVisibleMag(mode: RadarFieldMode): number {
-  return mode === "ctPres" || mode === "tPres" ? MIN_VISIBLE_PRESENCE_MAG : MIN_VISIBLE_MAG;
+  return mode === 'ctPres' || mode === 'tPres' ? MIN_VISIBLE_PRESENCE_MAG : MIN_VISIBLE_MAG;
 }
 
 function formatClock(seconds: number): string {
   const clamped = Math.max(0, Math.floor(seconds));
-  return `${Math.floor(clamped / 60)}:${String(clamped % 60).padStart(2, "0")}`;
+  return `${Math.floor(clamped / 60)}:${String(clamped % 60).padStart(2, '0')}`;
 }
 
 export interface RadarFieldCanvasProps {
@@ -148,20 +156,32 @@ export interface RadarFieldCanvasProps {
   onStateChange?: (state: RadarFieldCanvasState) => void;
 }
 
-export function RadarFieldCanvas({ field, baseline = null, map, state, onStateChange }: RadarFieldCanvasProps) {
-  const [localState, setLocalState] = useState<RadarFieldCanvasState>({ mode: "ctVis", second: 20, level: "upper" });
+export function RadarFieldCanvas({
+  field,
+  baseline = null,
+  map,
+  state,
+  onStateChange,
+}: RadarFieldCanvasProps) {
+  const [localState, setLocalState] = useState<RadarFieldCanvasState>({
+    mode: 'ctVis',
+    second: 20,
+    level: 'upper',
+  });
   const current = state ?? localState;
   const currentRef = useRef(current);
   currentRef.current = current;
   const update = (patch: Partial<RadarFieldCanvasState>) => {
     const next = { ...currentRef.current, ...patch };
     currentRef.current = next;
-    if (state) onStateChange?.(next); else setLocalState(next);
+    if (state) onStateChange?.(next);
+    else setLocalState(next);
   };
   const { mode, second: sec, level } = current;
   const setMode = (mode: RadarFieldMode) => update({ mode });
   const setLevel = (level: MapLevel) => update({ level });
-  const setSec = (value: number | ((previous: number) => number)) => update({ second: typeof value === "function" ? value(currentRef.current.second) : value });
+  const setSec = (value: number | ((previous: number) => number)) =>
+    update({ second: typeof value === 'function' ? value(currentRef.current.second) : value });
   const [playing, setPlaying] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const calibration = getMapCalibration(map.name);
@@ -171,7 +191,8 @@ export function RadarFieldCanvas({ field, baseline = null, map, state, onStateCh
   const maxSec = Math.max(0, field.maxSec - 1);
 
   useEffect(() => {
-    if (sec > maxSec || (!dualLevel && level === "lower")) update({ second: Math.min(sec, maxSec), level: dualLevel ? level : "upper" });
+    if (sec > maxSec || (!dualLevel && level === 'lower'))
+      update({ second: Math.min(sec, maxSec), level: dualLevel ? level : 'upper' });
   }, [maxSec, dualLevel, sec, level]);
 
   useEffect(() => {
@@ -193,7 +214,7 @@ export function RadarFieldCanvas({ field, baseline = null, map, state, onStateCh
     if (!canvas) return;
     canvas.width = CANVAS_SIZE;
     canvas.height = CANVAS_SIZE;
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext('2d');
     if (!ctx || !calibration) return;
 
     const cal = calibration;
@@ -203,7 +224,7 @@ export function RadarFieldCanvas({ field, baseline = null, map, state, onStateCh
     const blobR = (field.grid.cellSize / cal.scale) * 1.35 * px2canvas;
 
     ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-    ctx.globalCompositeOperation = "source-over";
+    ctx.globalCompositeOperation = 'source-over';
 
     for (let g = 0; g < cells.length; g++) {
       const v = frame.values[g]!;
@@ -217,7 +238,11 @@ export function RadarFieldCanvas({ field, baseline = null, map, state, onStateCh
       const y = radar.y * px2canvas;
       const t = Math.min(1, mag / frame.cap);
       const op = 0.12 + 0.36 * Math.pow(t, 0.72);
-      const rgb = frame.signed ? (v > 0 ? DIFF_POS_RGB : DIFF_NEG_RGB) : heatBand(map.name, mode, mag);
+      const rgb = frame.signed
+        ? v > 0
+          ? DIFF_POS_RGB
+          : DIFF_NEG_RGB
+        : heatBand(map.name, mode, mag);
       const grd = ctx.createRadialGradient(x, y, 0, x, y, blobR);
       grd.addColorStop(0, `rgba(${rgb},${op.toFixed(2)})`);
       grd.addColorStop(1, `rgba(${rgb},0)`);
@@ -226,23 +251,23 @@ export function RadarFieldCanvas({ field, baseline = null, map, state, onStateCh
       ctx.arc(x, y, blobR, 0, Math.PI * 2);
       ctx.fill();
     }
-    ctx.globalCompositeOperation = "source-over";
+    ctx.globalCompositeOperation = 'source-over';
   }, [field, baseline, mode, sec, level, calibration, dualLevel]);
 
-  const bgUrl = dualLevel && level === "lower" ? map.lowerRadarImageUrl : map.radarImageUrl;
+  const bgUrl = dualLevel && level === 'lower' ? map.lowerRadarImageUrl : map.radarImageUrl;
   const legend = isDiff
-    ? "红 = 高于赛事基线 · 蓝 = 低于基线"
-    : mode === "info-diff"
-        ? "暖 = T 信息优势 · 冷 = CT 预警"
-        : mode === "contested"
-          ? "双方都看到 = 对拼线 / 交火点"
-          : mode === "ctPres" || mode === "tPres"
-            ? "冷 → 热 = 站人频率低 → 高"
-            : mode === "ctAim" || mode === "tAim"
-              ? "冷 → 热 = 准星覆盖低 → 高"
-              : mode === "ctSound" || mode === "tSound"
-                ? "冷 → 热 = 发声被对面听到概率低 → 高"
-                : "冷 → 热 = 4:3 屏幕可见低 → 高";
+    ? '红 = 高于赛事基线 · 蓝 = 低于基线'
+    : mode === 'info-diff'
+      ? '暖 = T 信息优势 · 冷 = CT 预警'
+      : mode === 'contested'
+        ? '双方都看到 = 对拼线 / 交火点'
+        : mode === 'ctPres' || mode === 'tPres'
+          ? '冷 → 热 = 站人频率低 → 高'
+          : mode === 'ctAim' || mode === 'tAim'
+            ? '冷 → 热 = 准星覆盖低 → 高'
+            : mode === 'ctSound' || mode === 'tSound'
+              ? '冷 → 热 = 发声被对面听到概率低 → 高'
+              : '冷 → 热 = 4:3 屏幕可见低 → 高';
   const legendText = legend;
   const clock = formatClock(field.maxSec - sec);
   const endClock = formatClock(field.maxSec - maxSec);
@@ -257,7 +282,7 @@ export function RadarFieldCanvas({ field, baseline = null, map, state, onStateCh
               type="button"
               role="radio"
               aria-checked={mode === opt.value}
-              className={mode === opt.value ? "dak-mode dak-mode-active" : "dak-mode"}
+              className={mode === opt.value ? 'dak-mode dak-mode-active' : 'dak-mode'}
               onClick={() => setMode(opt.value)}
             >
               {opt.label}
@@ -265,16 +290,16 @@ export function RadarFieldCanvas({ field, baseline = null, map, state, onStateCh
           ))}
           {dualLevel && (
             <div className="dak-heatmap-side-filter" role="radiogroup" aria-label="地图层级">
-              {(["upper", "lower"] as const).map((next) => (
+              {(['upper', 'lower'] as const).map((next) => (
                 <button
                   key={next}
                   type="button"
                   role="radio"
                   aria-checked={level === next}
-                  className={level === next ? "dak-sf-chip dak-sf-chip-active" : "dak-sf-chip"}
+                  className={level === next ? 'dak-sf-chip dak-sf-chip-active' : 'dak-sf-chip'}
                   onClick={() => setLevel(next)}
                 >
-                  {next === "upper" ? "上层" : "下层"}
+                  {next === 'upper' ? '上层' : '下层'}
                 </button>
               ))}
             </div>
@@ -282,13 +307,20 @@ export function RadarFieldCanvas({ field, baseline = null, map, state, onStateCh
         </div>
       </div>
 
-      <div className="dak-heatmap dak-radar-field-map" style={bgUrl ? { backgroundImage: `url(${bgUrl})` } : undefined}>
+      <div
+        className="dak-heatmap dak-radar-field-map"
+        style={bgUrl ? { backgroundImage: `url(${bgUrl})` } : undefined}
+      >
         <canvas ref={canvasRef} className="dak-heatmap-canvas" aria-hidden="true" />
         {!calibration && <div className="dak-heatmap-empty">该地图暂无雷达标定</div>}
         <div className="dak-heatmap-legend">
           <span>
-            {field.scope.kind === "team" ? field.scope.team : "赛事地图基线"}
-            <small> · {field.scope.roundCount} 回合{isDiff ? ` vs 赛事基线 ${baseline!.scope.roundCount}` : ""}</small>
+            {field.scope.kind === 'team' ? field.scope.team : '赛事地图基线'}
+            <small>
+              {' '}
+              · {field.scope.roundCount} 回合
+              {isDiff ? ` vs 赛事基线 ${baseline!.scope.roundCount}` : ''}
+            </small>
           </span>
           <span className="dak-heatmap-legend-scale">
             <i className="dak-legend-radar-field" />
@@ -301,7 +333,7 @@ export function RadarFieldCanvas({ field, baseline = null, map, state, onStateCh
         <button
           type="button"
           className="dak-play-button dak-radar-play-button"
-          aria-label={playing ? "暂停控图播放" : "播放控图变化"}
+          aria-label={playing ? '暂停控图播放' : '播放控图变化'}
           onClick={() => {
             if (playing) {
               setPlaying(false);

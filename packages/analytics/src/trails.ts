@@ -1,10 +1,14 @@
-import { decodeDelta, type DemoPackage } from "@cs2dak/contract";
-import { openingTrailsModelSchema, type OpeningTrailRound, type OpeningTrailsModel } from "@cs2dak/tactics";
+import { decodeDelta, type DemoPackage } from '@cs2dak/contract';
+import {
+  openingTrailsModelSchema,
+  type OpeningTrailRound,
+  type OpeningTrailsModel,
+} from '@cs2dak/tactics';
 
-import { normalizeDemoPackage } from "@cs2dak/core";
-import { nameForSteamId } from "./workspace-utils.js";
+import { normalizeDemoPackage } from '@cs2dak/core';
+import { nameForSteamId } from './workspace-utils.js';
 
-type TrailEconomy = OpeningTrailRound["economyType"];
+type TrailEconomy = OpeningTrailRound['economyType'];
 
 export interface OpeningTrailsOptions {
   /** 开局窗口秒数，默认 30。 */
@@ -22,20 +26,20 @@ export function buildOpeningTrails(
   input: unknown,
   matchId: string,
   steamId64: string,
-  opts: OpeningTrailsOptions = {}
+  opts: OpeningTrailsOptions = {},
 ): OpeningTrailsModel {
   const pkg = normalizeDemoPackage(input) as DemoPackage;
   const windowSeconds = opts.windowSeconds ?? 30;
-  const economyTypes = opts.economyTypes ?? ["full"];
+  const economyTypes = opts.economyTypes ?? ['full'];
   const playerName = nameForSteamId(pkg, steamId64) ?? steamId64;
 
   const base = {
-    version: "cs2-demo-analysis-kit/opening-trails-0.2" as const,
+    version: 'cs2-demo-analysis-kit/opening-trails-0.2' as const,
     matchId,
     mapName: pkg.match.mapName,
     steamId64,
     playerName,
-    windowSeconds
+    windowSeconds,
   };
 
   const replay = pkg.replay;
@@ -56,7 +60,8 @@ export function buildOpeningTrails(
 
     const playerRow = pkg.players[player.playerIndex];
     if (!playerRow) return [];
-    const economyType = playerRow.teamKey === "teamA" ? roundRow.teamAEconomy : roundRow.teamBEconomy;
+    const economyType =
+      playerRow.teamKey === 'teamA' ? roundRow.teamAEconomy : roundRow.teamBEconomy;
     if (!economyTypes.includes(economyType)) return [];
 
     const windowStart = roundRow.freezeEndTick;
@@ -85,7 +90,7 @@ export function buildOpeningTrails(
           row.roundNumber === replayRound.roundNumber &&
           (pkg.players[row.throwerIndex]?.steamId64 ?? null) === steamId64 &&
           row.throwTick >= windowStart &&
-          row.throwTick <= windowEnd
+          row.throwTick <= windowEnd,
       )
       .map((row) => ({
         t: (row.throwTick - windowStart) / tickrate,
@@ -93,9 +98,10 @@ export function buildOpeningTrails(
         y: row.throwPosition.y,
         grenade: row.grenade,
         effectT: Math.max(0, (row.effectTick - windowStart) / tickrate),
-        destroyT: row.destroyTick == null ? null : Math.max(0, (row.destroyTick - windowStart) / tickrate),
+        destroyT:
+          row.destroyTick == null ? null : Math.max(0, (row.destroyTick - windowStart) / tickrate),
         effectX: row.effectPosition.x,
-        effectY: row.effectPosition.y
+        effectY: row.effectPosition.y,
       }))
       .sort((a, b) => a.t - b.t);
 
@@ -103,11 +109,11 @@ export function buildOpeningTrails(
       {
         matchId,
         roundNumber: replayRound.roundNumber,
-        side: playerRow.teamKey === "teamA" ? roundRow.teamASide : roundRow.teamBSide,
+        side: playerRow.teamKey === 'teamA' ? roundRow.teamASide : roundRow.teamBSide,
         economyType,
         points,
-        grenades
-      }
+        grenades,
+      },
     ];
   });
 

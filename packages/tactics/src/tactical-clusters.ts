@@ -1,11 +1,11 @@
-import type { OpeningPattern } from "./tactics/types.js";
+import type { OpeningPattern } from './tactics/types.js';
 
-export type TacticalExecuteBucket = "rush" | "fast" | "mid" | "late";
-export type EconomyEntry = "pistol" | "gun" | "anti_eco" | "force" | "semi" | "eco";
+export type TacticalExecuteBucket = 'rush' | 'fast' | 'mid' | 'late';
+export type EconomyEntry = 'pistol' | 'gun' | 'anti_eco' | 'force' | 'semi' | 'eco';
 
 export interface TacticalPatternRow {
-  side: "t" | "ct";
-  targetSite: "a" | "b" | null;
+  side: 't' | 'ct';
+  targetSite: 'a' | 'b' | null;
   matchId: string;
   mapName: string;
   teamKey: string;
@@ -20,17 +20,31 @@ export interface TacticalPatternRow {
   roundNumber: number;
   openingPattern: OpeningPattern;
   siteEntries: {
-    a: { entrants: number; order: Array<{ entryCallout: string | null; entryChokeId?: string | null; routeFamilyId?: string | null }> };
-    b: { entrants: number; order: Array<{ entryCallout: string | null; entryChokeId?: string | null; routeFamilyId?: string | null }> };
+    a: {
+      entrants: number;
+      order: Array<{
+        entryCallout: string | null;
+        entryChokeId?: string | null;
+        routeFamilyId?: string | null;
+      }>;
+    };
+    b: {
+      entrants: number;
+      order: Array<{
+        entryCallout: string | null;
+        entryChokeId?: string | null;
+        routeFamilyId?: string | null;
+      }>;
+    };
   };
   plant: unknown | null;
-  grenades: Array<{ type: string; targetRegion: "a" | "b" | "mid" | "other" | "unknown" }>;
-  c4Route: { endRegion: "a" | "b" | "mid" | "other" | null; rotated: boolean } | null;
+  grenades: Array<{ type: string; targetRegion: 'a' | 'b' | 'mid' | 'other' | 'unknown' }>;
+  c4Route: { endRegion: 'a' | 'b' | 'mid' | 'other' | null; rotated: boolean } | null;
   executeBucket: TacticalExecuteBucket | null;
 }
 
 export interface TacticalEntryEvidenceRoute {
-  site: "a" | "b";
+  site: 'a' | 'b';
   combo: string;
   roundCount: number;
   percentOfCovered: number;
@@ -46,7 +60,7 @@ export interface TacticalEntryEvidence {
 export interface TacticalCluster {
   id: string;
   mapName: string;
-  side: TacticalPatternRow["side"];
+  side: TacticalPatternRow['side'];
   economyEntry: EconomyEntry;
   /** 当前事实中可用的跨场队伍身份（规范化 teamName）。 */
   teamIdentity: string;
@@ -54,7 +68,7 @@ export interface TacticalCluster {
   opponentNames: string[];
   opponentIdentities: string[];
   /** 真实 OpeningPattern 的区域人数与 spread，不含任何最终打点事实。 */
-  openingIntent: Pick<OpeningPattern, "regionCounts" | "spread">;
+  openingIntent: Pick<OpeningPattern, 'regionCounts' | 'spread'>;
   /** 真实默认位人数结构；精确人数是开局身份的一部分。 */
   positionGroupCounts: Record<string, number>;
   primaryCategory: string;
@@ -63,15 +77,22 @@ export interface TacticalCluster {
   roundCount: number;
   winRatePercent: number | null;
   plantRatePercent: number | null;
-  rounds: Array<{ matchId: string; roundNumber: number; teamKey: string; won: boolean; economy: string; planted: boolean }>;
+  rounds: Array<{
+    matchId: string;
+    roundNumber: number;
+    teamKey: string;
+    won: boolean;
+    economy: string;
+    planted: boolean;
+  }>;
 }
 
 export function economyEntryOf(economy: string, opponentEconomy: string): EconomyEntry {
-  if (economy === "pistol") return "pistol";
-  if (economy === "full") return opponentEconomy === "full" ? "gun" : "anti_eco";
-  if (economy === "force") return "force";
-  if (economy === "semi") return "semi";
-  return "eco";
+  if (economy === 'pistol') return 'pistol';
+  if (economy === 'full') return opponentEconomy === 'full' ? 'gun' : 'anti_eco';
+  if (economy === 'force') return 'force';
+  if (economy === 'semi') return 'semi';
+  return 'eco';
 }
 
 export function defaultsBasisKey(defaults: Record<string, number>): string {
@@ -79,7 +100,7 @@ export function defaultsBasisKey(defaults: Record<string, number>): string {
     .filter(([, count]) => count > 0)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([id, count]) => `${id}:${count}`)
-    .join("|");
+    .join('|');
 }
 export const advancedBasisKey = defaultsBasisKey;
 
@@ -102,12 +123,19 @@ function opponentIdentityOf(row: TacticalPatternRow): string {
 }
 
 export function openingPatternKey(row: TacticalPatternRow): string {
-  return [row.mapName, row.side, openingIntentKey(row.openingPattern), positionGroupSetKey(row.openingPattern.positionGroupCounts)].join(":");
+  return [
+    row.mapName,
+    row.side,
+    openingIntentKey(row.openingPattern),
+    positionGroupSetKey(row.openingPattern.positionGroupCounts),
+  ].join(':');
 }
 
 /** 单回合真实进点证据。缺少目标点或入口时返回 null，不用 fallback 猜测。 */
-export function entryEvidenceKey(row: TacticalPatternRow): { site: "a" | "b"; combo: string } | null {
-  if (row.side !== "t") return null;
+export function entryEvidenceKey(
+  row: TacticalPatternRow,
+): { site: 'a' | 'b'; combo: string } | null {
+  if (row.side !== 't') return null;
   const site = row.targetSite;
   if (!site) return null;
   const ids = new Set<string>();
@@ -116,11 +144,11 @@ export function entryEvidenceKey(row: TacticalPatternRow): { site: "a" | "b"; co
     if (id) ids.add(id);
   }
   if (ids.size === 0) return null;
-  return { site, combo: [...ids].sort().join("+") };
+  return { site, combo: [...ids].sort().join('+') };
 }
 
 /** 兼容既有调用：该函数现在只读取真实进点 evidence，不参与聚类 key。 */
-export function chokeComboOf(row: TacticalPatternRow, site: "a" | "b" | null): string | null {
+export function chokeComboOf(row: TacticalPatternRow, site: 'a' | 'b' | null): string | null {
   const evidence = entryEvidenceKey(row);
   return evidence?.site === site ? evidence.combo : null;
 }
@@ -132,15 +160,19 @@ export function tacticalClusterKey(row: TacticalPatternRow): string {
     teamIdentityOf(row),
     economyEntryOf(row.economy, row.opponentEconomy),
     openingIntentKey(row.openingPattern),
-    positionGroupSetKey(row.openingPattern.positionGroupCounts) || "-",
-  ].join("|");
+    positionGroupSetKey(row.openingPattern.positionGroupCounts) || '-',
+  ].join('|');
 }
 
 function primaryCategoryOf(pattern: OpeningPattern): string {
   const { a, mid, b } = pattern.regionCounts;
   const max = Math.max(a, mid, b);
-  const leaders = [a === max ? "A侧" : null, mid === max ? "中路" : null, b === max ? "B侧" : null].filter(Boolean);
-  return leaders.length === 1 ? `${leaders[0]}控图` : "均衡控图";
+  const leaders = [
+    a === max ? 'A侧' : null,
+    mid === max ? '中路' : null,
+    b === max ? 'B侧' : null,
+  ].filter(Boolean);
+  return leaders.length === 1 ? `${leaders[0]}控图` : '均衡控图';
 }
 
 export function buildTacticalClusters(rows: readonly TacticalPatternRow[]): TacticalCluster[] {
@@ -176,7 +208,8 @@ export function buildTacticalClusters(rows: readonly TacticalPatternRow[]): Tact
       cluster.opponentNames.sort((a, b) => a.localeCompare(b));
     }
     const opponentIdentity = opponentIdentityOf(row);
-    if (!cluster.opponentIdentities.includes(opponentIdentity)) cluster.opponentIdentities.push(opponentIdentity);
+    if (!cluster.opponentIdentities.includes(opponentIdentity))
+      cluster.opponentIdentities.push(opponentIdentity);
     cluster.rounds.push({
       matchId: row.matchId,
       roundNumber: row.roundNumber,
@@ -202,20 +235,31 @@ export function buildTacticalClusters(rows: readonly TacticalPatternRow[]): Tact
       const coveredRounds = [...counts.values()].reduce((sum, count) => sum + count, 0);
       return {
         ...cluster,
-        winRatePercent: percent(cluster.rounds.filter((round) => round.won).length, cluster.roundCount),
-        plantRatePercent: percent(cluster.rounds.filter((round) => round.planted).length, cluster.roundCount),
+        winRatePercent: percent(
+          cluster.rounds.filter((round) => round.won).length,
+          cluster.roundCount,
+        ),
+        plantRatePercent: percent(
+          cluster.rounds.filter((round) => round.planted).length,
+          cluster.roundCount,
+        ),
         entryEvidence: {
           coveredRounds,
           totalRounds: cluster.roundCount,
           coveragePercent: percent(coveredRounds, cluster.roundCount),
           routes: [...counts.entries()]
             .map(([key, roundCount]) => ({
-              site: key.slice(0, 1) as "a" | "b",
+              site: key.slice(0, 1) as 'a' | 'b',
               combo: key.slice(2),
               roundCount,
               percentOfCovered: percent(roundCount, coveredRounds),
             }))
-            .sort((a, b) => b.roundCount - a.roundCount || a.site.localeCompare(b.site) || a.combo.localeCompare(b.combo)),
+            .sort(
+              (a, b) =>
+                b.roundCount - a.roundCount ||
+                a.site.localeCompare(b.site) ||
+                a.combo.localeCompare(b.combo),
+            ),
         },
       };
     })

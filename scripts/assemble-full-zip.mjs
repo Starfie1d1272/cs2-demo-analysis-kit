@@ -13,18 +13,29 @@
 //
 // 0.8 起：官方资产放 app 同级 assets/，userdata/ 只放用户资料库。
 
-import { execSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { basename, join, resolve } from "node:path";
-import { argv, exit } from "node:process";
-import { createHash } from "node:crypto";
-import { readEventPackageJson } from "./lib/event-package-json.mjs";
+import { execSync } from 'node:child_process';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { basename, join, resolve } from 'node:path';
+import { argv, exit } from 'node:process';
+import { createHash } from 'node:crypto';
+import { readEventPackageJson } from './lib/event-package-json.mjs';
 
 // ── 跨平台 zip 操作（首选 7z → fallback unzip/zip）───────────────────
 
 function hasCmd(cmd) {
   try {
-    execSync(process.platform === "win32" ? `where ${cmd}` : `command -v ${cmd}`, { stdio: "ignore" });
+    execSync(process.platform === 'win32' ? `where ${cmd}` : `command -v ${cmd}`, {
+      stdio: 'ignore',
+    });
     return true;
   } catch {
     return false;
@@ -33,57 +44,68 @@ function hasCmd(cmd) {
 
 /** 解压 zip 到 outDir（不依赖当前工作目录）。 */
 function extractZip(zipPath, outDir) {
-  if (hasCmd("7z")) {
-    execSync(`7z x -y "${zipPath}" -o"${outDir}" -bso0`, { stdio: "inherit" });
+  if (hasCmd('7z')) {
+    execSync(`7z x -y "${zipPath}" -o"${outDir}" -bso0`, { stdio: 'inherit' });
     return;
   }
-  if (hasCmd("unzip")) {
-    execSync(`unzip -q -o "${zipPath}" -d "${outDir}"`, { stdio: "inherit" });
+  if (hasCmd('unzip')) {
+    execSync(`unzip -q -o "${zipPath}" -d "${outDir}"`, { stdio: 'inherit' });
     return;
   }
-  throw new Error("缺少解压工具：请安装 7-Zip（推荐）或确保 unzip 在 PATH 中。CI 中自带 7z。");
+  throw new Error('缺少解压工具：请安装 7-Zip（推荐）或确保 unzip 在 PATH 中。CI 中自带 7z。');
 }
 
 /** 将目录打包为 zip。zipPath 是输出文件路径，workDir 是打包的工作目录，rootName 是 zip 内顶层条目名。 */
 function createZip(workDir, zipPath, rootName) {
-  if (hasCmd("7z")) {
-    execSync(`cd "${workDir}" && 7z a -tzip -mx=9 "${zipPath}" "${rootName}" -bso0`, { stdio: "inherit" });
+  if (hasCmd('7z')) {
+    execSync(`cd "${workDir}" && 7z a -tzip -mx=9 "${zipPath}" "${rootName}" -bso0`, {
+      stdio: 'inherit',
+    });
     return;
   }
-  if (hasCmd("zip")) {
-    execSync(`cd "${workDir}" && zip -q -r "${zipPath}" "${rootName}"`, { stdio: "inherit" });
+  if (hasCmd('zip')) {
+    execSync(`cd "${workDir}" && zip -q -r "${zipPath}" "${rootName}"`, { stdio: 'inherit' });
     return;
   }
-  throw new Error("缺少打包工具：请安装 7-Zip（推荐）或确保 zip 在 PATH 中。CI 中自带 7z。");
+  throw new Error('缺少打包工具：请安装 7-Zip（推荐）或确保 zip 在 PATH 中。CI 中自带 7z。');
 }
 
 function parseArgs(raw) {
   const args = {};
-  const flags = ["--runtime-zip", "--bundled-events", "--tris-manifest", "--tris-dir", "--install-manifest", "--out"];
+  const flags = [
+    '--runtime-zip',
+    '--bundled-events',
+    '--tris-manifest',
+    '--tris-dir',
+    '--install-manifest',
+    '--out',
+  ];
   for (let i = 0; i < raw.length; i++) {
     const a = raw[i];
     if (flags.includes(a) && i + 1 < raw.length) {
-      args[a.replace(/^--/, "")] = raw[++i];
+      args[a.replace(/^--/, '')] = raw[++i];
     }
   }
-  if (!args["runtime-zip"] || !args["install-manifest"] || !args.out) {
-    console.error("用法: assemble-full-zip.mjs --runtime-zip <path> --bundled-events <dir> --tris-manifest <path> --tris-dir <dir> --install-manifest <path> --out <dir>");
+  if (!args['runtime-zip'] || !args['install-manifest'] || !args.out) {
+    console.error(
+      '用法: assemble-full-zip.mjs --runtime-zip <path> --bundled-events <dir> --tris-manifest <path> --tris-dir <dir> --install-manifest <path> --out <dir>',
+    );
     exit(1);
   }
   return args;
 }
 
 function sha256(path) {
-  return createHash("sha256").update(readFileSync(path)).digest("hex");
+  return createHash('sha256').update(readFileSync(path)).digest('hex');
 }
 
 function main() {
   const args = parseArgs(argv.slice(2));
-  const runtimeZip = resolve(args["runtime-zip"]);
-  const bundledEventsDir = args["bundled-events"] ? resolve(args["bundled-events"]) : null;
-  const trisManifestPath = args["tris-manifest"] ? resolve(args["tris-manifest"]) : null;
-  const trisDir = args["tris-dir"] ? resolve(args["tris-dir"]) : null;
-  const installManifestPath = resolve(args["install-manifest"]);
+  const runtimeZip = resolve(args['runtime-zip']);
+  const bundledEventsDir = args['bundled-events'] ? resolve(args['bundled-events']) : null;
+  const trisManifestPath = args['tris-manifest'] ? resolve(args['tris-manifest']) : null;
+  const trisDir = args['tris-dir'] ? resolve(args['tris-dir']) : null;
+  const installManifestPath = resolve(args['install-manifest']);
   const outDir = resolve(args.out);
 
   if (!existsSync(runtimeZip)) {
@@ -97,12 +119,14 @@ function main() {
 
   const version = (() => {
     try {
-      const m = JSON.parse(readFileSync(installManifestPath, "utf-8"));
-      return m.appVersion || "0.0.0";
-    } catch { return "0.0.0"; }
+      const m = JSON.parse(readFileSync(installManifestPath, 'utf-8'));
+      return m.appVersion || '0.0.0';
+    } catch {
+      return '0.0.0';
+    }
   })();
   const runtimeName = basename(runtimeZip);
-  const versionStem = runtimeName.replace(/^dak-studio-windows-/, "").replace(/\.zip$/, "");
+  const versionStem = runtimeName.replace(/^dak-studio-windows-/, '').replace(/\.zip$/, '');
   const fullZipName = `dak-studio-windows-${versionStem}-full.zip`;
   const fullZipPath = join(outDir, fullZipName);
   mkdirSync(outDir, { recursive: true });
@@ -110,7 +134,7 @@ function main() {
   // Read install manifest to know which tris are required
   let requiredTris = {};
   try {
-    const manifest = JSON.parse(readFileSync(installManifestPath, "utf-8"));
+    const manifest = JSON.parse(readFileSync(installManifestPath, 'utf-8'));
     requiredTris = manifest.requiredTris || {};
   } catch (err) {
     console.error(`读取 install-manifest 失败：${err.message}`);
@@ -128,16 +152,21 @@ function main() {
   // Runtime zip contains a single top-level dir (PyInstaller onedir) e.g. "dak-studio/"
   // Find the top-level dir
   const topDirs = readdirSync(workDir).filter((f) => {
-    try { return statSync(join(workDir, f)).isDirectory(); } catch { return false; }
+    try {
+      return statSync(join(workDir, f)).isDirectory();
+    } catch {
+      return false;
+    }
   });
   const appRoot = topDirs.length === 1 ? join(workDir, topDirs[0]) : workDir;
 
   // 2. Copy bundled events — 扫描 dist/events/<slug>/<slug>.zip（与 R2 一致）
   if (bundledEventsDir && existsSync(bundledEventsDir)) {
-    const destDir = join(appRoot, "assets", "bundled-events");
+    const destDir = join(appRoot, 'assets', 'bundled-events');
     mkdirSync(destDir, { recursive: true });
-    const subdirs = readdirSync(bundledEventsDir, { withFileTypes: true })
-      .filter((d) => d.isDirectory());
+    const subdirs = readdirSync(bundledEventsDir, { withFileTypes: true }).filter((d) =>
+      d.isDirectory(),
+    );
     const manifestEvents = [];
     for (const dir of subdirs) {
       const slug = dir.name;
@@ -152,29 +181,31 @@ function main() {
       let displayName = slug;
       try {
         displayName = readEventPackageJson(src).event?.name || slug;
-      } catch { /* fallback to slug */ }
+      } catch {
+        /* fallback to slug */
+      }
       manifestEvents.push({
         slug,
         name: displayName,
         size,
         sha256: hash,
         urls: [`https://dakupdate.starfie1d.top/events/${slug}/${zipName}`],
-        packageVersion: "cs2-demo-analysis-kit/event-package-1.0",
+        packageVersion: 'cs2-demo-analysis-kit/event-package-1.0',
       });
     }
     // 写入本地 bundled-events manifest（供前端发现）
     const beManifest = {
-      version: "cs2-demo-analysis-kit/events-manifest-1.0",
+      version: 'cs2-demo-analysis-kit/events-manifest-1.0',
       generatedAt: new Date().toISOString(),
       events: manifestEvents,
     };
-    writeFileSync(join(destDir, "manifest.json"), JSON.stringify(beManifest, null, 2));
+    writeFileSync(join(destDir, 'manifest.json'), JSON.stringify(beManifest, null, 2));
     console.error(`  bundled-events/manifest.json (${manifestEvents.length} events)`);
   }
 
   // 3. Copy required tris
   if (trisDir && existsSync(trisDir)) {
-    const destDir = join(appRoot, "assets", "tris");
+    const destDir = join(appRoot, 'assets', 'tris');
     mkdirSync(destDir, { recursive: true });
     let copied = 0;
     for (const [mapName, entry] of Object.entries(requiredTris)) {
@@ -191,18 +222,18 @@ function main() {
     }
     console.error(`  tris: ${copied}/${Object.keys(requiredTris).length} 张地图`);
   } else {
-    console.error("  ⚠ 未提供 tris-dir，full zip 将不含 .tri 文件");
+    console.error('  ⚠ 未提供 tris-dir，full zip 将不含 .tri 文件');
   }
 
   // 4. Copy install-manifest.json
-  mkdirSync(join(appRoot, "userdata"), { recursive: true });
-  mkdirSync(join(appRoot, "assets"), { recursive: true });
-  copyFileSync(installManifestPath, join(appRoot, "assets", "install-manifest.json"));
-  console.error("  install-manifest.json");
+  mkdirSync(join(appRoot, 'userdata'), { recursive: true });
+  mkdirSync(join(appRoot, 'assets'), { recursive: true });
+  copyFileSync(installManifestPath, join(appRoot, 'assets', 'install-manifest.json'));
+  console.error('  install-manifest.json');
 
   // 5. Zip the work dir
   console.error(`打包：${fullZipName}…`);
-  const zipRoot = topDirs.length === 1 ? topDirs[0] : ".";
+  const zipRoot = topDirs.length === 1 ? topDirs[0] : '.';
   createZip(workDir, fullZipPath, zipRoot);
 
   // 6. Cleanup

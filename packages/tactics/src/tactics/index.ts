@@ -1,10 +1,7 @@
-export * from "./types.js";
-export * from "./segments.js";
-export * from "./formations.js";
-export {
-  TACTICAL_FACT_VERSION,
-  extractTacticalRoundFacts,
-} from "./round-facts.js";
+export * from './types.js';
+export * from './segments.js';
+export * from './formations.js';
+export { TACTICAL_FACT_VERSION, extractTacticalRoundFacts } from './round-facts.js';
 export type {
   C4RouteFact,
   ExecuteBucket,
@@ -13,4 +10,4 @@ export type {
   TacticalGrenadeOccurrence,
   TacticalPlantFact,
   TacticalRoundFact,
-} from "./round-facts.js";
+} from './round-facts.js';

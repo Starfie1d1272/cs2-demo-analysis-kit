@@ -1,13 +1,15 @@
-import { z } from "zod";
-import { evidenceRefSchema } from "./evidence.js";
+import { z } from 'zod';
+import { evidenceRefSchema } from './evidence.js';
 
 export const duelEvidenceSchema = evidenceRefSchema;
 
-export const duelPointSchema = z.object({
-  x: z.number(),
-  y: z.number(),
-  z: z.number()
-}).nullable();
+export const duelPointSchema = z
+  .object({
+    x: z.number(),
+    y: z.number(),
+    z: z.number(),
+  })
+  .nullable();
 
 export const duelFinderRowSchema = z.object({
   id: z.string(),
@@ -20,8 +22,8 @@ export const duelFinderRowSchema = z.object({
   killerName: z.string(),
   victimName: z.string(),
   weapon: z.string(),
-  classification: z.enum(["contested_duel", "suppressed_kill", "caught_off_guard"]),
-  hpBucket: z.enum(["full_hp", "low_hp"]),
+  classification: z.enum(['contested_duel', 'suppressed_kill', 'caught_off_guard']),
+  hpBucket: z.enum(['full_hp', 'low_hp']),
   thirdParty: z.boolean(),
   fullHealth: z.boolean(),
   victimHealthBefore: z.number().min(0).max(100),
@@ -35,18 +37,18 @@ export const duelFinderRowSchema = z.object({
     victimResponseTick: z.number().int().positive().nullable(),
     killTick: z.number().int().positive(),
     windowStartTick: z.number().int().positive().optional(),
-    windowEndTick: z.number().int().positive().optional()
+    windowEndTick: z.number().int().positive().optional(),
   }),
   killerPosition: duelPointSchema,
   victimPosition: duelPointSchema,
   /** 对枪发生时的回合剩余时间标签（"1:23"），无 freezeEnd 时为 null。 */
   roundTimeLabel: z.string().nullable(),
-  evidence: duelEvidenceSchema
+  evidence: duelEvidenceSchema,
 });
 
 export const openingDuelRowSchema = duelFinderRowSchema.extend({
   attackerCallout: z.string().nullable(),
-  victimCallout: z.string().nullable()
+  victimCallout: z.string().nullable(),
 });
 
 export const mechanicsMetricSchema = z.object({
@@ -62,7 +64,7 @@ export const mechanicsMetricSchema = z.object({
   sampleSize: z.number().int().nonnegative().optional(),
   /** 次级证据行，如「27/44 ≤5°」。 */
   detail: z.string().optional(),
-  percentileLabel: z.string().nullable()
+  percentileLabel: z.string().nullable(),
 });
 
 export const playerMechanicsRowSchema = z.object({
@@ -78,22 +80,22 @@ export const playerMechanicsRowSchema = z.object({
     single: z.number().int().nonnegative(),
     short: z.number().int().nonnegative(),
     medium: z.number().int().nonnegative(),
-    long: z.number().int().nonnegative()
+    long: z.number().int().nonnegative(),
   }),
   firingPatternRatio: z.object({
     tap: z.number().min(0).max(100),
     burst: z.number().min(0).max(100),
-    spray: z.number().min(0).max(100)
-  })
+    spray: z.number().min(0).max(100),
+  }),
 });
 
 export const duelInsightsModelSchema = z.object({
-  version: z.literal("cs2-demo-analysis-kit/duel-insights-0.1"),
+  version: z.literal('cs2-demo-analysis-kit/duel-insights-0.1'),
   matchCount: z.number().int().nonnegative(),
   duelRows: z.array(duelFinderRowSchema),
   openingRows: z.array(openingDuelRowSchema),
   mechanicsRows: z.array(playerMechanicsRowSchema),
-  notes: z.array(z.string())
+  notes: z.array(z.string()),
 });
 
 export type DuelEvidence = z.infer<typeof duelEvidenceSchema>;

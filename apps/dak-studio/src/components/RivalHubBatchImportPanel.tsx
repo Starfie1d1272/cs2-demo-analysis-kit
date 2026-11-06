@@ -1,38 +1,83 @@
-import { useMemo, useState } from "react";
-import { retryRivalHubLocalLink, type RivalHubBatchItem, type RivalHubBatchSession } from "../lib/rivalhub-import";
-import { rivalHubStatusPresentation } from "../lib/rivalhub-status";
+import { useMemo, useState } from 'react';
+import {
+  retryRivalHubLocalLink,
+  type RivalHubBatchItem,
+  type RivalHubBatchSession,
+} from '../lib/rivalhub-import';
+import { rivalHubStatusPresentation } from '../lib/rivalhub-status';
 
-const ACTIVE_BATCH_PHASES = new Set(["checking", "exporting", "importing", "matching", "building_evidence", "submitting"]);
+const ACTIVE_BATCH_PHASES = new Set([
+  'checking',
+  'exporting',
+  'importing',
+  'matching',
+  'building_evidence',
+  'submitting',
+]);
 
-export function currentRivalHubBatchItem(session: RivalHubBatchSession | null): RivalHubBatchItem | null {
+export function currentRivalHubBatchItem(
+  session: RivalHubBatchSession | null,
+): RivalHubBatchItem | null {
   if (!session) return null;
-  if (session.awaitingTargetItemId) return session.items.find((item) => item.id === session.awaitingTargetItemId) ?? null;
+  if (session.awaitingTargetItemId)
+    return session.items.find((item) => item.id === session.awaitingTargetItemId) ?? null;
   const item = session.items[session.currentIndex];
   return item && ACTIVE_BATCH_PHASES.has(item.phase) ? item : null;
 }
 
-function ItemRow({ item, onSelectTarget, onLocalLinkUpdate }: { item: RivalHubBatchItem; onSelectTarget?: (itemId: string, matchMapId: string) => void; onLocalLinkUpdate?: (item: RivalHubBatchItem) => void }) {
+function ItemRow({
+  item,
+  onSelectTarget,
+  onLocalLinkUpdate,
+}: {
+  item: RivalHubBatchItem;
+  onSelectTarget?: (itemId: string, matchMapId: string) => void;
+  onLocalLinkUpdate?: (item: RivalHubBatchItem) => void;
+}) {
   const [linking, setLinking] = useState(false);
   const status = rivalHubStatusPresentation(item.phase);
   return (
-    <details className="stu-rivalhub-batch-item" open={item.phase === "needs_target" || Boolean(item.detail)}>
+    <details
+      className="stu-rivalhub-batch-item"
+      open={item.phase === 'needs_target' || Boolean(item.detail)}
+    >
       <summary>
         <span className="stu-rivalhub-batch-file">{item.fileName}</span>
-        <span className={status.className}><i />{status.label}</span>
+        <span className={status.className}>
+          <i />
+          {status.label}
+        </span>
         {item.matchedSeriesLabel && <span className="stu-muted">{item.matchedSeriesLabel}</span>}
         {item.localLink && <span className="stu-muted">本地关联待修复</span>}
       </summary>
       {(item.detail || item.targetCandidates?.length || item.localLink) && (
         <div className="stu-rivalhub-batch-detail">
           {item.detail && <p className="stu-muted">{item.detail}</p>}
-          {item.localLink && <div>
-            <p className="stu-muted">RivalHub 已接收，本地资料库关联未写入。请仅重试本地关联。</p>
-            <details><summary>本地关联错误详情</summary><p className="stu-muted">{item.localLink.error.message}</p>{item.localLink.error.cause && <p className="stu-muted">{item.localLink.error.cause}</p>}</details>
-            <button type="button" className="stu-button-sm" disabled={linking || !onLocalLinkUpdate} onClick={() => {
-              setLinking(true);
-              void retryRivalHubLocalLink(item).then(updated => onLocalLinkUpdate?.(updated)).finally(() => setLinking(false));
-            }}>{linking ? "正在关联…" : "仅重试本地关联"}</button>
-          </div>}
+          {item.localLink && (
+            <div>
+              <p className="stu-muted">RivalHub 已接收，本地资料库关联未写入。请仅重试本地关联。</p>
+              <details>
+                <summary>本地关联错误详情</summary>
+                <p className="stu-muted">{item.localLink.error.message}</p>
+                {item.localLink.error.cause && (
+                  <p className="stu-muted">{item.localLink.error.cause}</p>
+                )}
+              </details>
+              <button
+                type="button"
+                className="stu-button-sm"
+                disabled={linking || !onLocalLinkUpdate}
+                onClick={() => {
+                  setLinking(true);
+                  void retryRivalHubLocalLink(item)
+                    .then((updated) => onLocalLinkUpdate?.(updated))
+                    .finally(() => setLinking(false));
+                }}
+              >
+                {linking ? '正在关联…' : '仅重试本地关联'}
+              </button>
+            </div>
+          )}
           {item.targetCandidates && item.targetCandidates.length > 0 && (
             <div className="stu-rivalhub-target-picker" aria-label={`${item.fileName} 目标地图`}>
               <b>请选择官方目标</b>
@@ -43,15 +88,24 @@ function ItemRow({ item, onSelectTarget, onLocalLinkUpdate }: { item: RivalHubBa
                   className="stu-button-sm"
                   onClick={() => onSelectTarget?.(item.id, candidate.matchMapId)}
                 >
-                  {candidate.stageName} · {candidate.mapName} · {candidate.teamAName} {candidate.scoreA ?? "—"}:{candidate.scoreB ?? "—"} {candidate.teamBName}
+                  {candidate.stageName} · {candidate.mapName} · {candidate.teamAName}{' '}
+                  {candidate.scoreA ?? '—'}:{candidate.scoreB ?? '—'} {candidate.teamBName}
                 </button>
               ))}
-              <button type="button" className="stu-button-sm stu-button-danger" onClick={() => onSelectTarget?.(item.id, "")}>跳过此项</button>
+              <button
+                type="button"
+                className="stu-button-sm stu-button-danger"
+                onClick={() => onSelectTarget?.(item.id, '')}
+              >
+                跳过此项
+              </button>
             </div>
           )}
           {item.serverIssues && item.serverIssues.length > 0 && (
             <ul className="stu-rivalhub-batch-issues">
-              {item.serverIssues.map((issue) => <li key={`${issue.code}:${issue.path ?? ""}`}>{issue.message}</li>)}
+              {item.serverIssues.map((issue) => (
+                <li key={`${issue.code}:${issue.path ?? ''}`}>{issue.message}</li>
+              ))}
             </ul>
           )}
         </div>
@@ -74,20 +128,47 @@ export function RivalHubBatchImportPanel({
 }) {
   const current = useMemo(() => currentRivalHubBatchItem(session), [session]);
   if (!session) return null;
-  const finished = session.total === 0 ? 0 : session.items.filter((item) => ["synced", "needs_attention", "already_synced", "skipped", "failed", "unconfirmed"].includes(item.phase)).length;
+  const finished =
+    session.total === 0
+      ? 0
+      : session.items.filter((item) =>
+          [
+            'synced',
+            'needs_attention',
+            'already_synced',
+            'skipped',
+            'failed',
+            'unconfirmed',
+          ].includes(item.phase),
+        ).length;
   const currentStatus = current ? rivalHubStatusPresentation(current.phase) : null;
   return (
-    <section className="stu-card stu-rivalhub-batch-panel" aria-live="polite" aria-label="RivalHub Demo 批处理进度">
+    <section
+      className="stu-card stu-rivalhub-batch-panel"
+      aria-live="polite"
+      aria-label="RivalHub Demo 批处理进度"
+    >
       <header className="stu-rivalhub-batch-head">
         <div>
           <b>RivalHub Demo 批处理</b>
-          <span className="stu-muted">{session.status === "completed" ? `已完成 · ${finished}/${session.total} 文件` : `${finished}/${session.total} 文件已完成`}</span>
+          <span className="stu-muted">
+            {session.status === 'completed'
+              ? `已完成 · ${finished}/${session.total} 文件`
+              : `${finished}/${session.total} 文件已完成`}
+          </span>
         </div>
-        {session.status === "completed" ? (
-          <button type="button" className="stu-button stu-button-ghost" onClick={onDismiss}>关闭结果</button>
+        {session.status === 'completed' ? (
+          <button type="button" className="stu-button stu-button-ghost" onClick={onDismiss}>
+            关闭结果
+          </button>
         ) : (
-          <button type="button" className="stu-button stu-button-ghost" onClick={onStop} disabled={session.status === "stopping"}>
-            {session.status === "stopping" ? "当前文件完成后停止…" : "当前文件完成后停止"}
+          <button
+            type="button"
+            className="stu-button stu-button-ghost"
+            onClick={onStop}
+            disabled={session.status === 'stopping'}
+          >
+            {session.status === 'stopping' ? '当前文件完成后停止…' : '当前文件完成后停止'}
           </button>
         )}
       </header>
@@ -95,7 +176,10 @@ export function RivalHubBatchImportPanel({
         <div className="stu-rivalhub-batch-current">
           <span className="stu-muted">当前</span>
           <b>{current.fileName}</b>
-          <span className={currentStatus.className}><i />{currentStatus.label}</span>
+          <span className={currentStatus.className}>
+            <i />
+            {currentStatus.label}
+          </span>
           {current.detail && <span className="stu-muted">{current.detail}</span>}
         </div>
       )}
@@ -106,11 +190,22 @@ export function RivalHubBatchImportPanel({
         <span className="stu-chip">待目标 {session.counts.needsTarget}</span>
         <span className="stu-chip">已跳过 {session.counts.skipped}</span>
         <span className="stu-chip">失败 {session.counts.failed}</span>
-        {(session.counts.unconfirmed ?? 0) > 0 && <span className="stu-chip">待确认 {session.counts.unconfirmed}</span>}
-        {session.counts.reusedLocal > 0 && <span className="stu-chip">复用本地 {session.counts.reusedLocal}</span>}
+        {(session.counts.unconfirmed ?? 0) > 0 && (
+          <span className="stu-chip">待确认 {session.counts.unconfirmed}</span>
+        )}
+        {session.counts.reusedLocal > 0 && (
+          <span className="stu-chip">复用本地 {session.counts.reusedLocal}</span>
+        )}
       </div>
       <div className="stu-rivalhub-batch-list">
-        {session.items.map((item) => <ItemRow key={`${session.id}:${item.id}`} item={item} onSelectTarget={onSelectTarget} onLocalLinkUpdate={session.status === "completed" ? onLocalLinkUpdate : undefined} />)}
+        {session.items.map((item) => (
+          <ItemRow
+            key={`${session.id}:${item.id}`}
+            item={item}
+            onSelectTarget={onSelectTarget}
+            onLocalLinkUpdate={session.status === 'completed' ? onLocalLinkUpdate : undefined}
+          />
+        ))}
       </div>
     </section>
   );

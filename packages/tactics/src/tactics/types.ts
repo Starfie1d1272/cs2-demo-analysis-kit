@@ -1,4 +1,4 @@
-import type { DefaultPositionSide, TacticalRegion } from "@cs2dak/maps";
+import type { DefaultPositionSide, TacticalRegion } from '@cs2dak/maps';
 
 export interface TacticalFrameSample {
   tick: number;
@@ -9,7 +9,7 @@ export interface TacticalFrameSample {
 }
 
 export interface TacticalEvidenceRef {
-  type: "position" | "dwell" | "transition";
+  type: 'position' | 'dwell' | 'transition';
   tick: number;
   endTick?: number;
   playerIndices?: number[];
@@ -53,7 +53,7 @@ export interface OpeningPattern {
   side: DefaultPositionSide;
   regionCounts: TacticalRegionCounts;
   positionGroupCounts: Record<string, number>;
-  spread: "stacked" | "split" | "balanced" | "unknown";
+  spread: 'stacked' | 'split' | 'balanced' | 'unknown';
   coarseSignature: string;
   detailedSignature: string;
   evidence: TacticalEvidenceRef[];
@@ -67,7 +67,7 @@ export interface OpeningPressureEvent {
   callout: string;
   calloutLabel: string;
   primaryRegion: TacticalRegion | null;
-  kind: "forward" | "deep";
+  kind: 'forward' | 'deep';
   opposingPositionGroupId: string | null;
   evidence: TacticalEvidenceRef;
 }

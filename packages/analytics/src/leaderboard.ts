@@ -1,7 +1,7 @@
-import { type SeasonCohortBundle } from "@cs2dak/cohort";
-import { seasonLeaderboardModelSchema, type SeasonLeaderboardModel } from "@cs2dak/presentation";
-import { SEASON_STAT_VIEWS } from "@cs2dak/presentation";
-import { computeSeasonMetrics } from "./season-metrics.js";
+import { type SeasonCohortBundle } from '@cs2dak/cohort';
+import { seasonLeaderboardModelSchema, type SeasonLeaderboardModel } from '@cs2dak/presentation';
+import { SEASON_STAT_VIEWS } from '@cs2dak/presentation';
+import { computeSeasonMetrics } from './season-metrics.js';
 
 /**
  * 把赛季 cohort 结果转换为产品中立的排行榜展示模型。
@@ -16,15 +16,15 @@ export function buildSeasonLeaderboardModel(bundle: SeasonCohortBundle): SeasonL
     teamKeys: player.teamKeys,
     mapCount: player.mapCount,
     confidence: player.confidence,
-    metrics: computeSeasonMetrics(player)
+    metrics: computeSeasonMetrics(player),
   }));
 
   return seasonLeaderboardModelSchema.parse({
-    version: "cs2-demo-analysis-kit/leaderboard-0.1",
+    version: 'cs2-demo-analysis-kit/leaderboard-0.1',
     weightsVersion: bundle.weightsVersion,
     matchCount: bundle.matchCount,
     provenance: bundle.provenance,
     views: SEASON_STAT_VIEWS,
-    rows
+    rows,
   });
 }

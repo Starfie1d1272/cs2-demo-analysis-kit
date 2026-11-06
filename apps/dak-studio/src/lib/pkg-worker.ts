@@ -1,12 +1,12 @@
-import { getMapNav } from "@cs2dak/map-assets";
-import { normalizeDiagnostic, type SafeDiagnostic } from "@cs2dak/rivalhub-upload";
-import { loadDemoPackageFromZip, type DemoPackageLoadProfile } from "@cs2dak/demo-io";
-import { buildMatchRadarField } from "@cs2dak/tactics";
-import { buildRadarFieldGrid, type TriangleBvh } from "@cs2dak/maps";
-import { loadCalloutGridBrowser } from "@cs2dak/map-assets/callout-grid-browser";
-import { buildTriBvh, fetchTriBuffer, type TriDiagnosticSink } from "./tri-loading";
-import { buildMatchRecords } from "./match-records";
-import { metaFromPackage } from "./demo-meta";
+import { getMapNav } from '@cs2dak/map-assets';
+import { normalizeDiagnostic, type SafeDiagnostic } from '@cs2dak/rivalhub-upload';
+import { loadDemoPackageFromZip, type DemoPackageLoadProfile } from '@cs2dak/demo-io';
+import { buildMatchRadarField } from '@cs2dak/tactics';
+import { buildRadarFieldGrid, type TriangleBvh } from '@cs2dak/maps';
+import { loadCalloutGridBrowser } from '@cs2dak/map-assets/callout-grid-browser';
+import { buildTriBvh, fetchTriBuffer, type TriDiagnosticSink } from './tri-loading';
+import { buildMatchRecords } from './match-records';
+import { metaFromPackage } from './demo-meta';
 
 /**
  * 导入 worker：解析 v3 ZIP，并（import 模式下）就地生成可重建 facts 与 derived cache。
@@ -22,14 +22,14 @@ import { metaFromPackage } from "./demo-meta";
 
 interface ParseMsg {
   id: number;
-  op: "parse";
+  op: 'parse';
   buffer: ArrayBuffer;
   profile?: DemoPackageLoadProfile;
 }
 
 interface ImportMsg {
   id: number;
-  op: "import";
+  op: 'import';
   buffer: ArrayBuffer;
   matchId: string;
   triBaseUrl: string;
@@ -38,11 +38,11 @@ interface ImportMsg {
 
 interface RadarFieldMsg {
   id: number;
-  op: "radarField";
+  op: 'radarField';
   buffer: ArrayBuffer;
   matchId: string;
   triBaseUrl: string;
-  economy: "gun" | "all";
+  economy: 'gun' | 'all';
 }
 
 type InMsg = ParseMsg | ImportMsg | RadarFieldMsg;
@@ -50,7 +50,11 @@ type InMsg = ParseMsg | ImportMsg | RadarFieldMsg;
 // BVH 树构建较重；同一 worker 处理同图的多场时复用（按图缓存）。
 const bvhByMap = new Map<string, Promise<TriangleBvh | null>>();
 
-function loadTriBvh(mapName: string, triBaseUrl: string, sink: TriDiagnosticSink): Promise<TriangleBvh | null> {
+function loadTriBvh(
+  mapName: string,
+  triBaseUrl: string,
+  sink: TriDiagnosticSink,
+): Promise<TriangleBvh | null> {
   const cached = bvhByMap.get(mapName);
   if (cached) return cached;
   const promise = (async () => {
@@ -65,15 +69,19 @@ self.onmessage = async (event: MessageEvent<InMsg>) => {
   const msg = event.data;
   const diagnostics: SafeDiagnostic[] = [];
   const observe = (diagnostic: unknown) => {
-    if (diagnostics.length < 16) diagnostics.push(normalizeDiagnostic(diagnostic, { fileId: `worker-${msg.id}` }));
+    if (diagnostics.length < 16)
+      diagnostics.push(normalizeDiagnostic(diagnostic, { fileId: `worker-${msg.id}` }));
   };
   try {
-    const pkg = await loadDemoPackageFromZip(msg.buffer, { profile: msg.op === "parse" ? msg.profile ?? "full" : "full", onDiagnostic: observe });
-    if (msg.op === "parse") {
+    const pkg = await loadDemoPackageFromZip(msg.buffer, {
+      profile: msg.op === 'parse' ? (msg.profile ?? 'full') : 'full',
+      onDiagnostic: observe,
+    });
+    if (msg.op === 'parse') {
       self.postMessage({ id: msg.id, diagnostics, ok: true, pkg });
       return;
     }
-    if (msg.op === "radarField") {
+    if (msg.op === 'radarField') {
       const mapName = pkg.match.mapName;
       const grid = buildRadarFieldGrid(getMapNav(mapName));
       if (!grid) {
@@ -81,19 +89,24 @@ self.onmessage = async (event: MessageEvent<InMsg>) => {
         return;
       }
       const bvh = await loadTriBvh(mapName, msg.triBaseUrl, observe);
-      const radarFields = buildMatchRadarField(pkg, { matchId: msg.matchId, grid, bvh, economy: msg.economy });
+      const radarFields = buildMatchRadarField(pkg, {
+        matchId: msg.matchId,
+        grid,
+        bvh,
+        economy: msg.economy,
+      });
       self.postMessage({ id: msg.id, diagnostics, ok: true, radarFields });
       return;
     }
     const mapName = pkg.match.mapName;
     const [bvh, calloutGrid] = await Promise.all([
       loadTriBvh(mapName, msg.triBaseUrl, observe),
-      loadCalloutGridBrowser(mapName, { urls: msg.calloutUrls })
+      loadCalloutGridBrowser(mapName, { urls: msg.calloutUrls }),
     ]);
     const data = buildMatchRecords(pkg, {
       matchId: msg.matchId,
       visibilityFor: (name) => (name === mapName ? bvh : null),
-      calloutGrid
+      calloutGrid,
     });
     const meta = metaFromPackage(pkg);
     self.postMessage({ id: msg.id, diagnostics, ok: true, meta, data });

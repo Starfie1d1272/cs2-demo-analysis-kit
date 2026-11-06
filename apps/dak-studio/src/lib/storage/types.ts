@@ -35,9 +35,16 @@ export interface BlobStore {
 }
 
 /** 原子操作使用明确的存在标志，避免把缺失记录与 JSON null 混淆。 */
-export interface RecordRef { namespace: string; key: string }
-export interface RecordSnapshot extends RecordRef { exists: boolean; value?: unknown }
-export type RecordMutation = (RecordRef & { kind: "put"; value: unknown }) | (RecordRef & { kind: "delete" });
+export interface RecordRef {
+  namespace: string;
+  key: string;
+}
+export interface RecordSnapshot extends RecordRef {
+  exists: boolean;
+  value?: unknown;
+}
+export type RecordMutation =
+  (RecordRef & { kind: 'put'; value: unknown }) | (RecordRef & { kind: 'delete' });
 
 export interface StorageAdapter {
   /** JSON 记录命名空间（如 "demos" / "derived" / "cache" / "identity" / "series" / "kv"）。 */

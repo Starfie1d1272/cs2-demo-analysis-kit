@@ -1,32 +1,42 @@
-import type { DemoPackage } from "@cs2dak/contract";
-import type { RivalHubRemoteSeries } from "./contract";
-import type { RivalHubRemoteMap, RivalHubRemoteTeam } from "./contract";
-import type { RivalHubEvidenceTarget } from "./evidence";
+import type { DemoPackage } from '@cs2dak/contract';
+import type { RivalHubRemoteSeries } from './contract';
+import type { RivalHubRemoteMap, RivalHubRemoteTeam } from './contract';
+import type { RivalHubEvidenceTarget } from './evidence';
 
 export interface RivalHubMatchCandidate {
-  series: Pick<RivalHubRemoteSeries, "id" | "teamAName" | "teamBName"> & { stageKey?: string | null; completedAt?: string | null; status?: RivalHubRemoteSeries["status"] };
+  series: Pick<RivalHubRemoteSeries, 'id' | 'teamAName' | 'teamBName'> & {
+    stageKey?: string | null;
+    completedAt?: string | null;
+    status?: RivalHubRemoteSeries['status'];
+  };
   map: RivalHubRemoteMap;
   /** EventRoster membership is the stable team-identity evidence for target discovery. */
   eventTeams?: RivalHubRemoteTeam[];
 }
 
 export type RivalHubMatchResult =
-  | { status: "matched"; candidate: RivalHubMatchCandidate; mode: "fixed" | "remote_demo_sha" | "event_roster" | "exact_lineup" | "review_fallback" }
-  | { status: "needs_target"; candidates: RivalHubMatchCandidate[]; reason: string }
-  | { status: "not_found"; reason: string };
+  | {
+      status: 'matched';
+      candidate: RivalHubMatchCandidate;
+      mode: 'fixed' | 'remote_demo_sha' | 'event_roster' | 'exact_lineup' | 'review_fallback';
+    }
+  | { status: 'needs_target'; candidates: RivalHubMatchCandidate[]; reason: string }
+  | { status: 'not_found'; reason: string };
 
 const MAX_UNKNOWN_EVENT_ROSTER_PLAYERS = 2;
 const MIN_RESOLVED_EVENT_ROSTER_PLAYERS_PER_SIDE = 3;
 
 function normalize(value: string | null | undefined): string {
-  return value?.trim().toLocaleLowerCase() ?? "";
+  return value?.trim().toLocaleLowerCase() ?? '';
 }
 
 function mapNameMatches(pkg: DemoPackage, candidate: RivalHubMatchCandidate): boolean {
-  return normalize(pkg.match.mapName) === normalize(candidate.map.mapName)
-    && normalize(pkg.match.mapName) === normalize(candidate.map.target.expectedMapName)
-    && candidate.map.target.matchMapId === candidate.map.id
-    && candidate.map.target.mapOrder === candidate.map.order;
+  return (
+    normalize(pkg.match.mapName) === normalize(candidate.map.mapName) &&
+    normalize(pkg.match.mapName) === normalize(candidate.map.target.expectedMapName) &&
+    candidate.map.target.matchMapId === candidate.map.id &&
+    candidate.map.target.mapOrder === candidate.map.order
+  );
 }
 
 function scoreMatches(pkg: DemoPackage, candidate: RivalHubMatchCandidate): boolean {
@@ -38,7 +48,11 @@ function scoreMatches(pkg: DemoPackage, candidate: RivalHubMatchCandidate): bool
 }
 
 function starterSteamIds(candidate: RivalHubMatchCandidate): Set<string> {
-  return new Set((candidate.map.lineup ?? []).filter((player) => player.isStarter).map((player) => player.steamId64));
+  return new Set(
+    (candidate.map.lineup ?? [])
+      .filter((player) => player.isStarter)
+      .map((player) => player.steamId64),
+  );
 }
 
 function lineupOverlap(pkg: DemoPackage, candidate: RivalHubMatchCandidate): number {
@@ -48,7 +62,8 @@ function lineupOverlap(pkg: DemoPackage, candidate: RivalHubMatchCandidate): num
 
 function exactLineup(pkg: DemoPackage, candidate: RivalHubMatchCandidate): boolean {
   const starters = (candidate.map.lineup ?? []).filter((player) => player.isStarter);
-  if (pkg.players.length !== 10 || starters.length !== 10 || starterSteamIds(candidate).size !== 10) return false;
+  if (pkg.players.length !== 10 || starters.length !== 10 || starterSteamIds(candidate).size !== 10)
+    return false;
   return lineupOverlap(pkg, candidate) === 10;
 }
 
@@ -57,7 +72,7 @@ export type RivalHubEventRosterResolution = {
   entryAId: string;
   entryBId: string;
   /** EventRoster member identity，按 Steam64 索引；不是本场 MatchRoster。 */
-  membersBySteam: Map<string, RivalHubRemoteTeam["players"][number]>;
+  membersBySteam: Map<string, RivalHubRemoteTeam['players'][number]>;
   duplicateSteam: Set<string>;
 };
 
@@ -71,15 +86,20 @@ export function resolveRivalHubEventRoster(
   pkg: DemoPackage,
   eventTeams: RivalHubRemoteTeam[],
 ): RivalHubEventRosterResolution | null {
-  if (eventTeams.length === 0 || pkg.players.length !== 10 || new Set(pkg.players.map((player) => player.steamId64)).size !== 10) return null;
+  if (
+    eventTeams.length === 0 ||
+    pkg.players.length !== 10 ||
+    new Set(pkg.players.map((player) => player.steamId64)).size !== 10
+  )
+    return null;
   const sidePlayers = {
-    teamA: pkg.players.filter((player) => player.teamKey === "teamA"),
-    teamB: pkg.players.filter((player) => player.teamKey === "teamB"),
+    teamA: pkg.players.filter((player) => player.teamKey === 'teamA'),
+    teamB: pkg.players.filter((player) => player.teamKey === 'teamB'),
   };
   if (sidePlayers.teamA.length !== 5 || sidePlayers.teamB.length !== 5) return null;
 
   const entriesBySteam = new Map<string, Set<string>>();
-  const membersBySteam = new Map<string, RivalHubRemoteTeam["players"][number]>();
+  const membersBySteam = new Map<string, RivalHubRemoteTeam['players'][number]>();
   const duplicateSteam = new Set<string>();
   for (const team of eventTeams) {
     for (const player of team.players) {
@@ -92,7 +112,7 @@ export function resolveRivalHubEventRoster(
   }
 
   let unknownPlayers = 0;
-  const entryForSide = (players: DemoPackage["players"]): string | null => {
+  const entryForSide = (players: DemoPackage['players']): string | null => {
     const entries = new Set<string>();
     let unknownForSide = 0;
     for (const player of players) {
@@ -105,25 +125,41 @@ export function resolveRivalHubEventRoster(
       entries.add([...memberships][0]!);
     }
     unknownPlayers += unknownForSide;
-    if (entries.size !== 1 || players.length - unknownForSide < MIN_RESOLVED_EVENT_ROSTER_PLAYERS_PER_SIDE) return null;
+    if (
+      entries.size !== 1 ||
+      players.length - unknownForSide < MIN_RESOLVED_EVENT_ROSTER_PLAYERS_PER_SIDE
+    )
+      return null;
     return [...entries][0]!;
   };
 
   const entryAId = entryForSide(sidePlayers.teamA);
   const entryBId = entryForSide(sidePlayers.teamB);
-  if (!entryAId || !entryBId || entryAId === entryBId || unknownPlayers > MAX_UNKNOWN_EVENT_ROSTER_PLAYERS) return null;
+  if (
+    !entryAId ||
+    !entryBId ||
+    entryAId === entryBId ||
+    unknownPlayers > MAX_UNKNOWN_EVENT_ROSTER_PLAYERS
+  )
+    return null;
   return { entryAId, entryBId, membersBySteam, duplicateSteam };
 }
 
 type EventRosterIdentity = { entryAId: string; entryBId: string };
 
-function eventRosterIdentity(pkg: DemoPackage, candidate: RivalHubMatchCandidate): EventRosterIdentity | null {
+function eventRosterIdentity(
+  pkg: DemoPackage,
+  candidate: RivalHubMatchCandidate,
+): EventRosterIdentity | null {
   const resolution = resolveRivalHubEventRoster(pkg, candidate.eventTeams ?? []);
   return resolution ? { entryAId: resolution.entryAId, entryBId: resolution.entryBId } : null;
 }
 
 function sameEntryPair(left: EventRosterIdentity, candidate: RivalHubMatchCandidate): boolean {
-  return [left.entryAId, left.entryBId].sort().join(":") === [candidate.map.target.entryAId, candidate.map.target.entryBId].sort().join(":");
+  return (
+    [left.entryAId, left.entryBId].sort().join(':') ===
+    [candidate.map.target.entryAId, candidate.map.target.entryBId].sort().join(':')
+  );
 }
 
 function withinOneDay(a: string | null, b: string | null): boolean {
@@ -136,7 +172,9 @@ function withinOneDay(a: string | null, b: string | null): boolean {
   };
   const left = day(a);
   const right = day(b);
-  return Number.isFinite(left) && Number.isFinite(right) && Math.abs(left - right) <= 24 * 60 * 60 * 1000;
+  return (
+    Number.isFinite(left) && Number.isFinite(right) && Math.abs(left - right) <= 24 * 60 * 60 * 1000
+  );
 }
 
 export function evidenceTargetFromRemoteMap(map: RivalHubRemoteMap): RivalHubEvidenceTarget {
@@ -157,56 +195,94 @@ export function matchRivalHubMap(
   if (options.fixedMatchMapId) {
     const candidate = candidates.find(({ map }) => map.id === options.fixedMatchMapId);
     return candidate
-      ? { status: "matched", candidate, mode: "fixed" }
-      : { status: "not_found", reason: "固定的 RivalHub Map 不在当前赛事上下文中" };
+      ? { status: 'matched', candidate, mode: 'fixed' }
+      : { status: 'not_found', reason: '固定的 RivalHub Map 不在当前赛事上下文中' };
   }
 
   if (options.demoSha256) {
-    const hashMatches = candidates.filter(({ map }) => map.demoSha256?.toLowerCase() === options.demoSha256!.toLowerCase());
-    if (hashMatches.length === 1) return { status: "matched", candidate: hashMatches[0]!, mode: "remote_demo_sha" };
-    if (hashMatches.length > 1) return { status: "needs_target", candidates: hashMatches, reason: "同一个 raw Demo hash 对应多个 RivalHub Map，服务端上下文不一致" };
+    const hashMatches = candidates.filter(
+      ({ map }) => map.demoSha256?.toLowerCase() === options.demoSha256!.toLowerCase(),
+    );
+    if (hashMatches.length === 1)
+      return { status: 'matched', candidate: hashMatches[0]!, mode: 'remote_demo_sha' };
+    if (hashMatches.length > 1)
+      return {
+        status: 'needs_target',
+        candidates: hashMatches,
+        reason: '同一个 raw Demo hash 对应多个 RivalHub Map，服务端上下文不一致',
+      };
   }
 
   const mapCandidates = candidates.filter((candidate) => mapNameMatches(pkg, candidate));
-  if (mapCandidates.length === 0) return { status: "not_found", reason: "没有找到地图名称与 target 合同一致的 RivalHub Map" };
+  if (mapCandidates.length === 0)
+    return { status: 'not_found', reason: '没有找到地图名称与 target 合同一致的 RivalHub Map' };
 
-  const eventIdentity = mapCandidates.map((candidate) => eventRosterIdentity(pkg, candidate)).find((identity): identity is EventRosterIdentity => identity != null) ?? null;
-  const eventRosterMatches = eventIdentity ? mapCandidates.filter((candidate) => sameEntryPair(eventIdentity, candidate)) : [];
+  const eventIdentity =
+    mapCandidates
+      .map((candidate) => eventRosterIdentity(pkg, candidate))
+      .find((identity): identity is EventRosterIdentity => identity != null) ?? null;
+  const eventRosterMatches = eventIdentity
+    ? mapCandidates.filter((candidate) => sameEntryPair(eventIdentity, candidate))
+    : [];
   if (eventRosterMatches.length === 1) {
-    return { status: "matched", candidate: eventRosterMatches[0]!, mode: "event_roster" };
+    return { status: 'matched', candidate: eventRosterMatches[0]!, mode: 'event_roster' };
   }
 
   // Once EventRoster has confidently resolved a pair, a candidate for another
   // canonical pair must not be rescued by display names or a coincidental score.
   if (eventIdentity && eventRosterMatches.length === 0) {
-    return { status: "not_found", reason: "EventRoster canonical Entry pair 与 RivalHub Map 候选不一致" };
+    return {
+      status: 'not_found',
+      reason: 'EventRoster canonical Entry pair 与 RivalHub Map 候选不一致',
+    };
   }
 
   const narrowed = eventRosterMatches.length > 1 ? eventRosterMatches : mapCandidates;
   const exactMatches = narrowed.filter((candidate) => exactLineup(pkg, candidate));
-  if (exactMatches.length === 1) return { status: "matched", candidate: exactMatches[0]!, mode: "exact_lineup" };
+  if (exactMatches.length === 1)
+    return { status: 'matched', candidate: exactMatches[0]!, mode: 'exact_lineup' };
 
   let evidenceCandidates = exactMatches.length > 1 ? exactMatches : narrowed;
-  const availableLineups = evidenceCandidates.filter((candidate) => (candidate.map.lineup?.length ?? 0) > 0);
+  const availableLineups = evidenceCandidates.filter(
+    (candidate) => (candidate.map.lineup?.length ?? 0) > 0,
+  );
   if (availableLineups.length > 0) {
-    const overlaps = availableLineups.map((candidate) => ({ candidate, overlap: lineupOverlap(pkg, candidate) }));
+    const overlaps = availableLineups.map((candidate) => ({
+      candidate,
+      overlap: lineupOverlap(pkg, candidate),
+    }));
     const max = Math.max(...overlaps.map((row) => row.overlap));
     if (max >= 5) {
       const best = overlaps.filter((row) => row.overlap === max);
-      if (best.length === 1) return { status: "matched", candidate: best[0]!.candidate, mode: "review_fallback" };
+      if (best.length === 1)
+        return { status: 'matched', candidate: best[0]!.candidate, mode: 'review_fallback' };
       evidenceCandidates = best.map((row) => row.candidate);
     }
   }
 
   const scoreMatchesOnly = evidenceCandidates.filter((candidate) => scoreMatches(pkg, candidate));
-  if (scoreMatchesOnly.length === 1) return { status: "matched", candidate: scoreMatchesOnly[0]!, mode: "review_fallback" };
+  if (scoreMatchesOnly.length === 1)
+    return { status: 'matched', candidate: scoreMatchesOnly[0]!, mode: 'review_fallback' };
   if (scoreMatchesOnly.length > 1) evidenceCandidates = scoreMatchesOnly;
 
-  const dateMatches = evidenceCandidates.filter((candidate) => withinOneDay(options.demoDate ?? null, candidate.series.completedAt ?? candidate.map.completedAt));
-  if (dateMatches.length === 1) return { status: "matched", candidate: dateMatches[0]!, mode: "review_fallback" };
+  const dateMatches = evidenceCandidates.filter((candidate) =>
+    withinOneDay(
+      options.demoDate ?? null,
+      candidate.series.completedAt ?? candidate.map.completedAt,
+    ),
+  );
+  if (dateMatches.length === 1)
+    return { status: 'matched', candidate: dateMatches[0]!, mode: 'review_fallback' };
   if (evidenceCandidates.length > 1) {
-    return { status: "needs_target", candidates: evidenceCandidates, reason: "地图、Canonical Entry、MatchRoster、比分和日期仍对应多个 RivalHub Map" };
+    return {
+      status: 'needs_target',
+      candidates: evidenceCandidates,
+      reason: '地图、Canonical Entry、MatchRoster、比分和日期仍对应多个 RivalHub Map',
+    };
   }
 
-  return { status: "not_found", reason: "没有找到满足地图、Canonical Entry、比分或 MatchRoster 证据的 RivalHub Map" };
+  return {
+    status: 'not_found',
+    reason: '没有找到满足地图、Canonical Entry、比分或 MatchRoster 证据的 RivalHub Map',
+  };
 }

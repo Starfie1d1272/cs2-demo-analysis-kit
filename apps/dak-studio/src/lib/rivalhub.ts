@@ -1,21 +1,27 @@
-import { createRivalHubClient, normalizeDiagnostic, normalizeBaseUrl, requestJson, RivalHubHttpError } from "@cs2dak/rivalhub-upload";
-export { normalizeBaseUrl, rivalHubEvidenceIdempotencyKey } from "@cs2dak/rivalhub-upload";
-import { getStorage } from "./storage";
-import { markRivalHubEventsStale } from "./events";
+import {
+  createRivalHubClient,
+  normalizeDiagnostic,
+  normalizeBaseUrl,
+  requestJson,
+  RivalHubHttpError,
+} from '@cs2dak/rivalhub-upload';
+export { normalizeBaseUrl, rivalHubEvidenceIdempotencyKey } from '@cs2dak/rivalhub-upload';
+import { getStorage } from './storage';
+import { markRivalHubEventsStale } from './events';
 import {
   RIVALHUB_EVENTS_CONTRACT,
   type EvidenceSubmissionResponse,
   type RivalHubEventsResponse,
   type RivalHubEvidenceSubmission,
-} from "./rivalhub-contract";
+} from './rivalhub-contract';
 
-const CONNECTION_KEY = "connection";
-export const OFFICIAL_RIVALHUB_URL = "https://match.starfie1d.top";
-const CREDENTIAL_SERVICE = "com.starfie1d.dak-studio.rivalhub";
-const CREDENTIAL_ACCOUNT = "access-token";
+const CONNECTION_KEY = 'connection';
+export const OFFICIAL_RIVALHUB_URL = 'https://match.starfie1d.top';
+const CREDENTIAL_SERVICE = 'com.starfie1d.dak-studio.rivalhub';
+const CREDENTIAL_ACCOUNT = 'access-token';
 const POLL_INTERVAL_MS = 1000;
-const BROWSER_PAIRING_WINDOW_NAME = "dak-rivalhub-pairing";
-const connectionStore = getStorage().records("rivalhub");
+const BROWSER_PAIRING_WINDOW_NAME = 'dak-rivalhub-pairing';
+const connectionStore = getStorage().records('rivalhub');
 
 export interface RivalHubConnectionRecord {
   baseUrl: string;
@@ -24,7 +30,7 @@ export interface RivalHubConnectionRecord {
   lastSyncAt: number | null;
 }
 
-export type RivalHubConnectionStatus = "disconnected" | "connecting" | "connected" | "error";
+export type RivalHubConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
 export interface RivalHubConnectionState extends RivalHubConnectionRecord {
   status: RivalHubConnectionStatus;
@@ -38,23 +44,26 @@ interface NativeRivalHubApi {
   rivalhub_credential_delete?: (service: string, account: string) => Promise<boolean>;
 }
 
-
 let memoryCredential: { baseUrl: string; token: string } | null = null;
 
 function nativeApi(): NativeRivalHubApi | null {
-  if (typeof window === "undefined") return null;
-  return ((window as unknown as { pywebview?: { api?: NativeRivalHubApi } }).pywebview?.api) ?? null;
+  if (typeof window === 'undefined') return null;
+  return (window as unknown as { pywebview?: { api?: NativeRivalHubApi } }).pywebview?.api ?? null;
 }
 
 function createConnectionClient(baseUrl: string, token?: string) {
-  return createRivalHubClient(async <T,>(path: string, method: "GET" | "POST", body?: unknown, key?: string): Promise<T> => {
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (token) headers.Authorization = `Bearer ${token}`;
-    if (key) headers["Idempotency-Key"] = key;
-    return requestJson<T>(`${baseUrl}/api/integrations/dak${path}`, {
-      method, headers, ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    });
-  });
+  return createRivalHubClient(
+    async <T>(path: string, method: 'GET' | 'POST', body?: unknown, key?: string): Promise<T> => {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers.Authorization = `Bearer ${token}`;
+      if (key) headers['Idempotency-Key'] = key;
+      return requestJson<T>(`${baseUrl}/api/integrations/dak${path}`, {
+        method,
+        headers,
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+    },
+  );
 }
 
 async function readCredential(baseUrl: string): Promise<string | null> {
@@ -63,7 +72,7 @@ async function readCredential(baseUrl: string): Promise<string | null> {
     try {
       return await api.rivalhub_credential_get(CREDENTIAL_SERVICE, CREDENTIAL_ACCOUNT);
     } catch (error) {
-      const diagnostic = normalizeDiagnostic(error, { stage: "credential.read" });
+      const diagnostic = normalizeDiagnostic(error, { stage: 'credential.read' });
       throw Object.assign(new Error(diagnostic.message), diagnostic);
     }
   }
@@ -73,7 +82,8 @@ async function readCredential(baseUrl: string): Promise<string | null> {
 async function saveCredential(baseUrl: string, token: string): Promise<void> {
   const api = nativeApi();
   if (api?.rivalhub_credential_set) {
-    if (!await api.rivalhub_credential_set(CREDENTIAL_SERVICE, CREDENTIAL_ACCOUNT, token)) throw new Error("无法写入系统安全存储，连接未保存");
+    if (!(await api.rivalhub_credential_set(CREDENTIAL_SERVICE, CREDENTIAL_ACCOUNT, token)))
+      throw new Error('无法写入系统安全存储，连接未保存');
     return;
   }
   // 浏览器开发环境只保存在当前 JS 进程内；不写入 IndexedDB/localStorage。
@@ -82,7 +92,8 @@ async function saveCredential(baseUrl: string, token: string): Promise<void> {
 
 async function deleteCredential(): Promise<void> {
   const api = nativeApi();
-  if (api?.rivalhub_credential_delete) await api.rivalhub_credential_delete(CREDENTIAL_SERVICE, CREDENTIAL_ACCOUNT);
+  if (api?.rivalhub_credential_delete)
+    await api.rivalhub_credential_delete(CREDENTIAL_SERVICE, CREDENTIAL_ACCOUNT);
   memoryCredential = null;
 }
 
@@ -92,11 +103,11 @@ function preopenBrowserPairingWindow(): Window {
     // Must run synchronously while the click activation is live. Do not pass
     // noopener/noreferrer here: those features can intentionally discard the
     // WindowProxy that we need to navigate after pairing/start returns.
-    popup = window.open("about:blank", BROWSER_PAIRING_WINDOW_NAME);
+    popup = window.open('about:blank', BROWSER_PAIRING_WINDOW_NAME);
   } catch {
     popup = null;
   }
-  if (!popup) throw new Error("浏览器阻止了连接授权页面，请允许打开新窗口后重试");
+  if (!popup) throw new Error('浏览器阻止了连接授权页面，请允许打开新窗口后重试');
   try {
     // about:blank is still same-origin here. Remove the child page's opener
     // capability while retaining our WindowProxy for the later navigation.
@@ -119,25 +130,32 @@ function closeBrowserPairingWindow(popup: Window | null): void {
 
 function navigateBrowserPairingWindow(url: string, preopened: Window | null): void {
   if (!preopened || preopened.closed) {
-    throw new Error("RivalHub 授权窗口已关闭，请重新发起连接");
+    throw new Error('RivalHub 授权窗口已关闭，请重新发起连接');
   }
   try {
     preopened.location.replace(url);
   } catch {
-    throw new Error("无法打开 RivalHub 授权页面，请重新发起连接");
+    throw new Error('无法打开 RivalHub 授权页面，请重新发起连接');
   }
 }
 
-async function openExternalUrl(url: string, preopenedBrowserWindow: Window | null = null): Promise<void> {
+async function openExternalUrl(
+  url: string,
+  preopenedBrowserWindow: Window | null = null,
+): Promise<void> {
   const api = nativeApi();
   if (api?.rivalhub_open_external_url) {
-    if (!await api.rivalhub_open_external_url(url)) throw new Error("无法打开系统浏览器");
+    if (!(await api.rivalhub_open_external_url(url))) throw new Error('无法打开系统浏览器');
     return;
   }
   navigateBrowserPairingWindow(url, preopenedBrowserWindow);
 }
 
-async function saveConnection(baseUrl: string, pairingId: string | null, previous?: RivalHubConnectionRecord): Promise<RivalHubConnectionRecord> {
+async function saveConnection(
+  baseUrl: string,
+  pairingId: string | null,
+  previous?: RivalHubConnectionRecord,
+): Promise<RivalHubConnectionRecord> {
   const record: RivalHubConnectionRecord = {
     baseUrl,
     pairingId: pairingId ?? previous?.pairingId ?? null,
@@ -148,22 +166,51 @@ async function saveConnection(baseUrl: string, pairingId: string | null, previou
   return record;
 }
 
-async function clearUnauthorizedConnection(state: RivalHubConnectionState, error: unknown): Promise<void> {
+async function clearUnauthorizedConnection(
+  state: RivalHubConnectionState,
+  error: unknown,
+): Promise<void> {
   if (!(error instanceof RivalHubHttpError) || error.status !== 401) return;
   await deleteCredential();
-  await connectionStore.put(CONNECTION_KEY, { baseUrl: state.baseUrl, pairingId: state.pairingId, connectedAt: state.connectedAt, lastSyncAt: state.lastSyncAt });
+  await connectionStore.put(CONNECTION_KEY, {
+    baseUrl: state.baseUrl,
+    pairingId: state.pairingId,
+    connectedAt: state.connectedAt,
+    lastSyncAt: state.lastSyncAt,
+  });
 }
 
 export async function loadRivalHubConnection(): Promise<RivalHubConnectionState> {
   const record = await connectionStore.get<RivalHubConnectionRecord>(CONNECTION_KEY);
-  if (!record?.baseUrl) return { baseUrl: "", pairingId: null, connectedAt: 0, lastSyncAt: null, status: "disconnected", error: null };
+  if (!record?.baseUrl)
+    return {
+      baseUrl: '',
+      pairingId: null,
+      connectedAt: 0,
+      lastSyncAt: null,
+      status: 'disconnected',
+      error: null,
+    };
   const baseUrl = normalizeBaseUrl(record.baseUrl);
-  const pairingId = typeof record.pairingId === "string" && record.pairingId ? record.pairingId : null;
+  const pairingId =
+    typeof record.pairingId === 'string' && record.pairingId ? record.pairingId : null;
   try {
     const token = await readCredential(baseUrl);
-    return { ...record, baseUrl, pairingId, status: token ? "connected" : "disconnected", error: null };
+    return {
+      ...record,
+      baseUrl,
+      pairingId,
+      status: token ? 'connected' : 'disconnected',
+      error: null,
+    };
   } catch (error) {
-    return { ...record, baseUrl, pairingId, status: "error", error: normalizeDiagnostic(error, { stage: "credential.read" }).message };
+    return {
+      ...record,
+      baseUrl,
+      pairingId,
+      status: 'error',
+      error: normalizeDiagnostic(error, { stage: 'credential.read' }).message,
+    };
   }
 }
 
@@ -173,21 +220,24 @@ export async function connectRivalHub(
 ): Promise<RivalHubConnectionState> {
   const baseUrl = normalizeBaseUrl(inputBaseUrl);
   const native = nativeApi();
-  const preopenedBrowserWindow = native?.rivalhub_open_external_url ? null : preopenBrowserPairingWindow();
+  const preopenedBrowserWindow = native?.rivalhub_open_external_url
+    ? null
+    : preopenBrowserPairingWindow();
   try {
     const client = createConnectionClient(baseUrl);
     const start = await client.startPairing();
-    onProgress?.("请在系统浏览器中确认 RivalHub 赛事权限…");
+    onProgress?.('请在系统浏览器中确认 RivalHub 赛事权限…');
     await openExternalUrl(start.authorizeUrl, preopenedBrowserWindow);
     const expiresAt = new Date(start.expiresAt).getTime();
     for (;;) {
       const poll = await client.pollPairing(start.pairingId, start.pollToken);
-      if (poll.status === "authorized" && poll.accessToken) {
+      if (poll.status === 'authorized' && poll.accessToken) {
         await saveCredential(baseUrl, poll.accessToken);
         const record = await saveConnection(baseUrl, start.pairingId);
-        return { ...record, status: "connected", error: null };
+        return { ...record, status: 'connected', error: null };
       }
-      if (poll.status === "expired" || Date.now() >= expiresAt) throw new Error("连接授权已过期，请重新发起");
+      if (poll.status === 'expired' || Date.now() >= expiresAt)
+        throw new Error('连接授权已过期，请重新发起');
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
     }
   } catch (error) {
@@ -199,25 +249,31 @@ export async function connectRivalHub(
 /** All operation/UI boundaries use the safe reason, including native rejection objects. */
 export function rivalHubFailureMessage(error: unknown, state?: RivalHubConnectionState): string {
   const diagnostic = normalizeDiagnostic(error);
-  if (diagnostic.message === "尚未连接 RivalHub" && state?.status === "error" && state.error) {
+  if (diagnostic.message === '尚未连接 RivalHub' && state?.status === 'error' && state.error) {
     return normalizeDiagnostic(state.error).message;
   }
   return diagnostic.message;
 }
 
 export function assertRivalHubConnected(state: RivalHubConnectionState): void {
-  if (state.status === "error" && state.error) throw new Error(normalizeDiagnostic(state.error).message);
-  if (!state.baseUrl || state.status !== "connected") throw new Error("尚未连接 RivalHub");
+  if (state.status === 'error' && state.error)
+    throw new Error(normalizeDiagnostic(state.error).message);
+  if (!state.baseUrl || state.status !== 'connected') throw new Error('尚未连接 RivalHub');
 }
 
 export async function fetchRivalHubEvents(): Promise<RivalHubEventsResponse> {
   const state = await loadRivalHubConnection();
   assertRivalHubConnected(state);
   const token = await readCredential(state.baseUrl);
-  if (!token) throw new Error("RivalHub 连接凭据不存在，请重新连接");
+  if (!token) throw new Error('RivalHub 连接凭据不存在，请重新连接');
   try {
     const parsed = await createConnectionClient(state.baseUrl, token).events();
-    await connectionStore.put(CONNECTION_KEY, { baseUrl: state.baseUrl, pairingId: state.pairingId, connectedAt: state.connectedAt, lastSyncAt: Date.now() });
+    await connectionStore.put(CONNECTION_KEY, {
+      baseUrl: state.baseUrl,
+      pairingId: state.pairingId,
+      connectedAt: state.connectedAt,
+      lastSyncAt: Date.now(),
+    });
     return parsed;
   } catch (error) {
     await clearUnauthorizedConnection(state, error);
@@ -232,7 +288,7 @@ export async function submitRivalHubEvidence(
   const state = await loadRivalHubConnection();
   assertRivalHubConnected(state);
   const token = await readCredential(state.baseUrl);
-  if (!token) throw new Error("RivalHub 连接凭据不存在，请重新连接");
+  if (!token) throw new Error('RivalHub 连接凭据不存在，请重新连接');
   try {
     return await createConnectionClient(state.baseUrl, token).submit(evidence, idempotencyKey);
   } catch (error) {
@@ -244,14 +300,17 @@ export async function submitRivalHubEvidence(
 export async function revokeRivalHubPairing(): Promise<void> {
   const state = await loadRivalHubConnection();
   assertRivalHubConnected(state);
-  if (!state.pairingId) throw new Error("当前连接缺少配对标识，请重新连接后再撤销此设备");
+  if (!state.pairingId) throw new Error('当前连接缺少配对标识，请重新连接后再撤销此设备');
   const token = await readCredential(state.baseUrl);
-  if (!token) throw new Error("RivalHub 连接凭据不存在，请重新连接");
+  if (!token) throw new Error('RivalHub 连接凭据不存在，请重新连接');
   try {
-    await requestJson<unknown>(`${state.baseUrl}/api/integrations/dak/pairings/${encodeURIComponent(state.pairingId)}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    await requestJson<unknown>(
+      `${state.baseUrl}/api/integrations/dak/pairings/${encodeURIComponent(state.pairingId)}`,
+      {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
   } catch (error) {
     await clearUnauthorizedConnection(state, error);
     throw error;

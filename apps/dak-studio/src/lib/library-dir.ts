@@ -13,7 +13,7 @@ interface LibraryDirApi {
 
 function getLibraryDirApi(): LibraryDirApi | null {
   const api =
-    typeof window === "undefined"
+    typeof window === 'undefined'
       ? undefined
       : (window as unknown as { pywebview?: { api?: Partial<LibraryDirApi> } }).pywebview?.api;
   if (!api?.userdata_dir || !api.open_userdata_dir) return null;
@@ -28,7 +28,7 @@ export function canOpenLibraryDir(): boolean {
 /** 在系统文件管理器中打开数据目录。 */
 export async function openLibraryDir(): Promise<{ ok: boolean; error?: string }> {
   const api = getLibraryDirApi();
-  if (!api) return { ok: false, error: "当前环境不支持打开本地目录" };
+  if (!api) return { ok: false, error: '当前环境不支持打开本地目录' };
   return api.open_userdata_dir();
 }
 

@@ -1,30 +1,43 @@
-import { isAnalysisStale } from "./analysis-manifest.js";
-import { getFactsStore } from "./facts-store.js";
-import type { FactsStore } from "./fact-types.js";
-import { getDerivedCacheStore, type DerivedCacheStore } from "./derived-cache.js";
-import { matchIdForEntry, type StudioDemoEntry } from "./demo-entry.js";
-import { listAvailableTris } from "./tri-assets.js";
+import { isAnalysisStale } from './analysis-manifest.js';
+import { getFactsStore } from './facts-store.js';
+import type { FactsStore } from './fact-types.js';
+import { getDerivedCacheStore, type DerivedCacheStore } from './derived-cache.js';
+import { matchIdForEntry, type StudioDemoEntry } from './demo-entry.js';
+import { listAvailableTris } from './tri-assets.js';
 
 export type StudioCapability =
-  | "personal-review"
-  | "duel"
-  | "economy"
-  | "utility"
-  | "lineup"
-  | "opening"
-  | "control"
-  | "tactical"
-  | "map-role"
-  | "player-map-pool"
-  | "team-awp"
-  | "season"
-  | "team-comparison";
+  | 'personal-review'
+  | 'duel'
+  | 'economy'
+  | 'utility'
+  | 'lineup'
+  | 'opening'
+  | 'control'
+  | 'tactical'
+  | 'map-role'
+  | 'player-map-pool'
+  | 'team-awp'
+  | 'season'
+  | 'team-comparison';
 
-export type CapabilityStatus = "ready" | "partial" | "unavailable";
-export type CapabilityOutputLevel = "observation" | "system-finding";
-export type CapabilityRepairAction = "rebuild-facts" | "reimport-with-replay" | "reimport-with-shots" | "install-tri";
+export type CapabilityStatus = 'ready' | 'partial' | 'unavailable';
+export type CapabilityOutputLevel = 'observation' | 'system-finding';
+export type CapabilityRepairAction =
+  'rebuild-facts' | 'reimport-with-replay' | 'reimport-with-shots' | 'install-tri';
 
-type FactKind = "season" | "team-comparison" | "player-map-pool" | "team-awp" | "opening" | "insights" | "duel" | "economy" | "utility" | "lineup" | "tactical" | "map-intelligence";
+type FactKind =
+  | 'season'
+  | 'team-comparison'
+  | 'player-map-pool'
+  | 'team-awp'
+  | 'opening'
+  | 'insights'
+  | 'duel'
+  | 'economy'
+  | 'utility'
+  | 'lineup'
+  | 'tactical'
+  | 'map-intelligence';
 
 export interface EntryCapabilityFacts {
   facts: Partial<Record<FactKind, boolean>>;
@@ -34,7 +47,7 @@ export interface EntryCapabilityFacts {
 }
 
 export interface CapabilityDependencyAvailability {
-  key: "replay" | "shots" | "tri";
+  key: 'replay' | 'shots' | 'tri';
   label: string;
   available: number;
   totalEligible: number;
@@ -60,65 +73,90 @@ export interface CapabilityAvailability {
 
 interface CapabilityRequirement {
   requiredFacts?: FactKind[];
-  requiredDependencies?: Array<CapabilityDependencyAvailability["key"]>;
-  optionalDependencies?: Array<CapabilityDependencyAvailability["key"]>;
+  requiredDependencies?: Array<CapabilityDependencyAvailability['key']>;
+  optionalDependencies?: Array<CapabilityDependencyAvailability['key']>;
   outputLevel: CapabilityOutputLevel;
 }
 
 const REQUIREMENTS: Record<StudioCapability, CapabilityRequirement> = {
-  "personal-review": { requiredFacts: ["insights"], outputLevel: "system-finding" },
-  duel: { requiredFacts: ["duel"], optionalDependencies: ["shots", "tri"], outputLevel: "system-finding" },
-  economy: { requiredFacts: ["economy"], outputLevel: "observation" },
-  utility: { requiredFacts: ["utility"], outputLevel: "system-finding" },
-  lineup: { requiredFacts: ["lineup"], optionalDependencies: ["replay"], outputLevel: "observation" },
-  opening: { requiredFacts: ["opening"], requiredDependencies: ["replay"], outputLevel: "observation" },
-  control: { requiredDependencies: ["replay"], optionalDependencies: ["tri"], outputLevel: "observation" },
-  tactical: { requiredFacts: ["tactical", "map-intelligence"], optionalDependencies: ["replay"], outputLevel: "system-finding" },
-  "map-role": { requiredFacts: ["map-intelligence"], outputLevel: "observation" },
-  "player-map-pool": { requiredFacts: ["player-map-pool"], outputLevel: "observation" },
-  "team-awp": { requiredFacts: ["team-awp"], outputLevel: "observation" },
-  season: { requiredFacts: ["season"], outputLevel: "observation" },
-  "team-comparison": { requiredFacts: ["team-comparison"], outputLevel: "observation" },
+  'personal-review': { requiredFacts: ['insights'], outputLevel: 'system-finding' },
+  duel: {
+    requiredFacts: ['duel'],
+    optionalDependencies: ['shots', 'tri'],
+    outputLevel: 'system-finding',
+  },
+  economy: { requiredFacts: ['economy'], outputLevel: 'observation' },
+  utility: { requiredFacts: ['utility'], outputLevel: 'system-finding' },
+  lineup: {
+    requiredFacts: ['lineup'],
+    optionalDependencies: ['replay'],
+    outputLevel: 'observation',
+  },
+  opening: {
+    requiredFacts: ['opening'],
+    requiredDependencies: ['replay'],
+    outputLevel: 'observation',
+  },
+  control: {
+    requiredDependencies: ['replay'],
+    optionalDependencies: ['tri'],
+    outputLevel: 'observation',
+  },
+  tactical: {
+    requiredFacts: ['tactical', 'map-intelligence'],
+    optionalDependencies: ['replay'],
+    outputLevel: 'system-finding',
+  },
+  'map-role': { requiredFacts: ['map-intelligence'], outputLevel: 'observation' },
+  'player-map-pool': { requiredFacts: ['player-map-pool'], outputLevel: 'observation' },
+  'team-awp': { requiredFacts: ['team-awp'], outputLevel: 'observation' },
+  season: { requiredFacts: ['season'], outputLevel: 'observation' },
+  'team-comparison': { requiredFacts: ['team-comparison'], outputLevel: 'observation' },
 };
 
-const DEPENDENCY_LABEL: Record<CapabilityDependencyAvailability["key"], string> = {
-  replay: "replay",
-  shots: "shots/duels",
-  tri: ".tri 静态碰撞",
+const DEPENDENCY_LABEL: Record<CapabilityDependencyAvailability['key'], string> = {
+  replay: 'replay',
+  shots: 'shots/duels',
+  tri: '.tri 静态碰撞',
 };
 
 const FACT_LABEL: Record<FactKind, string> = {
-  season: "选手赛季 facts",
-  "team-comparison": "队伍对比 facts",
-  "player-map-pool": "选手地图池 facts",
-  "team-awp": "AWP 回合 facts",
-  opening: "开局动线 facts",
-  insights: "个人复盘 facts",
-  duel: "对枪 facts",
-  economy: "经济 facts",
-  utility: "道具 facts",
-  lineup: "点位 facts",
-  tactical: "战术 facts",
-  "map-intelligence": "地图位置 facts",
+  season: '选手赛季 facts',
+  'team-comparison': '队伍对比 facts',
+  'player-map-pool': '选手地图池 facts',
+  'team-awp': 'AWP 回合 facts',
+  opening: '开局动线 facts',
+  insights: '个人复盘 facts',
+  duel: '对枪 facts',
+  economy: '经济 facts',
+  utility: '道具 facts',
+  lineup: '点位 facts',
+  tactical: '战术 facts',
+  'map-intelligence': '地图位置 facts',
 };
 
-function hasDependency(input: EntryCapabilityFacts, dependency: CapabilityDependencyAvailability["key"]): boolean {
-  if (dependency === "replay") return input.hasReplay;
-  if (dependency === "shots") return input.hasShots;
+function hasDependency(
+  input: EntryCapabilityFacts,
+  dependency: CapabilityDependencyAvailability['key'],
+): boolean {
+  if (dependency === 'replay') return input.hasReplay;
+  if (dependency === 'shots') return input.hasShots;
   return input.hasTri;
 }
 
 function repairForReason(reason: string): CapabilityRepairAction | null {
-  if (reason === "facts 需要重建" || reason.endsWith("facts 缺失")) return "rebuild-facts";
-  if (reason === "replay 缺失") return "reimport-with-replay";
-  if (reason === "shots/duels 缺失") return "reimport-with-shots";
+  if (reason === 'facts 需要重建' || reason.endsWith('facts 缺失')) return 'rebuild-facts';
+  if (reason === 'replay 缺失') return 'reimport-with-replay';
+  if (reason === 'shots/duels 缺失') return 'reimport-with-shots';
   return null;
 }
 
-function repairForDependency(dependency: CapabilityDependencyAvailability["key"]): CapabilityRepairAction {
-  if (dependency === "replay") return "reimport-with-replay";
-  if (dependency === "shots") return "reimport-with-shots";
-  return "install-tri";
+function repairForDependency(
+  dependency: CapabilityDependencyAvailability['key'],
+): CapabilityRepairAction {
+  if (dependency === 'replay') return 'reimport-with-replay';
+  if (dependency === 'shots') return 'reimport-with-shots';
+  return 'install-tri';
 }
 
 /**
@@ -136,16 +174,22 @@ export function deriveCapabilityAvailability(
 
   for (const entry of entries) {
     const input = inputsByEntryId.get(entry.id) ?? {
-      facts: {}, hasReplay: entry.meta.hasReplay, hasShots: false, hasTri: false,
+      facts: {},
+      hasReplay: entry.meta.hasReplay,
+      hasShots: false,
+      hasTri: false,
     };
     let reason: string | null = null;
-    if (capability === "opening" && !input.hasReplay) reason = "replay 缺失";
-    else if (requirement.requiredFacts && isAnalysisStale(entry.builtWith)) reason = "facts 需要重建";
+    if (capability === 'opening' && !input.hasReplay) reason = 'replay 缺失';
+    else if (requirement.requiredFacts && isAnalysisStale(entry.builtWith))
+      reason = 'facts 需要重建';
     else {
       const missingFact = requirement.requiredFacts?.find((fact) => !input.facts[fact]);
       if (missingFact) reason = `${FACT_LABEL[missingFact]} 缺失`;
       else {
-        const missingDependency = requirement.requiredDependencies?.find((dependency) => !hasDependency(input, dependency));
+        const missingDependency = requirement.requiredDependencies?.find(
+          (dependency) => !hasDependency(input, dependency),
+        );
         if (missingDependency) reason = `${DEPENDENCY_LABEL[missingDependency]} 缺失`;
       }
     }
@@ -158,29 +202,46 @@ export function deriveCapabilityAvailability(
     }
   }
 
-  const dependencies = [...(requirement.requiredDependencies ?? []), ...(requirement.optionalDependencies ?? [])]
-    .map((dependency) => ({
-      key: dependency,
-      label: DEPENDENCY_LABEL[dependency],
-      available: eligible.filter(({ input }) => hasDependency(input, dependency)).length,
-      totalEligible: eligible.length,
-      required: requirement.requiredDependencies?.includes(dependency) ?? false,
-    }));
-  const optionalMissing = dependencies.some((dependency) => !dependency.required && dependency.available < dependency.totalEligible);
-  const status: CapabilityStatus = eligible.length === 0
-    ? "unavailable"
-    : eligible.length < entries.length || optionalMissing ? "partial" : "ready";
-  const repairActions = [...new Set([
-    ...[...exclusions.keys()].map(repairForReason),
-    ...dependencies.filter((dependency) => dependency.available < dependency.totalEligible).map((dependency) => repairForDependency(dependency.key)),
-  ].filter((action): action is CapabilityRepairAction => action != null))];
+  const dependencies = [
+    ...(requirement.requiredDependencies ?? []),
+    ...(requirement.optionalDependencies ?? []),
+  ].map((dependency) => ({
+    key: dependency,
+    label: DEPENDENCY_LABEL[dependency],
+    available: eligible.filter(({ input }) => hasDependency(input, dependency)).length,
+    totalEligible: eligible.length,
+    required: requirement.requiredDependencies?.includes(dependency) ?? false,
+  }));
+  const optionalMissing = dependencies.some(
+    (dependency) => !dependency.required && dependency.available < dependency.totalEligible,
+  );
+  const status: CapabilityStatus =
+    eligible.length === 0
+      ? 'unavailable'
+      : eligible.length < entries.length || optionalMissing
+        ? 'partial'
+        : 'ready';
+  const repairActions = [
+    ...new Set(
+      [
+        ...[...exclusions.keys()].map(repairForReason),
+        ...dependencies
+          .filter((dependency) => dependency.available < dependency.totalEligible)
+          .map((dependency) => repairForDependency(dependency.key)),
+      ].filter((action): action is CapabilityRepairAction => action != null),
+    ),
+  ];
 
   return {
     capability,
     status,
     eligibleMatches: eligible.length,
     totalMatches: entries.length,
-    excluded: [...exclusions.entries()].map(([reason, entryIds]) => ({ reason, count: entryIds.length, entryIds })),
+    excluded: [...exclusions.entries()].map(([reason, entryIds]) => ({
+      reason,
+      count: entryIds.length,
+      entryIds,
+    })),
     dependencies,
     repairActions,
     outputLevel: requirement.outputLevel,
@@ -203,62 +264,90 @@ export async function loadCapabilityAvailabilityInputs(
   const matchIds = entries.map(matchIdForEntry);
   const requirement = REQUIREMENTS[capability];
   const needsFact = (kind: FactKind) => requirement.requiredFacts?.includes(kind) ?? false;
-  const needsDependency = (kind: CapabilityDependencyAvailability["key"]) =>
-    requirement.requiredDependencies?.includes(kind) || requirement.optionalDependencies?.includes(kind);
-  const [insights, duels, economy, utilityMatchIds, lineups, tactical, playerPositions, teamShapes, mechanics, opening, tris, rrRows, awpRows, comparisonRows, seasonRows] = await Promise.all([
-    needsFact("insights") ? derivedStore.getPlayerInsights({ matchIds, ...playerScope }) : [],
-    needsFact("duel") ? derivedStore.getDuels({ matchIds }) : [],
-    needsFact("economy") ? derivedStore.getTournament({ matchIds }) : [],
-    needsFact("utility") ? derivedStore.getUtilityValueMatchIds({ matchIds }) : [],
-    needsFact("lineup") ? factsStore.getLineups({ matchIds }) : [],
-    needsFact("tactical") ? factsStore.getTacticalRounds({ matchIds }) : [],
-    needsFact("map-intelligence") ? factsStore.getPlayerPositionRounds({ matchIds }) : [],
-    needsFact("map-intelligence") ? factsStore.getTeamShapeRounds({ matchIds }) : [],
-    needsDependency("shots") ? factsStore.getMechanicsRows({ matchIds }) : [],
-    needsFact("opening") && playerScope ? derivedStore.getOpeningTrails({ matchIds, ...playerScope }) : [],
-    needsDependency("tri") ? (availableTris ?? listAvailableTris()) : [],
-    needsFact("player-map-pool") && playerScope ? factsStore.getRrSignalRows({ matchIds, ...playerScope }) : [],
-    needsFact("team-awp") ? factsStore.getTeamAwpRounds({ matchIds }) : [],
-    needsFact("team-comparison") ? derivedStore.getTeamComparison({ matchIds }) : [],
-    needsFact("season") ? factsStore.getRrSignalRows({ matchIds }) : [],
+  const needsDependency = (kind: CapabilityDependencyAvailability['key']) =>
+    requirement.requiredDependencies?.includes(kind) ||
+    requirement.optionalDependencies?.includes(kind);
+  const [
+    insights,
+    duels,
+    economy,
+    utilityMatchIds,
+    lineups,
+    tactical,
+    playerPositions,
+    teamShapes,
+    mechanics,
+    opening,
+    tris,
+    rrRows,
+    awpRows,
+    comparisonRows,
+    seasonRows,
+  ] = await Promise.all([
+    needsFact('insights') ? derivedStore.getPlayerInsights({ matchIds, ...playerScope }) : [],
+    needsFact('duel') ? derivedStore.getDuels({ matchIds }) : [],
+    needsFact('economy') ? derivedStore.getTournament({ matchIds }) : [],
+    needsFact('utility') ? derivedStore.getUtilityValueMatchIds({ matchIds }) : [],
+    needsFact('lineup') ? factsStore.getLineups({ matchIds }) : [],
+    needsFact('tactical') ? factsStore.getTacticalRounds({ matchIds }) : [],
+    needsFact('map-intelligence') ? factsStore.getPlayerPositionRounds({ matchIds }) : [],
+    needsFact('map-intelligence') ? factsStore.getTeamShapeRounds({ matchIds }) : [],
+    needsDependency('shots') ? factsStore.getMechanicsRows({ matchIds }) : [],
+    needsFact('opening') && playerScope
+      ? derivedStore.getOpeningTrails({ matchIds, ...playerScope })
+      : [],
+    needsDependency('tri') ? (availableTris ?? listAvailableTris()) : [],
+    needsFact('player-map-pool') && playerScope
+      ? factsStore.getRrSignalRows({ matchIds, ...playerScope })
+      : [],
+    needsFact('team-awp') ? factsStore.getTeamAwpRounds({ matchIds }) : [],
+    needsFact('team-comparison') ? derivedStore.getTeamComparison({ matchIds }) : [],
+    needsFact('season') ? factsStore.getRrSignalRows({ matchIds }) : [],
   ]);
   const shapes = idsOf(teamShapes);
   const factSets = {
     season: idsOf(seasonRows),
-    "team-comparison": idsOf(comparisonRows),
-    "player-map-pool": idsOf(rrRows),
-    "team-awp": idsOf(awpRows),
-    opening: idsOf(opening.filter(row => row.row.available)),
+    'team-comparison': idsOf(comparisonRows),
+    'player-map-pool': idsOf(rrRows),
+    'team-awp': idsOf(awpRows),
+    opening: idsOf(opening.filter((row) => row.row.available)),
     insights: idsOf(insights),
     duel: idsOf(duels),
     economy: idsOf(economy),
     utility: new Set(utilityMatchIds),
     lineup: idsOf(lineups),
     tactical: idsOf(tactical),
-    "map-intelligence": new Set([...idsOf(playerPositions)].filter((matchId) => shapes.has(matchId))),
+    'map-intelligence': new Set(
+      [...idsOf(playerPositions)].filter((matchId) => shapes.has(matchId)),
+    ),
     mechanics: idsOf(mechanics),
   };
   const triMaps = new Set(tris);
-  return new Map(entries.map((entry) => {
-    const matchId = matchIdForEntry(entry);
-    return [entry.id, {
-      facts: {
-        season: factSets.season.has(matchId),
-        "team-comparison": factSets["team-comparison"].has(matchId),
-        "player-map-pool": factSets["player-map-pool"].has(matchId),
-        "team-awp": factSets["team-awp"].has(matchId),
-        opening: factSets.opening.has(matchId),
-        insights: factSets.insights.has(matchId),
-        duel: factSets.duel.has(matchId),
-        economy: factSets.economy.has(matchId),
-        utility: factSets.utility.has(matchId),
-        lineup: factSets.lineup.has(matchId),
-        tactical: factSets.tactical.has(matchId),
-        "map-intelligence": factSets["map-intelligence"].has(matchId),
-      },
-      hasReplay: entry.meta.hasReplay,
-      hasShots: factSets.mechanics.has(matchId),
-      hasTri: triMaps.has(entry.meta.mapName),
-    } satisfies EntryCapabilityFacts] as const;
-  }));
+  return new Map(
+    entries.map((entry) => {
+      const matchId = matchIdForEntry(entry);
+      return [
+        entry.id,
+        {
+          facts: {
+            season: factSets.season.has(matchId),
+            'team-comparison': factSets['team-comparison'].has(matchId),
+            'player-map-pool': factSets['player-map-pool'].has(matchId),
+            'team-awp': factSets['team-awp'].has(matchId),
+            opening: factSets.opening.has(matchId),
+            insights: factSets.insights.has(matchId),
+            duel: factSets.duel.has(matchId),
+            economy: factSets.economy.has(matchId),
+            utility: factSets.utility.has(matchId),
+            lineup: factSets.lineup.has(matchId),
+            tactical: factSets.tactical.has(matchId),
+            'map-intelligence': factSets['map-intelligence'].has(matchId),
+          },
+          hasReplay: entry.meta.hasReplay,
+          hasShots: factSets.mechanics.has(matchId),
+          hasTri: triMaps.has(entry.meta.mapName),
+        } satisfies EntryCapabilityFacts,
+      ] as const;
+    }),
+  );
 }

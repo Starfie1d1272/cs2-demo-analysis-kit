@@ -1,40 +1,67 @@
-import type { DirectoryLoadStatus } from "../app/use-studio-data";
-import type { EventsPageState } from "../lib/studio-page-state";
-import { usePageReady } from "../lib/use-page-ready";
-import { STUDIO_TABLE_CLASSES } from "../components/table-styles";
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { EventStage, EventStanding } from "@cs2dak/contract";
-import { DataTable, ElimBracket, EmptyState, SwissBracket, type DataTableColumn } from "@cs2dak/react";
-import { type StudioEventRecord } from "../lib/events";
-import type { StudioDemoEntry } from "../lib/demo-entry";
-import type { RivalHubConnectionState } from "../lib/rivalhub";
-import { OFFICIAL_RIVALHUB_URL } from "../lib/rivalhub";
-import type { RivalHubRemoteMap, RivalHubRemoteTeam } from "../lib/rivalhub-contract";
-import type { RivalHubBatchPhase, RivalHubImportContext, RivalHubMatchCandidate } from "../lib/rivalhub-import";
-import { candidateFromSeriesMap } from "../lib/rivalhub-match";
-import { rivalHubStatusPresentation } from "../lib/rivalhub-status";
-import { elimModelFromResults, swissModelFromResults } from "../lib/event-bracket";
-import { type StudioSeriesRecord } from "../lib/series";
-import { SeriesInspector } from "./SeriesInspector";
+import type { DirectoryLoadStatus } from '../app/use-studio-data';
+import type { EventsPageState } from '../lib/studio-page-state';
+import { usePageReady } from '../lib/use-page-ready';
+import { STUDIO_TABLE_CLASSES } from '../components/table-styles';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { EventStage, EventStanding } from '@cs2dak/contract';
+import {
+  DataTable,
+  ElimBracket,
+  EmptyState,
+  SwissBracket,
+  type DataTableColumn,
+} from '@cs2dak/react';
+import { type StudioEventRecord } from '../lib/events';
+import type { StudioDemoEntry } from '../lib/demo-entry';
+import type { RivalHubConnectionState } from '../lib/rivalhub';
+import { OFFICIAL_RIVALHUB_URL } from '../lib/rivalhub';
+import type { RivalHubRemoteMap, RivalHubRemoteTeam } from '../lib/rivalhub-contract';
+import type {
+  RivalHubBatchPhase,
+  RivalHubImportContext,
+  RivalHubMatchCandidate,
+} from '../lib/rivalhub-import';
+import { candidateFromSeriesMap } from '../lib/rivalhub-match';
+import { rivalHubStatusPresentation } from '../lib/rivalhub-status';
+import { elimModelFromResults, swissModelFromResults } from '../lib/event-bracket';
+import { type StudioSeriesRecord } from '../lib/series';
+import { SeriesInspector } from './SeriesInspector';
 
-const MATCHABLE_REMOTE_STATUSES = new Set<RivalHubRemoteMap["demoStatus"]>(["finished_pending_demo", "needs_attention", "synced"]);
+const MATCHABLE_REMOTE_STATUSES = new Set<RivalHubRemoteMap['demoStatus']>([
+  'finished_pending_demo',
+  'needs_attention',
+  'synced',
+]);
 
-function remoteMapsForSeries(series: StudioSeriesRecord): Array<{ series: StudioSeriesRecord; map: RivalHubRemoteMap }> {
-  return (series.mapAssignments ?? []).flatMap((assignment) => assignment.rivalHub && MATCHABLE_REMOTE_STATUSES.has(assignment.rivalHub.demoStatus)
-    ? [{ series, map: assignment.rivalHub }]
-    : []);
+function remoteMapsForSeries(
+  series: StudioSeriesRecord,
+): Array<{ series: StudioSeriesRecord; map: RivalHubRemoteMap }> {
+  return (series.mapAssignments ?? []).flatMap((assignment) =>
+    assignment.rivalHub && MATCHABLE_REMOTE_STATUSES.has(assignment.rivalHub.demoStatus)
+      ? [{ series, map: assignment.rivalHub }]
+      : [],
+  );
 }
 
 function displayStatusForSeries(series: StudioSeriesRecord) {
-  const maps = (series.mapAssignments ?? []).filter((assignment) => assignment.rivalHub).map((assignment) => assignment.rivalHub!);
+  const maps = (series.mapAssignments ?? [])
+    .filter((assignment) => assignment.rivalHub)
+    .map((assignment) => assignment.rivalHub!);
   if (maps.length === 0) return null;
-  const severity = ["needs_attention", "demo_processing", "live", "finished_pending_demo", "synced", "not_started"] as const;
+  const severity = [
+    'needs_attention',
+    'demo_processing',
+    'live',
+    'finished_pending_demo',
+    'synced',
+    'not_started',
+  ] as const;
   const status = severity.find((candidate) => maps.some((map) => map.demoStatus === candidate));
   return status ? rivalHubStatusPresentation(status) : null;
 }
 
 function formatScore(a: number | null | undefined, b: number | null | undefined): string {
-  return `${a ?? "—"}:${b ?? "—"}`;
+  return `${a ?? '—'}:${b ?? '—'}`;
 }
 
 function ImportButton({
@@ -56,30 +83,67 @@ function ImportButton({
   if (!onImport && !onSyncLocalDemos) return null;
   return (
     <>
-      {onImport && <input ref={inputRef} type="file" accept=".dem,.zip,application/zip" multiple hidden onChange={(event) => {
-        const files = event.currentTarget.files;
-        event.currentTarget.value = "";
-        if (files && files.length > 0) void onImport(files, context);
-      }} />}
+      {onImport && (
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".dem,.zip,application/zip"
+          multiple
+          hidden
+          onChange={(event) => {
+            const files = event.currentTarget.files;
+            event.currentTarget.value = '';
+            if (files && files.length > 0) void onImport(files, context);
+          }}
+        />
+      )}
       <div className="stu-online-import-actions">
-        {onImport && <button
-          type="button"
-          className={secondary ? "stu-online-import-button stu-online-import-button-secondary" : "stu-online-import-button"}
-          onClick={() => { if (onPick) void onPick(context); else inputRef.current?.click(); }}
-        >
-          {label}
-        </button>}
-        {onSyncLocalDemos && <button type="button" className="stu-button-sm" onClick={() => void onSyncLocalDemos(context)}>同步已有本地 Demo</button>}
+        {onImport && (
+          <button
+            type="button"
+            className={
+              secondary
+                ? 'stu-online-import-button stu-online-import-button-secondary'
+                : 'stu-online-import-button'
+            }
+            onClick={() => {
+              if (onPick) void onPick(context);
+              else inputRef.current?.click();
+            }}
+          >
+            {label}
+          </button>
+        )}
+        {onSyncLocalDemos && (
+          <button
+            type="button"
+            className="stu-button-sm"
+            onClick={() => void onSyncLocalDemos(context)}
+          >
+            同步已有本地 Demo
+          </button>
+        )}
       </div>
     </>
   );
 }
 
 function localStandings(series: StudioSeriesRecord[]): Array<EventStanding & { teamName: string }> {
-  const rows = new Map<string, { teamName: string; wins: number; losses: number; roundWins: number; roundLosses: number }>();
-  for (const match of series.filter((row) => row.status === "finished" && row.scoreA != null && row.scoreB != null)) {
+  const rows = new Map<
+    string,
+    { teamName: string; wins: number; losses: number; roundWins: number; roundLosses: number }
+  >();
+  for (const match of series.filter(
+    (row) => row.status === 'finished' && row.scoreA != null && row.scoreB != null,
+  )) {
     const add = (teamName: string, own: number, against: number) => {
-      const row = rows.get(teamName) ?? { teamName, wins: 0, losses: 0, roundWins: 0, roundLosses: 0 };
+      const row = rows.get(teamName) ?? {
+        teamName,
+        wins: 0,
+        losses: 0,
+        roundWins: 0,
+        roundLosses: 0,
+      };
       if (own > against) row.wins += 1;
       if (own < against) row.losses += 1;
       row.roundWins += own;
@@ -90,7 +154,12 @@ function localStandings(series: StudioSeriesRecord[]): Array<EventStanding & { t
     add(match.teamBName, match.scoreB!, match.scoreA!);
   }
   return [...rows.values()]
-    .sort((a, b) => b.wins - a.wins || (b.roundWins - b.roundLosses) - (a.roundWins - a.roundLosses) || a.teamName.localeCompare(b.teamName))
+    .sort(
+      (a, b) =>
+        b.wins - a.wins ||
+        b.roundWins - b.roundLosses - (a.roundWins - a.roundLosses) ||
+        a.teamName.localeCompare(b.teamName),
+    )
     .map((row, index) => ({
       entryId: `local:${row.teamName}`,
       teamName: row.teamName,
@@ -103,35 +172,158 @@ function localStandings(series: StudioSeriesRecord[]): Array<EventStanding & { t
     }));
 }
 
-function StandingsTable({ stage, series, remote }: { stage: EventStage; series: StudioSeriesRecord[]; remote: boolean }) {
-  const [tableState, setTableState] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: null, direction: "desc" }, page: 0 });
+function StandingsTable({
+  stage,
+  series,
+  remote,
+}: {
+  stage: EventStage;
+  series: StudioSeriesRecord[];
+  remote: boolean;
+}) {
+  const [tableState, setTableState] = useState<import('@cs2dak/presentation').TableState>({
+    sort: { key: null, direction: 'desc' },
+    page: 0,
+  });
   const rows = remote
-    ? (stage.standings ?? []).map((standing) => ({ ...standing, teamName: standing.teamName ?? standing.entryId }))
+    ? (stage.standings ?? []).map((standing) => ({
+        ...standing,
+        teamName: standing.teamName ?? standing.entryId,
+      }))
     : localStandings(series);
   if (remote && !stage.standings) {
-    return <div className="stu-card stu-stage-empty"><b>RivalHub 尚未提供官方积分榜</b><p className="stu-muted">排名与 tiebreak 只显示官方 read model，不在 DAK 端猜算。</p></div>;
+    return (
+      <div className="stu-card stu-stage-empty">
+        <b>RivalHub 尚未提供官方积分榜</b>
+        <p className="stu-muted">排名与 tiebreak 只显示官方 read model，不在 DAK 端猜算。</p>
+      </div>
+    );
   }
-  const columns: DataTableColumn<typeof rows[number]>[] = [
-    { key: "rank", label: "排名", numeric: true, sortable: true, sortValue: (row) => row.rank, format: (row) => row.rank },
-    { key: "team", label: "队伍 / Entry", sortable: true, sortValue: (row) => row.teamName, render: (row) => <span title={row.entryId}>{row.teamName}</span> },
-    { key: "record", label: "战绩", sortable: true, sortValue: (row) => row.wins * 100 - row.losses, format: (row) => `${row.wins}-${row.losses}` },
-    { key: "roundWins", label: "回合胜", numeric: true, sortable: true, sortValue: (row) => row.roundWins ?? null, format: (row) => row.roundWins ?? "—" },
-    { key: "roundLosses", label: "回合负", numeric: true, sortable: true, sortValue: (row) => row.roundLosses ?? null, format: (row) => row.roundLosses ?? "—" },
-    { key: "roundDiff", label: "回合差", numeric: true, sortable: true, sortValue: (row) => row.roundDiff ?? null, format: (row) => row.roundDiff ?? "—" },
-    { key: "tiebreak", label: "官方 tiebreak", render: (row) => row.tiebreakFacts ? Object.entries(row.tiebreakFacts).map(([key, value]) => `${key}: ${value ?? "—"}`).join(" · ") : "—" },
+  const columns: DataTableColumn<(typeof rows)[number]>[] = [
+    {
+      key: 'rank',
+      label: '排名',
+      numeric: true,
+      sortable: true,
+      sortValue: (row) => row.rank,
+      format: (row) => row.rank,
+    },
+    {
+      key: 'team',
+      label: '队伍 / Entry',
+      sortable: true,
+      sortValue: (row) => row.teamName,
+      render: (row) => <span title={row.entryId}>{row.teamName}</span>,
+    },
+    {
+      key: 'record',
+      label: '战绩',
+      sortable: true,
+      sortValue: (row) => row.wins * 100 - row.losses,
+      format: (row) => `${row.wins}-${row.losses}`,
+    },
+    {
+      key: 'roundWins',
+      label: '回合胜',
+      numeric: true,
+      sortable: true,
+      sortValue: (row) => row.roundWins ?? null,
+      format: (row) => row.roundWins ?? '—',
+    },
+    {
+      key: 'roundLosses',
+      label: '回合负',
+      numeric: true,
+      sortable: true,
+      sortValue: (row) => row.roundLosses ?? null,
+      format: (row) => row.roundLosses ?? '—',
+    },
+    {
+      key: 'roundDiff',
+      label: '回合差',
+      numeric: true,
+      sortable: true,
+      sortValue: (row) => row.roundDiff ?? null,
+      format: (row) => row.roundDiff ?? '—',
+    },
+    {
+      key: 'tiebreak',
+      label: '官方 tiebreak',
+      render: (row) =>
+        row.tiebreakFacts
+          ? Object.entries(row.tiebreakFacts)
+              .map(([key, value]) => `${key}: ${value ?? '—'}`)
+              .join(' · ')
+          : '—',
+    },
   ];
-  return <DataTable state={tableState} onStateChange={setTableState} rows={rows} columns={columns} rowKey={(row) => row.entryId} classes={STUDIO_TABLE_CLASSES} />;
+  return (
+    <DataTable
+      state={tableState}
+      onStateChange={setTableState}
+      rows={rows}
+      columns={columns}
+      rowKey={(row) => row.entryId}
+      classes={STUDIO_TABLE_CLASSES}
+    />
+  );
 }
 
-function MatchIndex({ series, selectedId, onSelect }: { series: StudioSeriesRecord[]; selectedId: string | null; onSelect: (id: string) => void }) {
-  const ordered = [...series].sort((a, b) => (a.round ?? 0) - (b.round ?? 0) || (a.completedAt ?? a.scheduledAt ?? "").localeCompare(b.completedAt ?? b.scheduledAt ?? "") || a.id.localeCompare(b.id));
+function MatchIndex({
+  series,
+  selectedId,
+  onSelect,
+}: {
+  series: StudioSeriesRecord[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+}) {
+  const ordered = [...series].sort(
+    (a, b) =>
+      (a.round ?? 0) - (b.round ?? 0) ||
+      (a.completedAt ?? a.scheduledAt ?? '').localeCompare(b.completedAt ?? b.scheduledAt ?? '') ||
+      a.id.localeCompare(b.id),
+  );
   if (ordered.length === 0) return <p className="stu-muted">该阶段暂无系列赛。</p>;
   return (
     <div className="stu-series-index" aria-label="系列赛索引">
-      <div className="stu-series-index-head"><b>系列赛</b><span className="stu-muted">按轮次 / 日期</span></div>
+      <div className="stu-series-index-head">
+        <b>系列赛</b>
+        <span className="stu-muted">按轮次 / 日期</span>
+      </div>
       {ordered.map((match) => {
         const status = displayStatusForSeries(match);
-        return <button key={match.id} type="button" className={selectedId === match.id ? "stu-series-index-row stu-series-index-row-active" : "stu-series-index-row"} onClick={() => onSelect(match.id)}><span className="stu-series-index-round">{match.round != null ? `R${match.round}` : "—"}</span><span className="stu-series-index-match"><b>{match.teamAName}</b> <strong>{formatScore(match.scoreA, match.scoreB)}</strong> <b>{match.teamBName}</b></span><span className="stu-muted">{match.completedAt ? new Date(match.completedAt).toLocaleDateString("zh-CN") : match.status}</span>{status && <span className={status.className}><i />{status.label}</span>}</button>;
+        return (
+          <button
+            key={match.id}
+            type="button"
+            className={
+              selectedId === match.id
+                ? 'stu-series-index-row stu-series-index-row-active'
+                : 'stu-series-index-row'
+            }
+            onClick={() => onSelect(match.id)}
+          >
+            <span className="stu-series-index-round">
+              {match.round != null ? `R${match.round}` : '—'}
+            </span>
+            <span className="stu-series-index-match">
+              <b>{match.teamAName}</b> <strong>{formatScore(match.scoreA, match.scoreB)}</strong>{' '}
+              <b>{match.teamBName}</b>
+            </span>
+            <span className="stu-muted">
+              {match.completedAt
+                ? new Date(match.completedAt).toLocaleDateString('zh-CN')
+                : match.status}
+            </span>
+            {status && (
+              <span className={status.className}>
+                <i />
+                {status.label}
+              </span>
+            )}
+          </button>
+        );
       })}
     </div>
   );
@@ -142,47 +334,163 @@ function stageSeriesId(key: string, series: StudioSeriesRecord[]): string | null
 }
 
 function RemoteStageStructureUnavailable() {
-  return <div className="stu-card stu-stage-empty"><b>RivalHub 尚未提供官方 bracket 结构</b><p className="stu-muted">该阶段的 compact match index 仍可用于逐场查看；官方拓扑补齐后才显示 bracket。</p></div>;
+  return (
+    <div className="stu-card stu-stage-empty">
+      <b>RivalHub 尚未提供官方 bracket 结构</b>
+      <p className="stu-muted">
+        该阶段的 compact match index 仍可用于逐场查看；官方拓扑补齐后才显示 bracket。
+      </p>
+    </div>
+  );
 }
 
-export function StageContent({ stage, series, remote, onSelectSeries }: { stage: EventStage; series: StudioSeriesRecord[]; remote: boolean; onSelectSeries: (id: string) => void }) {
+export function StageContent({
+  stage,
+  series,
+  remote,
+  onSelectSeries,
+}: {
+  stage: EventStage;
+  series: StudioSeriesRecord[];
+  remote: boolean;
+  onSelectSeries: (id: string) => void;
+}) {
   const hasNodes = (stage.bracketNodes?.length ?? 0) > 0;
   if (remote) {
-    if (stage.type === "round_robin" || stage.type === "swiss" || (stage.type === "gsl_group" && !hasNodes)) {
+    if (
+      stage.type === 'round_robin' ||
+      stage.type === 'swiss' ||
+      (stage.type === 'gsl_group' && !hasNodes)
+    ) {
       return <StandingsTable stage={stage} series={series} remote />;
     }
     if (!hasNodes) return <RemoteStageStructureUnavailable />;
   }
-  if (stage.type === "round_robin" || (stage.type === "gsl_group" && !hasNodes)) return <StandingsTable stage={stage} series={series} remote={remote} />;
-  if (stage.type === "swiss") {
+  if (stage.type === 'round_robin' || (stage.type === 'gsl_group' && !hasNodes))
+    return <StandingsTable stage={stage} series={series} remote={remote} />;
+  if (stage.type === 'swiss') {
     const model = swissModelFromResults(series);
-    return <SwissBracket model={model} onSelectCell={(key) => { const id = stageSeriesId(key, series); if (id) onSelectSeries(id); }} />;
+    return (
+      <SwissBracket
+        model={model}
+        onSelectCell={(key) => {
+          const id = stageSeriesId(key, series);
+          if (id) onSelectSeries(id);
+        }}
+      />
+    );
   }
   const model = elimModelFromResults(series, stage);
-  return <ElimBracket model={model} onSelectCell={(key) => { const id = stageSeriesId(key, series); if (id) onSelectSeries(id); }} />;
+  return (
+    <ElimBracket
+      model={model}
+      onSelectCell={(key) => {
+        const id = stageSeriesId(key, series);
+        if (id) onSelectSeries(id);
+      }}
+    />
+  );
 }
 
-function EventStageSection({ eventId, stage, series, entries, candidates, remote, onOpenMatch, onImportOnlineFiles, onPickOnlineFiles, onSyncLocalDemos, selectedSeriesId, onSelectSeries }: { selectedSeriesId: string | null; onSelectSeries: (id: string) => void; eventId: string; stage: EventStage; series: StudioSeriesRecord[]; entries: StudioDemoEntry[]; candidates: RivalHubMatchCandidate[]; remote: boolean; onOpenMatch: (entryId: string) => void; onImportOnlineFiles?: (files: Iterable<File>, context: RivalHubImportContext) => Promise<void>; onPickOnlineFiles?: (context: RivalHubImportContext) => Promise<void>; onSyncLocalDemos?: (context: RivalHubImportContext) => Promise<void> }) {
+function EventStageSection({
+  eventId,
+  stage,
+  series,
+  entries,
+  candidates,
+  remote,
+  onOpenMatch,
+  onImportOnlineFiles,
+  onPickOnlineFiles,
+  onSyncLocalDemos,
+  selectedSeriesId,
+  onSelectSeries,
+}: {
+  selectedSeriesId: string | null;
+  onSelectSeries: (id: string) => void;
+  eventId: string;
+  stage: EventStage;
+  series: StudioSeriesRecord[];
+  entries: StudioDemoEntry[];
+  candidates: RivalHubMatchCandidate[];
+  remote: boolean;
+  onOpenMatch: (entryId: string) => void;
+  onImportOnlineFiles?: (files: Iterable<File>, context: RivalHubImportContext) => Promise<void>;
+  onPickOnlineFiles?: (context: RivalHubImportContext) => Promise<void>;
+  onSyncLocalDemos?: (context: RivalHubImportContext) => Promise<void>;
+}) {
   const selectedSeries = series.find((row) => row.id === selectedSeriesId) ?? null;
-  const stageCandidates = candidates.filter((candidate) => series.some((row) => row.id === candidate.series.id));
+  const stageCandidates = candidates.filter((candidate) =>
+    series.some((row) => row.id === candidate.series.id),
+  );
   return (
     <section className="stu-event-stage" aria-labelledby={`stage-${eventId}-${stage.key}`}>
       <header className="stu-event-stage-head">
-        <div><h3 id={`stage-${eventId}-${stage.key}`}>{stage.name}</h3><span className="stu-muted">{stage.type} · {stage.teamCount} 队 · {series.length} 个系列</span></div>
-        {onImportOnlineFiles && stageCandidates.length > 0 && <ImportButton label="选择本阶段 Demo" secondary context={{ scope: "stage", eventId, candidates: stageCandidates }} onImport={onImportOnlineFiles} onPick={onPickOnlineFiles} onSyncLocalDemos={onSyncLocalDemos} />}
+        <div>
+          <h3 id={`stage-${eventId}-${stage.key}`}>{stage.name}</h3>
+          <span className="stu-muted">
+            {stage.type} · {stage.teamCount} 队 · {series.length} 个系列
+          </span>
+        </div>
+        {onImportOnlineFiles && stageCandidates.length > 0 && (
+          <ImportButton
+            label="选择本阶段 Demo"
+            secondary
+            context={{ scope: 'stage', eventId, candidates: stageCandidates }}
+            onImport={onImportOnlineFiles}
+            onPick={onPickOnlineFiles}
+            onSyncLocalDemos={onSyncLocalDemos}
+          />
+        )}
       </header>
       <StageContent stage={stage} series={series} remote={remote} onSelectSeries={onSelectSeries} />
       <MatchIndex series={series} selectedId={selectedSeriesId} onSelect={onSelectSeries} />
-      <SeriesInspector series={selectedSeries} entries={entries} eventId={eventId} candidates={stageCandidates} onOpenMatch={onOpenMatch} onImportOnlineFiles={onImportOnlineFiles} onPickOnlineFiles={onPickOnlineFiles} />
+      <SeriesInspector
+        series={selectedSeries}
+        entries={entries}
+        eventId={eventId}
+        candidates={stageCandidates}
+        onOpenMatch={onOpenMatch}
+        onImportOnlineFiles={onImportOnlineFiles}
+        onPickOnlineFiles={onPickOnlineFiles}
+      />
     </section>
   );
 }
 
-function stageCandidatesFor(series: StudioSeriesRecord[], eventTeams: RivalHubRemoteTeam[] = []): RivalHubMatchCandidate[] {
-  return series.flatMap((row) => remoteMapsForSeries(row).map(({ series: candidateSeries, map }) => candidateFromSeriesMap(candidateSeries, map, eventTeams)));
+function stageCandidatesFor(
+  series: StudioSeriesRecord[],
+  eventTeams: RivalHubRemoteTeam[] = [],
+): RivalHubMatchCandidate[] {
+  return series.flatMap((row) =>
+    remoteMapsForSeries(row).map(({ series: candidateSeries, map }) =>
+      candidateFromSeriesMap(candidateSeries, map, eventTeams),
+    ),
+  );
 }
 
-export function EventsView({ state, onStateChange, eventTools, events, series, eventsStatus, seriesStatus, onRetry, entries, onOpenMatch, onAnalyzeEvent, onGoLibrary, rivalHubConnection, onConnectRivalHub, onRevokeRivalHub, onRefreshRivalHub, onImportOnlineFiles, onPickOnlineFiles, onSyncLocalDemos, onPageReady }: {
+export function EventsView({
+  state,
+  onStateChange,
+  eventTools,
+  events,
+  series,
+  eventsStatus,
+  seriesStatus,
+  onRetry,
+  entries,
+  onOpenMatch,
+  onAnalyzeEvent,
+  onGoLibrary,
+  rivalHubConnection,
+  onConnectRivalHub,
+  onRevokeRivalHub,
+  onRefreshRivalHub,
+  onImportOnlineFiles,
+  onPickOnlineFiles,
+  onSyncLocalDemos,
+  onPageReady,
+}: {
   onRetry: () => void;
   eventsStatus: DirectoryLoadStatus;
   seriesStatus: DirectoryLoadStatus;
@@ -205,60 +513,388 @@ export function EventsView({ state, onStateChange, eventTools, events, series, e
   onSyncLocalDemos?: (context: RivalHubImportContext) => Promise<void>;
 }) {
   const { activeEventId: activeId, activeStageKey, selectedSeriesId } = state;
-  const [customBaseUrl, setCustomBaseUrl] = useState(rivalHubConnection?.baseUrl ?? "");
-  usePageReady(eventsStatus !== "loading" && seriesStatus !== "loading", onPageReady);
-  useEffect(() => { if (rivalHubConnection?.baseUrl) setCustomBaseUrl(rivalHubConnection.baseUrl); }, [rivalHubConnection?.baseUrl]);
-  const orderedEvents = useMemo(() => [...events].sort((a, b) => (a.source === "rivalhub" ? 0 : 1) - (b.source === "rivalhub" ? 0 : 1) || b.updatedAt - a.updatedAt), [events]);
+  const [customBaseUrl, setCustomBaseUrl] = useState(rivalHubConnection?.baseUrl ?? '');
+  usePageReady(eventsStatus !== 'loading' && seriesStatus !== 'loading', onPageReady);
   useEffect(() => {
-    if (eventsStatus !== "ready" || seriesStatus !== "ready") return;
-    const event = activeId ? orderedEvents.find(row => row.id === activeId) : orderedEvents[0];
+    if (rivalHubConnection?.baseUrl) setCustomBaseUrl(rivalHubConnection.baseUrl);
+  }, [rivalHubConnection?.baseUrl]);
+  const orderedEvents = useMemo(
+    () =>
+      [...events].sort(
+        (a, b) =>
+          (a.source === 'rivalhub' ? 0 : 1) - (b.source === 'rivalhub' ? 0 : 1) ||
+          b.updatedAt - a.updatedAt,
+      ),
+    [events],
+  );
+  useEffect(() => {
+    if (eventsStatus !== 'ready' || seriesStatus !== 'ready') return;
+    const event = activeId ? orderedEvents.find((row) => row.id === activeId) : orderedEvents[0];
     if (!event) return;
-    const eventSeries = series.filter(row => row.eventId === event.id);
-    const firstStage = event.stages.find(stage => eventSeries.some(row => row.stageKey === stage.key))?.key
-      ?? (eventSeries.some(row => !row.stageKey) ? "other" : event.stages[0]?.key ?? null);
+    const eventSeries = series.filter((row) => row.eventId === event.id);
+    const firstStage =
+      event.stages.find((stage) => eventSeries.some((row) => row.stageKey === stage.key))?.key ??
+      (eventSeries.some((row) => !row.stageKey) ? 'other' : (event.stages[0]?.key ?? null));
     const stage = activeStageKey ?? firstStage;
-    if (activeStageKey && !event.stages.some(row => row.key === activeStageKey)
-      && !(activeStageKey === "other" && eventSeries.some(row => !row.stageKey))) return;
-    const firstSeries = eventSeries.find(row => stage === "other" ? !row.stageKey : row.stageKey === stage);
+    if (
+      activeStageKey &&
+      !event.stages.some((row) => row.key === activeStageKey) &&
+      !(activeStageKey === 'other' && eventSeries.some((row) => !row.stageKey))
+    )
+      return;
+    const firstSeries = eventSeries.find((row) =>
+      stage === 'other' ? !row.stageKey : row.stageKey === stage,
+    );
     if (activeId && activeStageKey === stage && (selectedSeriesId || !firstSeries)) return;
-    onStateChange({ activeEventId: event.id, activeStageKey: stage, selectedSeriesId: selectedSeriesId ?? firstSeries?.id ?? null });
-  }, [eventsStatus, seriesStatus, activeId, activeStageKey, selectedSeriesId, orderedEvents, series, onStateChange]);
+    onStateChange({
+      activeEventId: event.id,
+      activeStageKey: stage,
+      selectedSeriesId: selectedSeriesId ?? firstSeries?.id ?? null,
+    });
+  }, [
+    eventsStatus,
+    seriesStatus,
+    activeId,
+    activeStageKey,
+    selectedSeriesId,
+    orderedEvents,
+    series,
+    onStateChange,
+  ]);
   const active = orderedEvents.find((event) => event.id === activeId) ?? null;
-  const eventSeries = useMemo(() => active ? series.filter((row) => row.eventId === active.id) : [], [active, series]);
-  const eventCandidates = useMemo(() => stageCandidatesFor(eventSeries, active?.rivalHub?.teams ?? []), [active?.rivalHub?.teams, eventSeries]);
+  const eventSeries = useMemo(
+    () => (active ? series.filter((row) => row.eventId === active.id) : []),
+    [active, series],
+  );
+  const eventCandidates = useMemo(
+    () => stageCandidatesFor(eventSeries, active?.rivalHub?.teams ?? []),
+    [active?.rivalHub?.teams, eventSeries],
+  );
   const stageOptions = useMemo(() => {
     if (!active) return [];
     const options = [...active.stages];
-    if (eventSeries.some((row) => !row.stageKey)) options.push({ key: "other", name: "未分阶段", type: "round_robin", teamCount: 2, advanceCount: 0 });
+    if (eventSeries.some((row) => !row.stageKey))
+      options.push({
+        key: 'other',
+        name: '未分阶段',
+        type: 'round_robin',
+        teamCount: 2,
+        advanceCount: 0,
+      });
     return options;
   }, [active, eventSeries]);
   const activeStage = stageOptions.find((stage) => stage.key === activeStageKey) ?? null;
-  const activeStageSeries = activeStage ? eventSeries.filter((row) => activeStage.key === "other" ? !row.stageKey : row.stageKey === activeStage.key) : [];
-  const totalMaps = eventSeries.reduce((sum, row) => sum + (row.mapAssignments?.length ?? row.entryIds.length), 0);
-  const localLinked = eventSeries.reduce((sum, row) => sum + (row.mapAssignments?.filter((map) => map.entryId).length ?? row.entryIds.length), 0);
-  const remoteSynced = eventCandidates.filter(({ map }) => map.demoStatus === "synced").length;
-  const remoteNeedsAttention = eventCandidates.filter(({ map }) => map.demoStatus === "needs_attention").length;
+  const activeStageSeries = activeStage
+    ? eventSeries.filter((row) =>
+        activeStage.key === 'other' ? !row.stageKey : row.stageKey === activeStage.key,
+      )
+    : [];
+  const totalMaps = eventSeries.reduce(
+    (sum, row) => sum + (row.mapAssignments?.length ?? row.entryIds.length),
+    0,
+  );
+  const localLinked = eventSeries.reduce(
+    (sum, row) =>
+      sum + (row.mapAssignments?.filter((map) => map.entryId).length ?? row.entryIds.length),
+    0,
+  );
+  const remoteSynced = eventCandidates.filter(({ map }) => map.demoStatus === 'synced').length;
+  const remoteNeedsAttention = eventCandidates.filter(
+    ({ map }) => map.demoStatus === 'needs_attention',
+  ).length;
 
   return (
     <div className="stu-view stu-reading-view">
-      {eventsStatus === "ready" && activeId && !active && <p className="stu-error" role="status">所选赛事已不存在，请从目录选择。</p>}
+      {eventsStatus === 'ready' && activeId && !active && (
+        <p className="stu-error" role="status">
+          所选赛事已不存在，请从目录选择。
+        </p>
+      )}
       <header className="stu-view-header">
-        <div><h1>赛事目录</h1><p>按 Event → Stage → Series → Map 浏览赛事；官方结构与排名来自 RivalHub，本地 Demo 只负责分析与关联。</p></div>
-        {onConnectRivalHub && <div className="stu-rivalhub-connection" aria-label="RivalHub 连接">
-          <div className="stu-rivalhub-connection-row"><span className={rivalHubConnection?.status === "connected" ? "stu-status-dot stu-status-dot-ok" : "stu-status-dot"} /><span>{rivalHubConnection?.status === "connected" ? "RivalHub 已连接" : rivalHubConnection?.status === "connecting" ? "正在连接…" : "RivalHub 未连接"}</span>{rivalHubConnection?.lastSyncAt ? <small>· {new Date(rivalHubConnection.lastSyncAt).toLocaleTimeString("zh-CN")} 已刷新</small> : null}</div>
-          <div className="stu-rivalhub-connection-actions">{rivalHubConnection?.status === "error" && rivalHubConnection.pairingId && onRefreshRivalHub && <button type="button" className="stu-button" onClick={() => void onRefreshRivalHub()}>刷新赛事</button>}{rivalHubConnection?.status === "connected" ? <><button type="button" className="stu-button" onClick={() => void onRefreshRivalHub?.()}>刷新赛事</button>{rivalHubConnection.pairingId && onRevokeRivalHub ? <button type="button" className="stu-button" onClick={() => void onRevokeRivalHub()}>断开并撤销此设备</button> : null}</> : <button type="button" className="stu-button" onClick={() => void onConnectRivalHub(OFFICIAL_RIVALHUB_URL)} disabled={rivalHubConnection?.status === "connecting"}>连接 RivalHub</button>}</div>
-          {rivalHubConnection?.status !== "connected" && <details className="stu-rivalhub-custom-url"><summary>高级：自定义服务器</summary><div className="stu-rivalhub-connection-actions"><input aria-label="自定义 RivalHub 地址" value={customBaseUrl} onChange={(event) => setCustomBaseUrl(event.target.value)} placeholder={OFFICIAL_RIVALHUB_URL} /><button type="button" className="stu-button-sm" onClick={() => void onConnectRivalHub(customBaseUrl)} disabled={rivalHubConnection?.status === "connecting" || !customBaseUrl.trim()}>连接自定义地址</button></div></details>}
-          {rivalHubConnection?.error && <small className="stu-error-text">{rivalHubConnection.error}</small>}
-        </div>}
+        <div>
+          <h1>赛事目录</h1>
+          <p>
+            按 Event → Stage → Series → Map 浏览赛事；官方结构与排名来自 RivalHub，本地 Demo
+            只负责分析与关联。
+          </p>
+        </div>
+        {onConnectRivalHub && (
+          <div className="stu-rivalhub-connection" aria-label="RivalHub 连接">
+            <div className="stu-rivalhub-connection-row">
+              <span
+                className={
+                  rivalHubConnection?.status === 'connected'
+                    ? 'stu-status-dot stu-status-dot-ok'
+                    : 'stu-status-dot'
+                }
+              />
+              <span>
+                {rivalHubConnection?.status === 'connected'
+                  ? 'RivalHub 已连接'
+                  : rivalHubConnection?.status === 'connecting'
+                    ? '正在连接…'
+                    : 'RivalHub 未连接'}
+              </span>
+              {rivalHubConnection?.lastSyncAt ? (
+                <small>
+                  · {new Date(rivalHubConnection.lastSyncAt).toLocaleTimeString('zh-CN')} 已刷新
+                </small>
+              ) : null}
+            </div>
+            <div className="stu-rivalhub-connection-actions">
+              {rivalHubConnection?.status === 'error' &&
+                rivalHubConnection.pairingId &&
+                onRefreshRivalHub && (
+                  <button
+                    type="button"
+                    className="stu-button"
+                    onClick={() => void onRefreshRivalHub()}
+                  >
+                    刷新赛事
+                  </button>
+                )}
+              {rivalHubConnection?.status === 'connected' ? (
+                <>
+                  <button
+                    type="button"
+                    className="stu-button"
+                    onClick={() => void onRefreshRivalHub?.()}
+                  >
+                    刷新赛事
+                  </button>
+                  {rivalHubConnection.pairingId && onRevokeRivalHub ? (
+                    <button
+                      type="button"
+                      className="stu-button"
+                      onClick={() => void onRevokeRivalHub()}
+                    >
+                      断开并撤销此设备
+                    </button>
+                  ) : null}
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="stu-button"
+                  onClick={() => void onConnectRivalHub(OFFICIAL_RIVALHUB_URL)}
+                  disabled={rivalHubConnection?.status === 'connecting'}
+                >
+                  连接 RivalHub
+                </button>
+              )}
+            </div>
+            {rivalHubConnection?.status !== 'connected' && (
+              <details className="stu-rivalhub-custom-url">
+                <summary>高级：自定义服务器</summary>
+                <div className="stu-rivalhub-connection-actions">
+                  <input
+                    aria-label="自定义 RivalHub 地址"
+                    value={customBaseUrl}
+                    onChange={(event) => setCustomBaseUrl(event.target.value)}
+                    placeholder={OFFICIAL_RIVALHUB_URL}
+                  />
+                  <button
+                    type="button"
+                    className="stu-button-sm"
+                    onClick={() => void onConnectRivalHub(customBaseUrl)}
+                    disabled={rivalHubConnection?.status === 'connecting' || !customBaseUrl.trim()}
+                  >
+                    连接自定义地址
+                  </button>
+                </div>
+              </details>
+            )}
+            {rivalHubConnection?.error && (
+              <small className="stu-error-text">{rivalHubConnection.error}</small>
+            )}
+          </div>
+        )}
       </header>
-      {eventsStatus === "loading" && <p role="status">正在读取赛事目录…</p>}
-      {eventsStatus === "error" && <p className="stu-error" role="alert">赛事目录读取失败。<button type="button" className="stu-button-sm" onClick={onRetry}>重试读取</button></p>}
-      {seriesStatus === "loading" && <p role="status">正在读取系列…</p>}
-      {seriesStatus === "error" && <p className="stu-error" role="alert">系列读取失败，赛事目录仍可浏览。<button type="button" className="stu-button-sm" onClick={onRetry}>重试读取</button></p>}
-      {events.length === 0 && eventsStatus === "ready" ? <EmptyState title="还没有赛事目录" hint="连接 RivalHub 获取在线赛事，或在资料库导入本地 event-package/1.0 资源包。" action={<button className="stu-button" onClick={onGoLibrary}>去资料库</button>} /> : events.length > 0 ? <div className="stu-event-directory">
-        <aside className="stu-event-list" aria-label="赛事列表"><span className="stu-event-list-label">在线赛事优先 · {orderedEvents.length}</span>{orderedEvents.map((event) => { const linkedSeries = series.filter((row) => row.eventId === event.id); const linked = linkedSeries.reduce((sum, row) => sum + (row.mapAssignments?.filter((map) => map.entryId).length ?? row.entryIds.length), 0); const remote = linkedSeries.flatMap((row) => row.mapAssignments?.flatMap((map) => map.rivalHub ? [map.rivalHub] : []) ?? []); return <button key={event.id} type="button" className={event.id === activeId ? "stu-event-list-item stu-event-list-item-active" : "stu-event-list-item"} onClick={() => { const firstStage = event.stages[0]?.key ?? (linkedSeries.some(row => !row.stageKey) ? "other" : null); const firstSeries = linkedSeries.find(row => firstStage === "other" ? !row.stageKey : row.stageKey === firstStage); onStateChange({ activeEventId: event.id, activeStageKey: firstStage, selectedSeriesId: firstSeries?.id ?? null }); }}><b>{event.name}</b><span>{event.source === "rivalhub" ? "RivalHub" : "本地"} · {seriesStatus === "ready" ? `本地已关联 ${linked} 图 · 远程已同步 ${remote.filter((map) => map.demoStatus === "synced").length}` : "系列不可用"}{event.rivalHub?.stale ? " · 缓存已过期" : ""}</span></button>; })}</aside>
-        {active && <section className="stu-event-content">{eventsStatus === "ready" && seriesStatus === "ready" && activeStageKey && !activeStage && <p role="status">所选阶段已不存在，请选择其他阶段。</p>}{seriesStatus === "ready" && activeStage && selectedSeriesId && !activeStageSeries.some(row => row.id === selectedSeriesId) && <p role="status">所选系列已不存在，请选择其他系列。</p>}<header className="stu-event-content-head"><div><h2>{active.name}</h2><p>{active.kind} · {seriesStatus === "ready" ? `${eventSeries.length} 个系列` : "系列不可用"} · {active.source}{active.readOnly ? " · 只读资产" : ""}</p><div className="stu-event-sync-summary">{seriesStatus === "ready" && <span>本地已关联 {localLinked}/{totalMaps} 图</span>}{active.source === "rivalhub" && <><span>远程已同步 {remoteSynced}/{eventCandidates.length} 图</span><span>需要处理 {remoteNeedsAttention}</span>{active.rivalHub?.lastSyncedAt && <span>上次同步 {new Date(active.rivalHub.lastSyncedAt).toLocaleString("zh-CN")}{active.rivalHub.stale ? " · 缓存已过期" : ""}</span>}</>}</div></div><button type="button" className="stu-button" onClick={() => onAnalyzeEvent(active)}>分析此赛事</button></header>{onImportOnlineFiles && active.source === "rivalhub" && eventCandidates.length > 0 && <ImportButton label="选择本赛事 Demo" context={{ scope: "event", eventId: active.id, candidates: eventCandidates }} onImport={onImportOnlineFiles} onPick={onPickOnlineFiles} onSyncLocalDemos={onSyncLocalDemos} />}{stageOptions.length > 0 && <div className="stu-stage-tabs" role="tablist" aria-label="赛事阶段">{stageOptions.map((stage) => <button key={stage.key} type="button" role="tab" aria-selected={activeStage?.key === stage.key} className={activeStage?.key === stage.key ? "stu-chip stu-chip-active" : "stu-chip"} onClick={() => onStateChange({ ...state, activeStageKey: stage.key, selectedSeriesId: eventSeries.find(row => stage.key === "other" ? !row.stageKey : row.stageKey === stage.key)?.id ?? null })}>{stage.name}</button>)}</div>}{activeStage && seriesStatus === "ready" && <EventStageSection selectedSeriesId={selectedSeriesId} onSelectSeries={(id) => onStateChange({ ...state, selectedSeriesId: id })} eventId={active.id} stage={activeStage} series={activeStageSeries} entries={entries} candidates={eventCandidates} remote={active.source === "rivalhub"} onOpenMatch={onOpenMatch} onImportOnlineFiles={onImportOnlineFiles} onPickOnlineFiles={onPickOnlineFiles} onSyncLocalDemos={onSyncLocalDemos} />}</section>}
-      </div> : null}
+      {eventsStatus === 'loading' && <p role="status">正在读取赛事目录…</p>}
+      {eventsStatus === 'error' && (
+        <p className="stu-error" role="alert">
+          赛事目录读取失败。
+          <button type="button" className="stu-button-sm" onClick={onRetry}>
+            重试读取
+          </button>
+        </p>
+      )}
+      {seriesStatus === 'loading' && <p role="status">正在读取系列…</p>}
+      {seriesStatus === 'error' && (
+        <p className="stu-error" role="alert">
+          系列读取失败，赛事目录仍可浏览。
+          <button type="button" className="stu-button-sm" onClick={onRetry}>
+            重试读取
+          </button>
+        </p>
+      )}
+      {events.length === 0 && eventsStatus === 'ready' ? (
+        <EmptyState
+          title="还没有赛事目录"
+          hint="连接 RivalHub 获取在线赛事，或在资料库导入本地 event-package/1.0 资源包。"
+          action={
+            <button className="stu-button" onClick={onGoLibrary}>
+              去资料库
+            </button>
+          }
+        />
+      ) : events.length > 0 ? (
+        <div className="stu-event-directory">
+          <aside className="stu-event-list" aria-label="赛事列表">
+            <span className="stu-event-list-label">在线赛事优先 · {orderedEvents.length}</span>
+            {orderedEvents.map((event) => {
+              const linkedSeries = series.filter((row) => row.eventId === event.id);
+              const linked = linkedSeries.reduce(
+                (sum, row) =>
+                  sum +
+                  (row.mapAssignments?.filter((map) => map.entryId).length ?? row.entryIds.length),
+                0,
+              );
+              const remote = linkedSeries.flatMap(
+                (row) =>
+                  row.mapAssignments?.flatMap((map) => (map.rivalHub ? [map.rivalHub] : [])) ?? [],
+              );
+              return (
+                <button
+                  key={event.id}
+                  type="button"
+                  className={
+                    event.id === activeId
+                      ? 'stu-event-list-item stu-event-list-item-active'
+                      : 'stu-event-list-item'
+                  }
+                  onClick={() => {
+                    const firstStage =
+                      event.stages[0]?.key ??
+                      (linkedSeries.some((row) => !row.stageKey) ? 'other' : null);
+                    const firstSeries = linkedSeries.find((row) =>
+                      firstStage === 'other' ? !row.stageKey : row.stageKey === firstStage,
+                    );
+                    onStateChange({
+                      activeEventId: event.id,
+                      activeStageKey: firstStage,
+                      selectedSeriesId: firstSeries?.id ?? null,
+                    });
+                  }}
+                >
+                  <b>{event.name}</b>
+                  <span>
+                    {event.source === 'rivalhub' ? 'RivalHub' : '本地'} ·{' '}
+                    {seriesStatus === 'ready'
+                      ? `本地已关联 ${linked} 图 · 远程已同步 ${remote.filter((map) => map.demoStatus === 'synced').length}`
+                      : '系列不可用'}
+                    {event.rivalHub?.stale ? ' · 缓存已过期' : ''}
+                  </span>
+                </button>
+              );
+            })}
+          </aside>
+          {active && (
+            <section className="stu-event-content">
+              {eventsStatus === 'ready' &&
+                seriesStatus === 'ready' &&
+                activeStageKey &&
+                !activeStage && <p role="status">所选阶段已不存在，请选择其他阶段。</p>}
+              {seriesStatus === 'ready' &&
+                activeStage &&
+                selectedSeriesId &&
+                !activeStageSeries.some((row) => row.id === selectedSeriesId) && (
+                  <p role="status">所选系列已不存在，请选择其他系列。</p>
+                )}
+              <header className="stu-event-content-head">
+                <div>
+                  <h2>{active.name}</h2>
+                  <p>
+                    {active.kind} ·{' '}
+                    {seriesStatus === 'ready' ? `${eventSeries.length} 个系列` : '系列不可用'} ·{' '}
+                    {active.source}
+                    {active.readOnly ? ' · 只读资产' : ''}
+                  </p>
+                  <div className="stu-event-sync-summary">
+                    {seriesStatus === 'ready' && (
+                      <span>
+                        本地已关联 {localLinked}/{totalMaps} 图
+                      </span>
+                    )}
+                    {active.source === 'rivalhub' && (
+                      <>
+                        <span>
+                          远程已同步 {remoteSynced}/{eventCandidates.length} 图
+                        </span>
+                        <span>需要处理 {remoteNeedsAttention}</span>
+                        {active.rivalHub?.lastSyncedAt && (
+                          <span>
+                            上次同步{' '}
+                            {new Date(active.rivalHub.lastSyncedAt).toLocaleString('zh-CN')}
+                            {active.rivalHub.stale ? ' · 缓存已过期' : ''}
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+                <button type="button" className="stu-button" onClick={() => onAnalyzeEvent(active)}>
+                  分析此赛事
+                </button>
+              </header>
+              {onImportOnlineFiles &&
+                active.source === 'rivalhub' &&
+                eventCandidates.length > 0 && (
+                  <ImportButton
+                    label="选择本赛事 Demo"
+                    context={{ scope: 'event', eventId: active.id, candidates: eventCandidates }}
+                    onImport={onImportOnlineFiles}
+                    onPick={onPickOnlineFiles}
+                    onSyncLocalDemos={onSyncLocalDemos}
+                  />
+                )}
+              {stageOptions.length > 0 && (
+                <div className="stu-stage-tabs" role="tablist" aria-label="赛事阶段">
+                  {stageOptions.map((stage) => (
+                    <button
+                      key={stage.key}
+                      type="button"
+                      role="tab"
+                      aria-selected={activeStage?.key === stage.key}
+                      className={
+                        activeStage?.key === stage.key ? 'stu-chip stu-chip-active' : 'stu-chip'
+                      }
+                      onClick={() =>
+                        onStateChange({
+                          ...state,
+                          activeStageKey: stage.key,
+                          selectedSeriesId:
+                            eventSeries.find((row) =>
+                              stage.key === 'other' ? !row.stageKey : row.stageKey === stage.key,
+                            )?.id ?? null,
+                        })
+                      }
+                    >
+                      {stage.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {activeStage && seriesStatus === 'ready' && (
+                <EventStageSection
+                  selectedSeriesId={selectedSeriesId}
+                  onSelectSeries={(id) => onStateChange({ ...state, selectedSeriesId: id })}
+                  eventId={active.id}
+                  stage={activeStage}
+                  series={activeStageSeries}
+                  entries={entries}
+                  candidates={eventCandidates}
+                  remote={active.source === 'rivalhub'}
+                  onOpenMatch={onOpenMatch}
+                  onImportOnlineFiles={onImportOnlineFiles}
+                  onPickOnlineFiles={onPickOnlineFiles}
+                  onSyncLocalDemos={onSyncLocalDemos}
+                />
+              )}
+            </section>
+          )}
+        </div>
+      ) : null}
       {eventTools}
     </div>
   );

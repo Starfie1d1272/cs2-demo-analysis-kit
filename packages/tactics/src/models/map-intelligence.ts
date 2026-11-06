@@ -1,12 +1,12 @@
-import { z } from "zod";
-import { playerIndexSchema, sideSchema, steamId64Schema, teamKeySchema } from "@cs2dak/contract";
+import { z } from 'zod';
+import { playerIndexSchema, sideSchema, steamId64Schema, teamKeySchema } from '@cs2dak/contract';
 
 /** Bump when the compact map-intelligence producer changes its factual meaning. */
 export const MAP_INTELLIGENCE_FACT_VERSION = 6;
 export const OPENING_RESPONSIBILITY_WINDOW_VERSION = 1;
 export const CT_ROTATION_FACT_VERSION = 1;
 
-const availabilitySchema = z.enum(["available", "degraded", "missing"]);
+const availabilitySchema = z.enum(['available', 'degraded', 'missing']);
 
 export const mapIntelligenceAvailabilitySchema = z.object({
   replay: availabilitySchema,
@@ -15,7 +15,7 @@ export const mapIntelligenceAvailabilitySchema = z.object({
   shots: availabilitySchema,
 });
 
-const tacticalRegionSchema = z.enum(["a", "b", "mid"]);
+const tacticalRegionSchema = z.enum(['a', 'b', 'mid']);
 export const ctRotationAvailabilitySchema = mapIntelligenceAvailabilitySchema.extend({
   combatTimeline: availabilitySchema,
 });
@@ -37,7 +37,9 @@ export const openingPathPointSchema = z.object({
   tick: z.number().int().nonnegative(),
   callout: z.string().nullable(),
   positionGroupId: z.string().nullable(),
-  x: z.number(), y: z.number(), z: z.number(),
+  x: z.number(),
+  y: z.number(),
+  z: z.number(),
 });
 
 /** A compact, locatable period where a player was separated from their team component. */
@@ -64,7 +66,7 @@ export const playerPositionRoundFactSchema = z.object({
   side: sideSchema,
   playerIndex: playerIndexSchema,
   steamId64: steamId64Schema,
-  economyType: z.enum(["pistol", "eco", "semi", "force", "full"]).nullable(),
+  economyType: z.enum(['pistol', 'eco', 'semi', 'force', 'full']).nullable(),
   openingWindow: responsibilityWindowSchema.nullable(),
   openingEligibleSeconds: z.number().nonnegative().nullable(),
   openingPositionGroupDwell: z.array(positionGroupDwellSchema),
@@ -124,9 +126,9 @@ export const teamAwpRoundFactSchema = z.object({
   roundNumber: z.number().int().positive(),
   teamKey: teamKeySchema,
   side: sideSchema,
-  economyType: z.enum(["pistol", "eco", "semi", "force", "full"]),
-  opponentEconomyType: z.enum(["pistol", "eco", "semi", "force", "full"]),
-  scorePhase: z.enum(["first_half", "second_half", "overtime"]),
+  economyType: z.enum(['pistol', 'eco', 'semi', 'force', 'full']),
+  opponentEconomyType: z.enum(['pistol', 'eco', 'semi', 'force', 'full']),
+  scorePhase: z.enum(['first_half', 'second_half', 'overtime']),
   won: z.boolean(),
   roundStartAwpPlayerIndices: z.array(playerIndexSchema),
   doubleAwpActiveSeconds: z.number().nonnegative().nullable(),
@@ -147,7 +149,7 @@ export const ctRotationRoundFactSchema = z.object({
   mapName: z.string().min(1),
   roundNumber: z.number().int().positive(),
   teamKey: teamKeySchema,
-  side: z.literal("ct"),
+  side: z.literal('ct'),
   playerIndex: playerIndexSchema,
   steamId64: steamId64Schema,
   initialPositionGroupId: z.string().min(1).nullable(),

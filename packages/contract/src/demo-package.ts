@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from 'zod';
 import {
   manifestSchema,
   matchSchema,
@@ -15,7 +15,7 @@ import {
   shotsSchema,
   replaySchema,
   duelsSchema,
-} from "cs2-demo-format";
+} from 'cs2-demo-format';
 
 export const demoPackageSchema = z.object({
   manifest: manifestSchema,

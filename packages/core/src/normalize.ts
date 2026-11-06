@@ -1,7 +1,7 @@
-import { demoPackageSchema, type DemoPackage } from "@cs2dak/contract";
+import { demoPackageSchema, type DemoPackage } from '@cs2dak/contract';
 
 export function parsePackageJson(text: string): unknown {
-  return JSON.parse(text.replace(/\bNaN\b/g, "null"));
+  return JSON.parse(text.replace(/\bNaN\b/g, 'null'));
 }
 
 /**
@@ -21,7 +21,7 @@ const normalized = new WeakSet<object>();
 const leanSchema = demoPackageSchema.omit({ replay: true, duels: true });
 
 export function normalizeDemoPackage(input: unknown): DemoPackage {
-  if (typeof input === "object" && input !== null && normalized.has(input)) {
+  if (typeof input === 'object' && input !== null && normalized.has(input)) {
     return input as DemoPackage;
   }
   const raw = (input ?? {}) as { replay?: unknown; duels?: unknown };

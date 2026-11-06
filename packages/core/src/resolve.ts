@@ -1,4 +1,4 @@
-import type { DemoPackage, PackagePlayer, PackageRound, Side, TeamKey } from "@cs2dak/contract";
+import type { DemoPackage, PackagePlayer, PackageRound, Side, TeamKey } from '@cs2dak/contract';
 
 /**
  * v3 基础设施：playerIndex → player 解析与 per-round side 推导。
@@ -23,7 +23,7 @@ export interface PlayerResolver {
 
 export function createPlayerResolver(
   players: readonly PackagePlayer[],
-  rounds: readonly PackageRound[]
+  rounds: readonly PackageRound[],
 ): PlayerResolver {
   const steamIdToIndex = new Map<string, number>();
   players.forEach((p, i) => {
@@ -46,7 +46,7 @@ export function createPlayerResolver(
 
   const teamSideOf = (teamKey: TeamKey, roundNumber: number): Side => {
     const round = requireRound(roundNumber);
-    return teamKey === "teamA" ? round.teamASide : round.teamBSide;
+    return teamKey === 'teamA' ? round.teamASide : round.teamBSide;
   };
 
   const byIndexOrNull = (index: number | null | undefined): PackagePlayer | null =>
@@ -57,7 +57,7 @@ export function createPlayerResolver(
     byIndex,
     byIndexOrNull,
     indexOfSteamId: (steamId64) => steamIdToIndex.get(steamId64) ?? null,
-    steamIdOf: (index) => byIndexOrNull(index)?.steamId64 ?? "",
+    steamIdOf: (index) => byIndexOrNull(index)?.steamId64 ?? '',
     nameByIndex: (index) => byIndexOrNull(index)?.name ?? null,
     sideOf: (playerIndex, roundNumber) => teamSideOf(byIndex(playerIndex).teamKey, roundNumber),
     teamSideOf,

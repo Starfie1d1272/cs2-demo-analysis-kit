@@ -1,32 +1,50 @@
-import { canExportSnapshot, withCapabilityConditions, unionExportEntries, withAnalysisExportEntries as applyExportEntries } from "../lib/analysis-export";
-import { CapabilityBar, useCapability } from "../components/CapabilityBar";
-import type { CapabilityRepairAction } from "../lib/capability-availability";
-import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
-import { AnalysisExportButtons } from "../components/AnalysisExportButtons";
-import { buildPlayerAnalysisResult } from "../lib/analysis-export-player";
-import type { AnalysisExportSource } from "../lib/analysis-export";
-import { PlayerFindingsPanel } from "./analysis/PlayerFindingsPanel";
-import type { PlayerPageState } from "../lib/studio-page-state";
-import { Star } from "lucide-react";
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import type { PlayerSeasonProfile } from "@cs2dak/presentation";
-import { SEASON_STAT_VIEWS, mechanicsMetricsForWeapon, type MechanicsMetricKey } from "@cs2dak/presentation";
+import {
+  canExportSnapshot,
+  withCapabilityConditions,
+  unionExportEntries,
+  withAnalysisExportEntries as applyExportEntries,
+} from '../lib/analysis-export';
+import { CapabilityBar, useCapability } from '../components/CapabilityBar';
+import type { CapabilityRepairAction } from '../lib/capability-availability';
+import {
+  getAnalysisDataSnapshot,
+  subscribeAnalysisDataInvalidation,
+  assertAnalysisGeneration,
+} from '../lib/queries/query-cache';
+import { AnalysisExportButtons } from '../components/AnalysisExportButtons';
+import { buildPlayerAnalysisResult } from '../lib/analysis-export-player';
+import type { AnalysisExportSource } from '../lib/analysis-export';
+import { PlayerFindingsPanel } from './analysis/PlayerFindingsPanel';
+import type { PlayerPageState } from '../lib/studio-page-state';
+import { Star } from 'lucide-react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import type { PlayerSeasonProfile } from '@cs2dak/presentation';
+import {
+  SEASON_STAT_VIEWS,
+  mechanicsMetricsForWeapon,
+  type MechanicsMetricKey,
+} from '@cs2dak/presentation';
 import {
   buildMistakeFindings,
   type PlayerMechanicsProfile,
   type PlayerSeasonInsights,
   type PlayerWeaponStat,
-} from "@cs2dak/analytics";
-import { getPlayerSeasonDetails, type PlayerSeasonDetails } from "../lib/queries/player-queries";
-import { getSeasonSummary } from "../lib/queries/season-queries";
-import { type IdentityOptions } from "../lib/identity";
-import { displayTeamName } from "../lib/team-identity";
-import { entryDate, formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../lib/demo-entry";
-import { getPinnedPlayer, matchPinned, setPinnedPlayer, type PinnedPlayer } from "../lib/pin";
-import { FingerprintRadar, TrendChart } from "./profile-widgets";
-import { EmptyState, MetricInfo } from "@cs2dak/react";
-import { EvidenceActions } from "../components/EvidenceActions";
-import type { OpenEvidence } from "../lib/evidence-continuation";
+} from '@cs2dak/analytics';
+import { getPlayerSeasonDetails, type PlayerSeasonDetails } from '../lib/queries/player-queries';
+import { getSeasonSummary } from '../lib/queries/season-queries';
+import { type IdentityOptions } from '../lib/identity';
+import { displayTeamName } from '../lib/team-identity';
+import {
+  entryDate,
+  formatMatchLabel,
+  matchIdForEntry,
+  type StudioDemoEntry,
+} from '../lib/demo-entry';
+import { getPinnedPlayer, matchPinned, setPinnedPlayer, type PinnedPlayer } from '../lib/pin';
+import { FingerprintRadar, TrendChart } from './profile-widgets';
+import { EmptyState, MetricInfo } from '@cs2dak/react';
+import { EvidenceActions } from '../components/EvidenceActions';
+import type { OpenEvidence } from '../lib/evidence-continuation';
 
 export interface PlayersViewProps {
   onCapabilityRepair: (action: CapabilityRepairAction) => void;
@@ -50,22 +68,22 @@ export interface PlayersViewProps {
   onOpenRoles: () => void;
 }
 
-const CORE_VIEW = SEASON_STAT_VIEWS.find((view) => view.key === "core")!;
-const CORE_COLUMNS = CORE_VIEW.columns.filter((col) => col.key !== "maps");
+const CORE_VIEW = SEASON_STAT_VIEWS.find((view) => view.key === 'core')!;
+const CORE_COLUMNS = CORE_VIEW.columns.filter((col) => col.key !== 'maps');
 
 const PROFILE_TABS = [
-  { key: "overview", label: "总览" },
-  { key: "aim", label: "枪法 / 机制" },
-  { key: "utility", label: "道具 / 失误" },
-  { key: "trend", label: "趋势 / 比赛" }
+  { key: 'overview', label: '总览' },
+  { key: 'aim', label: '枪法 / 机制' },
+  { key: 'utility', label: '道具 / 失误' },
+  { key: 'trend', label: '趋势 / 比赛' },
 ] as const;
-type ProfileTab = (typeof PROFILE_TABS)[number]["key"];
+type ProfileTab = (typeof PROFILE_TABS)[number]['key'];
 
 function formatMetric(value: number | null, format: string): string {
-  if (value == null) return "—";
-  if (format === "integer") return String(Math.round(value));
-  if (format === "adr") return value.toFixed(1);
-  if (format === "percent") return `${value.toFixed(1)}%`;
+  if (value == null) return '—';
+  if (format === 'integer') return String(Math.round(value));
+  if (format === 'adr') return value.toFixed(1);
+  if (format === 'percent') return `${value.toFixed(1)}%`;
   return value.toFixed(2);
 }
 
@@ -87,23 +105,65 @@ export function PlayersView({
   identityOptions,
   contextSummary,
   onOpenMaterials,
-  onOpenOpening, onOpenRoles
+  onOpenOpening,
+  onOpenRoles,
 }: PlayersViewProps) {
   const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
-  const playerScope = useMemo(() => selectedPlayerKey ? {
-    playerKeys: [selectedPlayerKey],
-    steamIds: [...new Set([...(selectedPlayerKey.startsWith("steam:") ? [selectedPlayerKey.slice(6)] : []), ...Object.entries(identityOptions?.map ?? {}).filter(([, mapped]) => (typeof mapped === "string" ? mapped : mapped.playerKey) === selectedPlayerKey).map(([steamId]) => steamId)])],
-  } : undefined, [selectedPlayerKey, identityOptions?.map]);
-  const teamEntries = useMemo(() => selectedTeam ? entries.filter(entry => [entry.meta.teamAName, entry.meta.teamBName].some(name => displayTeamName(name, identityOptions?.teamRenames) === selectedTeam)) : entries, [entries, selectedTeam, identityOptions?.teamRenames]);
-  const seasonCapability = useCapability(teamEntries, "season");
-  const detailsCapability = useCapability(teamEntries, "personal-review", playerScope);
+  const playerScope = useMemo(
+    () =>
+      selectedPlayerKey
+        ? {
+            playerKeys: [selectedPlayerKey],
+            steamIds: [
+              ...new Set([
+                ...(selectedPlayerKey.startsWith('steam:') ? [selectedPlayerKey.slice(6)] : []),
+                ...Object.entries(identityOptions?.map ?? {})
+                  .filter(
+                    ([, mapped]) =>
+                      (typeof mapped === 'string' ? mapped : mapped.playerKey) ===
+                      selectedPlayerKey,
+                  )
+                  .map(([steamId]) => steamId),
+              ]),
+            ],
+          }
+        : undefined,
+    [selectedPlayerKey, identityOptions?.map],
+  );
+  const teamEntries = useMemo(
+    () =>
+      selectedTeam
+        ? entries.filter((entry) =>
+            [entry.meta.teamAName, entry.meta.teamBName].some(
+              (name) => displayTeamName(name, identityOptions?.teamRenames) === selectedTeam,
+            ),
+          )
+        : entries,
+    [entries, selectedTeam, identityOptions?.teamRenames],
+  );
+  const seasonCapability = useCapability(teamEntries, 'season');
+  const detailsCapability = useCapability(teamEntries, 'personal-review', playerScope);
   const seasonEntries = seasonCapability.eligible;
   const detailsEntries = detailsCapability.eligible;
-  const profileKey = JSON.stringify([entries.map(entry => entry.id), selectedTeam, identityOptions?.version]);
-  const [profileSnapshot, setProfileSnapshot] = useState<{ key: string; generation: number; sample: string; value: PlayerSeasonProfile[] } | null>(null);
+  const profileKey = JSON.stringify([
+    entries.map((entry) => entry.id),
+    selectedTeam,
+    identityOptions?.version,
+  ]);
+  const [profileSnapshot, setProfileSnapshot] = useState<{
+    key: string;
+    generation: number;
+    sample: string;
+    value: PlayerSeasonProfile[];
+  } | null>(null);
   const profiles = profileSnapshot?.key === profileKey ? profileSnapshot.value : null;
   const detailKey = JSON.stringify([profileKey, selectedPlayerKey]);
-  const [detailSnapshot, setDetailSnapshot] = useState<{ key: string; generation: number; sample: string; value: PlayerSeasonDetails } | null>(null);
+  const [detailSnapshot, setDetailSnapshot] = useState<{
+    key: string;
+    generation: number;
+    sample: string;
+    value: PlayerSeasonDetails;
+  } | null>(null);
   const details = detailSnapshot?.key === detailKey ? detailSnapshot.value : null;
   const insights = details?.insights ?? null;
   const matchStats = details?.participation ?? [];
@@ -114,25 +174,45 @@ export function PlayersView({
   const [detailsError, setDetailsError] = useState<string | null>(null);
   const [pinned, setPinned] = useState<PinnedPlayer | null>(null);
   const { comparePlayerKey: compareKey, profileTab, flashMode, trendMetric } = state;
-  const setCompareKey = (comparePlayerKey: string | null) => onStateChange({ ...state, comparePlayerKey });
+  const setCompareKey = (comparePlayerKey: string | null) =>
+    onStateChange({ ...state, comparePlayerKey });
   const setProfileTab = (profileTab: ProfileTab) => onStateChange({ ...state, profileTab });
-  const setTrendMetric = (trendMetric: PlayerPageState["trendMetric"]) => onStateChange({ ...state, trendMetric });
-  const setFlashMode = (flashMode: "net" | "enemy") => onStateChange({ ...state, flashMode });
+  const setTrendMetric = (trendMetric: PlayerPageState['trendMetric']) =>
+    onStateChange({ ...state, trendMetric });
+  const setFlashMode = (flashMode: 'net' | 'enemy') => onStateChange({ ...state, flashMode });
 
   useEffect(() => {
     let cancelled = false;
-    getPinnedPlayer().then((p) => { if (!cancelled) setPinned(p); });
-    return () => { cancelled = true; };
+    getPinnedPlayer().then((p) => {
+      if (!cancelled) setPinned(p);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
-    if (!seasonEntries || !seasonEntries.length || analysis.status !== "ready") return;
+    if (!seasonEntries || !seasonEntries.length || analysis.status !== 'ready') return;
     let cancelled = false;
     setError(null);
     getSeasonSummary(seasonEntries, identityOptions, selectedTeam ? [selectedTeam] : [])
-      .then(summary => { if (!cancelled) { assertAnalysisGeneration(analysis.generation); setProfileSnapshot({ key: profileKey, generation: analysis.generation, sample: JSON.stringify(seasonEntries.map(entry => entry.id)), value: [...summary.profiles].sort((a, b) => b.rating.rivalhubRR - a.rating.rivalhubRR) }); } })
-      .catch(err => { if (!cancelled) setError(err instanceof Error ? err.message : String(err)); });
-    return () => { cancelled = true; };
+      .then((summary) => {
+        if (!cancelled) {
+          assertAnalysisGeneration(analysis.generation);
+          setProfileSnapshot({
+            key: profileKey,
+            generation: analysis.generation,
+            sample: JSON.stringify(seasonEntries.map((entry) => entry.id)),
+            value: [...summary.profiles].sort((a, b) => b.rating.rivalhubRR - a.rating.rivalhubRR),
+          });
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [seasonEntries, identityOptions?.version, selectedTeam, profileKey, analysis]);
 
   // 关注选手置顶；其余按 RR 降序
@@ -149,12 +229,49 @@ export function PlayersView({
   }, [orderedProfiles, selectedPlayerKey]);
 
   useEffect(() => {
-    if (!onPageReady || (!profiles && !error && !seasonCapability.error && !seasonCapability.stale && seasonEntries?.length !== 0 && entries.length > 0)) return;
-    if (selected && (profileTab === "overview" || profileTab === "utility") && !insights && !detailsError && !detailsCapability.error && !detailsCapability.stale && detailsEntries?.length !== 0) return;
-    onPageReady(Array.from(document.querySelectorAll<HTMLElement>("[id]"), node => node.id));
-  }, [profiles, error, seasonCapability.error, seasonEntries, insights, detailsError, detailsCapability.error, detailsEntries, entries.length, onPageReady, selected, profileTab]);
+    if (
+      !onPageReady ||
+      (!profiles &&
+        !error &&
+        !seasonCapability.error &&
+        !seasonCapability.stale &&
+        seasonEntries?.length !== 0 &&
+        entries.length > 0)
+    )
+      return;
+    if (
+      selected &&
+      (profileTab === 'overview' || profileTab === 'utility') &&
+      !insights &&
+      !detailsError &&
+      !detailsCapability.error &&
+      !detailsCapability.stale &&
+      detailsEntries?.length !== 0
+    )
+      return;
+    onPageReady(Array.from(document.querySelectorAll<HTMLElement>('[id]'), (node) => node.id));
+  }, [
+    profiles,
+    error,
+    seasonCapability.error,
+    seasonEntries,
+    insights,
+    detailsError,
+    detailsCapability.error,
+    detailsEntries,
+    entries.length,
+    onPageReady,
+    selected,
+    profileTab,
+  ]);
 
-  const findings = useMemo(() => insights && selected ? buildMistakeFindings(insights.mistakes, { id: selected.playerKey, label: selected.name }) : [], [insights, selected]);
+  const findings = useMemo(
+    () =>
+      insights && selected
+        ? buildMistakeFindings(insights.mistakes, { id: selected.playerKey, label: selected.name })
+        : [],
+    [insights, selected],
+  );
 
   const compare = useMemo(() => {
     if (!profiles || !compareKey || compareKey === selected?.playerKey) return null;
@@ -164,25 +281,54 @@ export function PlayersView({
   // matchId → 资料库条目，用于"该选手的比赛"跳转
   const entryByMatchId = useMemo(
     () => new Map(entries.map((entry) => [matchIdForEntry(entry), entry])),
-    [entries]
+    [entries],
   );
 
   const isPinned = (profile: PlayerSeasonProfile) => matchPinned(pinned, [profile]) != null;
   const togglePin = (profile: PlayerSeasonProfile) => {
-    const next = isPinned(profile) ? null : { playerKey: profile.playerKey, steamIds: profile.steamIds, name: profile.name };
+    const next = isPinned(profile)
+      ? null
+      : { playerKey: profile.playerKey, steamIds: profile.steamIds, name: profile.name };
     setPinned(next);
     void setPinnedPlayer(next);
   };
 
   useEffect(() => {
-    if (!selected || !detailsEntries || !detailsEntries.length || analysis.status !== "ready") return;
+    if (!selected || !detailsEntries || !detailsEntries.length || analysis.status !== 'ready')
+      return;
     let cancelled = false;
     setDetailsError(null);
-    getPlayerSeasonDetails(detailsEntries, selected.steamIds, identityOptions, selectedTeam ? [selectedTeam] : [])
-      .then(value => { if (!cancelled) { assertAnalysisGeneration(analysis.generation); setDetailSnapshot({ key: detailKey, generation: analysis.generation, sample: JSON.stringify(detailsEntries.map(entry => entry.id)), value }); } })
-      .catch(err => { if (!cancelled) setDetailsError(err instanceof Error ? err.message : String(err)); });
-    return () => { cancelled = true; };
-  }, [detailsEntries, selected?.playerKey, identityOptions?.version, selectedTeam, detailKey, analysis]);
+    getPlayerSeasonDetails(
+      detailsEntries,
+      selected.steamIds,
+      identityOptions,
+      selectedTeam ? [selectedTeam] : [],
+    )
+      .then((value) => {
+        if (!cancelled) {
+          assertAnalysisGeneration(analysis.generation);
+          setDetailSnapshot({
+            key: detailKey,
+            generation: analysis.generation,
+            sample: JSON.stringify(detailsEntries.map((entry) => entry.id)),
+            value,
+          });
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) setDetailsError(err instanceof Error ? err.message : String(err));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    detailsEntries,
+    selected?.playerKey,
+    identityOptions?.version,
+    selectedTeam,
+    detailKey,
+    analysis,
+  ]);
 
   if (allEntries.length === 0) {
     return (
@@ -191,7 +337,11 @@ export function PlayersView({
           mark
           title="还没有选手数据"
           hint="选手档案由资料库内 demo 聚合而成，先导入几场比赛。"
-          action={<button type="button" className="stu-button" onClick={onGoLibrary}>去资料库</button>}
+          action={
+            <button type="button" className="stu-button" onClick={onGoLibrary}>
+              去资料库
+            </button>
+          }
         />
       </div>
     );
@@ -200,18 +350,46 @@ export function PlayersView({
   if ((error || seasonCapability.error) && !profiles) {
     return (
       <div className="stu-view">
-        <EmptyState variant="error" title="聚合失败" hint={error ?? seasonCapability.error ?? undefined} action={seasonCapability.error ? <button type="button" className="stu-button-sm" onClick={seasonCapability.retry}>重试</button> : undefined} />
+        <EmptyState
+          variant="error"
+          title="聚合失败"
+          hint={error ?? seasonCapability.error ?? undefined}
+          action={
+            seasonCapability.error ? (
+              <button type="button" className="stu-button-sm" onClick={seasonCapability.retry}>
+                重试
+              </button>
+            ) : undefined
+          }
+        />
       </div>
     );
   }
   if (entries.length === 0) {
     return (
       <div className="stu-view">
-        <EmptyState variant="insufficient" title="聚合范围为空" hint="当前过滤条件没有命中任何 demo，请调整聚合范围。" />
+        <EmptyState
+          variant="insufficient"
+          title="聚合范围为空"
+          hint="当前过滤条件没有命中任何 demo，请调整聚合范围。"
+        />
       </div>
     );
   }
-  if (seasonEntries && seasonEntries.length === 0 && !profiles) return <div className="stu-view">{seasonCapability.availability && <CapabilityBar availability={seasonCapability.availability} onRepair={onCapabilityRepair} />}<p className="stu-muted" role="status">当前范围暂无可用比赛，请查看上方原因和操作。</p></div>;
+  if (seasonEntries && seasonEntries.length === 0 && !profiles)
+    return (
+      <div className="stu-view">
+        {seasonCapability.availability && (
+          <CapabilityBar
+            availability={seasonCapability.availability}
+            onRepair={onCapabilityRepair}
+          />
+        )}
+        <p className="stu-muted" role="status">
+          当前范围暂无可用比赛，请查看上方原因和操作。
+        </p>
+      </div>
+    );
   if (!orderedProfiles) {
     return (
       <div className="stu-view">
@@ -222,12 +400,33 @@ export function PlayersView({
   if (!selected) {
     return (
       <div className="stu-view">
-        {seasonCapability.availability && <CapabilityBar availability={seasonCapability.availability} onRepair={onCapabilityRepair} />}
-        {profiles && (error || seasonCapability.error || analysis.status !== "ready" || profileSnapshot?.generation !== analysis.generation || profileSnapshot.sample !== JSON.stringify(seasonEntries?.map(entry => entry.id))) && <p role="status">{error || seasonCapability.error || analysis.status === "error" ? "更新失败，显示旧版本结果。" : analysis.status === "ready" && seasonEntries?.length === 0 ? "当前无可用样本，以下保留上次结果。" : "正在更新，显示旧版本结果。"}</p>}
+        {seasonCapability.availability && (
+          <CapabilityBar
+            availability={seasonCapability.availability}
+            onRepair={onCapabilityRepair}
+          />
+        )}
+        {profiles &&
+          (error ||
+            seasonCapability.error ||
+            analysis.status !== 'ready' ||
+            profileSnapshot?.generation !== analysis.generation ||
+            profileSnapshot.sample !== JSON.stringify(seasonEntries?.map((entry) => entry.id))) && (
+            <p role="status">
+              {error || seasonCapability.error || analysis.status === 'error'
+                ? '更新失败，显示旧版本结果。'
+                : analysis.status === 'ready' && seasonEntries?.length === 0
+                  ? '当前无可用样本，以下保留上次结果。'
+                  : '正在更新，显示旧版本结果。'}
+            </p>
+          )}
         <header className="stu-view-header">
           <div>
             <h1>选手档案</h1>
-            <p>基于 {profileSnapshot ? JSON.parse(profileSnapshot.sample).length : 0} 场 demo 的跨场画像。请先从名单中选择要查看的选手。</p>
+            <p>
+              基于 {profileSnapshot ? JSON.parse(profileSnapshot.sample).length : 0} 场 demo
+              的跨场画像。请先从名单中选择要查看的选手。
+            </p>
           </div>
         </header>
         <div className="stu-split">
@@ -251,8 +450,12 @@ export function PlayersView({
           <section className="stu-profile">
             <EmptyState
               variant="insufficient"
-              title={selectedPlayerKey ? "当前选手不在语料中" : "请选择选手"}
-              hint={selectedPlayerKey ? "当前语料不包含该选手，请从左侧名单重新选择。" : "从左侧名单选择一名选手后查看档案。"}
+              title={selectedPlayerKey ? '当前选手不在语料中' : '请选择选手'}
+              hint={
+                selectedPlayerKey
+                  ? '当前语料不包含该选手，请从左侧名单重新选择。'
+                  : '从左侧名单选择一名选手后查看档案。'
+              }
             />
           </section>
         </div>
@@ -263,22 +466,102 @@ export function PlayersView({
   const trendMax = Math.max(...selected.perMatch.map((m) => m.rivalhubRR), 0.01);
   const playerMatches = [...selected.perMatch].reverse();
 
-
   return (
     <div className="stu-view">
-      {seasonCapability.availability && <CapabilityBar availability={seasonCapability.availability} onRepair={onCapabilityRepair} />}
-      {detailsCapability.availability && <CapabilityBar availability={detailsCapability.availability} onRepair={onCapabilityRepair} />}
-      {analysis.status === "ready" && detailsEntries?.length === 0 && !details && <p>当前选手没有可用详情样本，请查看能力限制。</p>}
-      {detailsCapability.error && <p role="alert">选手详情能力读取失败：{detailsCapability.error} <button type="button" className="stu-button-sm" onClick={detailsCapability.retry}>重试</button></p>}
-      {seasonCapability.error && <p role="alert">选手能力读取失败：{seasonCapability.error} <button type="button" className="stu-button-sm" onClick={seasonCapability.retry}>重试</button></p>}
-      {(error || seasonCapability.error || detailsError || detailsCapability.error || analysis.status !== "ready" || profileSnapshot?.generation !== analysis.generation || (details && detailSnapshot?.generation !== analysis.generation) || profileSnapshot?.sample !== JSON.stringify(seasonEntries?.map(entry => entry.id)) || (details && detailSnapshot?.sample !== JSON.stringify(detailsEntries?.map(entry => entry.id)))) && <p role="status">{error || seasonCapability.error || detailsError || detailsCapability.error || analysis.status === "error" ? "更新失败，显示旧版本结果。" : analysis.status === "ready" && (seasonEntries?.length === 0 || (details && detailsEntries?.length === 0)) ? "当前无可用样本，以下保留上次结果。" : "正在更新，显示旧版本结果。"}</p>}
+      {seasonCapability.availability && (
+        <CapabilityBar availability={seasonCapability.availability} onRepair={onCapabilityRepair} />
+      )}
+      {detailsCapability.availability && (
+        <CapabilityBar
+          availability={detailsCapability.availability}
+          onRepair={onCapabilityRepair}
+        />
+      )}
+      {analysis.status === 'ready' && detailsEntries?.length === 0 && !details && (
+        <p>当前选手没有可用详情样本，请查看能力限制。</p>
+      )}
+      {detailsCapability.error && (
+        <p role="alert">
+          选手详情能力读取失败：{detailsCapability.error}{' '}
+          <button type="button" className="stu-button-sm" onClick={detailsCapability.retry}>
+            重试
+          </button>
+        </p>
+      )}
+      {seasonCapability.error && (
+        <p role="alert">
+          选手能力读取失败：{seasonCapability.error}{' '}
+          <button type="button" className="stu-button-sm" onClick={seasonCapability.retry}>
+            重试
+          </button>
+        </p>
+      )}
+      {(error ||
+        seasonCapability.error ||
+        detailsError ||
+        detailsCapability.error ||
+        analysis.status !== 'ready' ||
+        profileSnapshot?.generation !== analysis.generation ||
+        (details && detailSnapshot?.generation !== analysis.generation) ||
+        profileSnapshot?.sample !== JSON.stringify(seasonEntries?.map((entry) => entry.id)) ||
+        (details &&
+          detailSnapshot?.sample !== JSON.stringify(detailsEntries?.map((entry) => entry.id)))) && (
+        <p role="status">
+          {error ||
+          seasonCapability.error ||
+          detailsError ||
+          detailsCapability.error ||
+          analysis.status === 'error'
+            ? '更新失败，显示旧版本结果。'
+            : analysis.status === 'ready' &&
+                (seasonEntries?.length === 0 || (details && detailsEntries?.length === 0))
+              ? '当前无可用样本，以下保留上次结果。'
+              : '正在更新，显示旧版本结果。'}
+        </p>
+      )}
       <header className="stu-view-header">
         <div>
           <h1>选手档案</h1>
-          {exportSource && !error && !detailsError && !seasonCapability.error && !seasonCapability.stale && !detailsCapability.error && !detailsCapability.stale && canExportSnapshot(profileSnapshot, analysis, seasonEntries) && (canExportSnapshot(detailSnapshot, analysis, detailsEntries) || (detailsEntries?.length === 0 && !details && (profileTab === "overview" || profileTab === "trend"))) && <AnalysisExportButtons capture={() => buildPlayerAnalysisResult(withCapabilityConditions(applyExportEntries(exportSource, unionExportEntries(seasonEntries, detailsEntries)), seasonCapability.availability, detailsCapability.availability), selected, compare, insights, weaponStats, mechanics, coverage, state, trendMetric, findings)} />}
+          {exportSource &&
+            !error &&
+            !detailsError &&
+            !seasonCapability.error &&
+            !seasonCapability.stale &&
+            !detailsCapability.error &&
+            !detailsCapability.stale &&
+            canExportSnapshot(profileSnapshot, analysis, seasonEntries) &&
+            (canExportSnapshot(detailSnapshot, analysis, detailsEntries) ||
+              (detailsEntries?.length === 0 &&
+                !details &&
+                (profileTab === 'overview' || profileTab === 'trend'))) && (
+              <AnalysisExportButtons
+                capture={() =>
+                  buildPlayerAnalysisResult(
+                    withCapabilityConditions(
+                      applyExportEntries(
+                        exportSource,
+                        unionExportEntries(seasonEntries, detailsEntries),
+                      ),
+                      seasonCapability.availability,
+                      detailsCapability.availability,
+                    ),
+                    selected,
+                    compare,
+                    insights,
+                    weaponStats,
+                    mechanics,
+                    coverage,
+                    state,
+                    trendMetric,
+                    findings,
+                  )
+                }
+              />
+            )}
           <p>
-            基于 {profileSnapshot ? JSON.parse(profileSnapshot.sample).length : 0} 场 demo 的跨场画像 · 权重 {selected.weightsVersion}。强弱项相对当前聚合范围内的选手计算
-            {orderedProfiles.length < 5 ? "（不足 5 人，暂不出强弱项判断）" : ""}。
+            基于 {profileSnapshot ? JSON.parse(profileSnapshot.sample).length : 0} 场 demo
+            的跨场画像 · 权重 {selected.weightsVersion}。强弱项相对当前聚合范围内的选手计算
+            {orderedProfiles.length < 5 ? '（不足 5 人，暂不出强弱项判断）' : ''}。
           </p>
         </div>
       </header>
@@ -289,7 +572,11 @@ export function PlayersView({
             <button
               key={profile.playerKey}
               type="button"
-              className={profile.playerKey === selected.playerKey ? "stu-roster-item stu-roster-item-active" : "stu-roster-item"}
+              className={
+                profile.playerKey === selected.playerKey
+                  ? 'stu-roster-item stu-roster-item-active'
+                  : 'stu-roster-item'
+              }
               onClick={() => onSelectPlayer(profile.playerKey, profile.name)}
             >
               <span className="stu-roster-name">
@@ -309,8 +596,10 @@ export function PlayersView({
                 {selected.name}
                 <button
                   type="button"
-                  className={isPinned(selected) ? "stu-pin-button stu-pin-button-active" : "stu-pin-button"}
-                  title={isPinned(selected) ? "取消关注" : "设为关注选手（这是我）"}
+                  className={
+                    isPinned(selected) ? 'stu-pin-button stu-pin-button-active' : 'stu-pin-button'
+                  }
+                  title={isPinned(selected) ? '取消关注' : '设为关注选手（这是我）'}
                   onClick={() => togglePin(selected)}
                 >
                   <Star size={15} />
@@ -321,7 +610,10 @@ export function PlayersView({
               </small>
             </div>
             <div className="stu-rating-cards">
-              <div className="stu-rating-card stu-rating-card-primary" title="Rival Rating（RivalHub 绝对刻度评分）">
+              <div
+                className="stu-rating-card stu-rating-card-primary"
+                title="Rival Rating（RivalHub 绝对刻度评分）"
+              >
                 <span>RR</span>
                 <b>{selected.rating.rivalhubRR.toFixed(2)}</b>
               </div>
@@ -334,7 +626,7 @@ export function PlayersView({
                 <span id="analysis-comparison">对比选手</span>
                 <select
                   className="stu-select"
-                  value={compare?.playerKey ?? ""}
+                  value={compare?.playerKey ?? ''}
                   onChange={(e) => setCompareKey(e.target.value || null)}
                 >
                   <option value="">无</option>
@@ -374,7 +666,7 @@ export function PlayersView({
                 type="button"
                 role="tab"
                 aria-selected={profileTab === key}
-                className={profileTab === key ? "stu-subtab stu-subtab-active" : "stu-subtab"}
+                className={profileTab === key ? 'stu-subtab stu-subtab-active' : 'stu-subtab'}
                 onClick={() => setProfileTab(key)}
               >
                 {label}
@@ -382,318 +674,465 @@ export function PlayersView({
             ))}
           </div>
 
-          {profileTab === "overview" && (
-          <div className="stu-profile-grid">
-            <button type="button" className="stu-button-sm" onClick={onOpenOpening}>查看开局动线</button>
-            {insights && <PlayerFindingsPanel findings={findings} player={selected} entries={entries} contextSummary={contextSummary} onOpenEvidence={onOpenEvidence} onOpenMaterials={onOpenMaterials} />}
-            <div className="stu-card stu-card-wide"><h3>位置与职责</h3><button type="button" className="stu-button-sm" onClick={onOpenRoles}>查看位置与职责</button></div>
-            <div className="stu-card">
-              <h3>核心指标</h3>
-              <div className="stu-metric-grid">
-                {CORE_COLUMNS.map((col) => (
-                  <div className="stu-metric" key={col.key} title={col.description ?? undefined}>
-                    <span>{col.label}</span>
-                    <b>{formatMetric(selected.metrics[col.key] ?? null, col.format)}</b>
-                  </div>
-                ))}
+          {profileTab === 'overview' && (
+            <div className="stu-profile-grid">
+              <button type="button" className="stu-button-sm" onClick={onOpenOpening}>
+                查看开局动线
+              </button>
+              {insights && (
+                <PlayerFindingsPanel
+                  findings={findings}
+                  player={selected}
+                  entries={entries}
+                  contextSummary={contextSummary}
+                  onOpenEvidence={onOpenEvidence}
+                  onOpenMaterials={onOpenMaterials}
+                />
+              )}
+              <div className="stu-card stu-card-wide">
+                <h3>位置与职责</h3>
+                <button type="button" className="stu-button-sm" onClick={onOpenRoles}>
+                  查看位置与职责
+                </button>
               </div>
-            </div>
-
-            <div className="stu-card">
-              <h3>RR 六账户分解</h3>
-              <div className="stu-bars">
-                {(() => {
-                  // 账户值是贡献量（非百分位），条形按六账户最大绝对值归一化
-                  const maxAbs = Math.max(...selected.rating.breakdown.map((p) => Math.abs(p.value)), 0.0001);
-                  return selected.rating.breakdown.map((part) => (
-                    <div className="stu-bar-row" key={part.key}>
-                      <span>{part.label}</span>
-                      <div className="stu-bar-track">
-                        <div
-                          className={part.value >= 0 ? "stu-bar stu-bar-pos" : "stu-bar stu-bar-neg"}
-                          style={{ width: `${(Math.abs(part.value) / maxAbs) * 100}%` }}
-                        />
-                      </div>
-                      <b>{(part.value >= 0 ? "+" : "") + part.value.toFixed(3)}</b>
-                    </div>
-                  ));
-                })()}
-              </div>
-            </div>
-
-            <div className="stu-card">
-              <div className="stu-section-head">
-                <h3>PRISM 八维打法画像</h3>
-                <MetricInfo note="行为倾向与执行效率分别按当前分析范围内的选手排名。" />
-              </div>
-              {selected.style ? (
-                <div className="stu-prism-axis-list">
-                  {selected.style.axes.map((axis) => (
-                    <div className={`stu-prism-axis stu-prism-axis-${axis.status}`} key={axis.key}>
-                      <span className="stu-prism-axis-name">{axis.label}</span>
-                      {axis.status === "ready" ? (
-                        <>
-                          <span className="stu-prism-axis-value"><small>行为</small><b>P{axis.involvementPercentile!.toFixed(0)}</b></span>
-                          <span className="stu-prism-axis-value"><small>效率</small><b>P{axis.efficiencyPercentile!.toFixed(0)}</b></span>
-                        </>
-                      ) : (
-                        <span className="stu-prism-axis-status">
-                          {axis.status === "partial"
-                            ? `部分信号 · 覆盖 ${(axis.signalCoverage * 100).toFixed(0)}%`
-                            : axis.status === "insufficient"
-                              ? `样本不足 · ${axis.comparisonCount} 人`
-                              : "不可用"}
-                        </span>
-                      )}
+              <div className="stu-card">
+                <h3>核心指标</h3>
+                <div className="stu-metric-grid">
+                  {CORE_COLUMNS.map((col) => (
+                    <div className="stu-metric" key={col.key} title={col.description ?? undefined}>
+                      <span>{col.label}</span>
+                      <b>{formatMetric(selected.metrics[col.key] ?? null, col.format)}</b>
                     </div>
                   ))}
-                  <p className="stu-dim stu-prism-note">P 值均为当前 {selected.mapCount} 图分析范围内的相对位置；信号覆盖低于 75% 或有效对比少于 5 人时不展示精确排名。</p>
                 </div>
-              ) : (
-                <p className="stu-dim">该聚合范围无 PRISM 结果。</p>
+              </div>
+
+              <div className="stu-card">
+                <h3>RR 六账户分解</h3>
+                <div className="stu-bars">
+                  {(() => {
+                    // 账户值是贡献量（非百分位），条形按六账户最大绝对值归一化
+                    const maxAbs = Math.max(
+                      ...selected.rating.breakdown.map((p) => Math.abs(p.value)),
+                      0.0001,
+                    );
+                    return selected.rating.breakdown.map((part) => (
+                      <div className="stu-bar-row" key={part.key}>
+                        <span>{part.label}</span>
+                        <div className="stu-bar-track">
+                          <div
+                            className={
+                              part.value >= 0 ? 'stu-bar stu-bar-pos' : 'stu-bar stu-bar-neg'
+                            }
+                            style={{ width: `${(Math.abs(part.value) / maxAbs) * 100}%` }}
+                          />
+                        </div>
+                        <b>{(part.value >= 0 ? '+' : '') + part.value.toFixed(3)}</b>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </div>
+
+              <div className="stu-card">
+                <div className="stu-section-head">
+                  <h3>PRISM 八维打法画像</h3>
+                  <MetricInfo note="行为倾向与执行效率分别按当前分析范围内的选手排名。" />
+                </div>
+                {selected.style ? (
+                  <div className="stu-prism-axis-list">
+                    {selected.style.axes.map((axis) => (
+                      <div
+                        className={`stu-prism-axis stu-prism-axis-${axis.status}`}
+                        key={axis.key}
+                      >
+                        <span className="stu-prism-axis-name">{axis.label}</span>
+                        {axis.status === 'ready' ? (
+                          <>
+                            <span className="stu-prism-axis-value">
+                              <small>行为</small>
+                              <b>P{axis.involvementPercentile!.toFixed(0)}</b>
+                            </span>
+                            <span className="stu-prism-axis-value">
+                              <small>效率</small>
+                              <b>P{axis.efficiencyPercentile!.toFixed(0)}</b>
+                            </span>
+                          </>
+                        ) : (
+                          <span className="stu-prism-axis-status">
+                            {axis.status === 'partial'
+                              ? `部分信号 · 覆盖 ${(axis.signalCoverage * 100).toFixed(0)}%`
+                              : axis.status === 'insufficient'
+                                ? `样本不足 · ${axis.comparisonCount} 人`
+                                : '不可用'}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                    <p className="stu-dim stu-prism-note">
+                      P 值均为当前 {selected.mapCount} 图分析范围内的相对位置；信号覆盖低于 75%
+                      或有效对比少于 5 人时不展示精确排名。
+                    </p>
+                  </div>
+                ) : (
+                  <p className="stu-dim">该聚合范围无 PRISM 结果。</p>
+                )}
+              </div>
+
+              {selected.style && (
+                <div className="stu-card">
+                  <h3>倾向与效率</h3>
+                  <FingerprintRadar style={selected.style} />
+                </div>
               )}
             </div>
-
-            {selected.style && (
-              <div className="stu-card">
-                <h3>倾向与效率</h3>
-                <FingerprintRadar style={selected.style} />
-              </div>
-            )}
-          </div>
           )}
 
-
-          {profileTab === "aim" && (
-          <div className="stu-profile-grid">
-            <div className="stu-card">
-              <h3>武器画像</h3>
-              {coverage && <p>参赛样本 {coverage.eligibleMatchCount} 场 · 枪法样本 {coverage.mechanicsMatchCount} 场</p>}
-              <WeaponBars weapons={weaponStats} />
-            </div>
-
-            {mechanics && (
-              <div className="stu-card stu-card-wide">
-                <h3>武器分析</h3>
-                <MechanicsWeaponCards profile={mechanics} />
-              </div>
-            )}
-
-            {detailsError && (
+          {profileTab === 'aim' && (
+            <div className="stu-profile-grid">
               <div className="stu-card">
-                <h3>逐场洞察</h3>
-                <p className="stu-dim">加载失败：{detailsError}</p>
+                <h3>武器画像</h3>
+                {coverage && (
+                  <p>
+                    参赛样本 {coverage.eligibleMatchCount} 场 · 枪法样本{' '}
+                    {coverage.mechanicsMatchCount} 场
+                  </p>
+                )}
+                <WeaponBars weapons={weaponStats} />
               </div>
-            )}
-          </div>
-          )}
 
-          {profileTab === "utility" && (
-          <div className="stu-profile-grid">
-            {insights && (
-              <div className="stu-card">
-                <h3>闪光价值</h3>
-                <div className="stu-metric-grid">
-                  <div className="stu-metric"><span>投掷闪光</span><b>{insights.flash.flashesThrown}</b></div>
-                  <div className="stu-metric" title="所有回合敌方致盲秒数累计">
-                    <span>致盲敌方·总</span><b>{insights.flash.enemyBlindSeconds.toFixed(1)}s</b>
-                  </div>
-                  <div className="stu-metric" title="被该选手闪到的敌人数累计（人次）">
-                    <span>致盲人次</span><b>{insights.flash.enemyBlindVictims}</b>
-                  </div>
-                  <div className="stu-metric" title="敌方致盲秒数 / 投掷数">
-                    <span>均致盲/颗</span>
-                    <b>{insights.flash.enemySecondsPerFlash == null ? "—" : `${insights.flash.enemySecondsPerFlash.toFixed(2)}s`}</b>
-                  </div>
-                  <div className="stu-metric" title="所有回合队友致盲秒数累计"><span>致盲队友·总</span><b>{insights.flash.teamBlindSeconds.toFixed(1)}s</b></div>
-                  <div className="stu-metric" title="（敌方 - 友方）致盲秒数 / 投掷数">
-                    <span>闪光净收益/颗</span>
-                    <b>{insights.flash.netSecondsPerFlash == null ? "—" : `${insights.flash.netSecondsPerFlash.toFixed(2)}s`}</b>
-                  </div>
-                  <div className="stu-metric"><span>闪光助攻</span><b>{insights.flash.flashAssists}</b></div>
+              {mechanics && (
+                <div className="stu-card stu-card-wide">
+                  <h3>武器分析</h3>
+                  <MechanicsWeaponCards profile={mechanics} />
                 </div>
-                {(insights.flash.bestEnemyFlashes?.length ?? 0) > 0 && (
-                  <>
-                    <div className="stu-card-head" style={{ marginTop: 12 }}>
-                      <h4 className="stu-subhead" style={{ margin: 0 }}>最佳闪光</h4>
-                      <div className="stu-chip-row" role="tablist" aria-label="最佳闪光排序">
-                        <button type="button" role="tab" aria-selected={flashMode === "net"}
-                          className={flashMode === "net" ? "stu-chip stu-chip-active" : "stu-chip"}
-                          onClick={() => setFlashMode("net")}>净收益</button>
-                        <button type="button" role="tab" aria-selected={flashMode === "enemy"}
-                          className={flashMode === "enemy" ? "stu-chip stu-chip-active" : "stu-chip"}
-                          onClick={() => setFlashMode("enemy")}>致盲最久</button>
-                      </div>
+              )}
+
+              {detailsError && (
+                <div className="stu-card">
+                  <h3>逐场洞察</h3>
+                  <p className="stu-dim">加载失败：{detailsError}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {profileTab === 'utility' && (
+            <div className="stu-profile-grid">
+              {insights && (
+                <div className="stu-card">
+                  <h3>闪光价值</h3>
+                  <div className="stu-metric-grid">
+                    <div className="stu-metric">
+                      <span>投掷闪光</span>
+                      <b>{insights.flash.flashesThrown}</b>
                     </div>
-                    <div className="stu-evidence-list">
-                      {[...insights.flash.bestEnemyFlashes]
-                        .sort((a, b) => flashMode === "net" ? b.netSeconds - a.netSeconds : b.enemySeconds - a.enemySeconds)
-                        .slice(0, 5)
-                        .map((flash, i) => {
-                          const e = entryByMatchId.get(flash.matchId);
-                          const metric = flashMode === "net"
-                            ? `净 ${flash.netSeconds.toFixed(1)}s`
-                            : `致盲 ${flash.enemySeconds.toFixed(1)}s`;
+                    <div className="stu-metric" title="所有回合敌方致盲秒数累计">
+                      <span>致盲敌方·总</span>
+                      <b>{insights.flash.enemyBlindSeconds.toFixed(1)}s</b>
+                    </div>
+                    <div className="stu-metric" title="被该选手闪到的敌人数累计（人次）">
+                      <span>致盲人次</span>
+                      <b>{insights.flash.enemyBlindVictims}</b>
+                    </div>
+                    <div className="stu-metric" title="敌方致盲秒数 / 投掷数">
+                      <span>均致盲/颗</span>
+                      <b>
+                        {insights.flash.enemySecondsPerFlash == null
+                          ? '—'
+                          : `${insights.flash.enemySecondsPerFlash.toFixed(2)}s`}
+                      </b>
+                    </div>
+                    <div className="stu-metric" title="所有回合队友致盲秒数累计">
+                      <span>致盲队友·总</span>
+                      <b>{insights.flash.teamBlindSeconds.toFixed(1)}s</b>
+                    </div>
+                    <div className="stu-metric" title="（敌方 - 友方）致盲秒数 / 投掷数">
+                      <span>闪光净收益/颗</span>
+                      <b>
+                        {insights.flash.netSecondsPerFlash == null
+                          ? '—'
+                          : `${insights.flash.netSecondsPerFlash.toFixed(2)}s`}
+                      </b>
+                    </div>
+                    <div className="stu-metric">
+                      <span>闪光助攻</span>
+                      <b>{insights.flash.flashAssists}</b>
+                    </div>
+                  </div>
+                  {(insights.flash.bestEnemyFlashes?.length ?? 0) > 0 && (
+                    <>
+                      <div className="stu-card-head" style={{ marginTop: 12 }}>
+                        <h4 className="stu-subhead" style={{ margin: 0 }}>
+                          最佳闪光
+                        </h4>
+                        <div className="stu-chip-row" role="tablist" aria-label="最佳闪光排序">
+                          <button
+                            type="button"
+                            role="tab"
+                            aria-selected={flashMode === 'net'}
+                            className={
+                              flashMode === 'net' ? 'stu-chip stu-chip-active' : 'stu-chip'
+                            }
+                            onClick={() => setFlashMode('net')}
+                          >
+                            净收益
+                          </button>
+                          <button
+                            type="button"
+                            role="tab"
+                            aria-selected={flashMode === 'enemy'}
+                            className={
+                              flashMode === 'enemy' ? 'stu-chip stu-chip-active' : 'stu-chip'
+                            }
+                            onClick={() => setFlashMode('enemy')}
+                          >
+                            致盲最久
+                          </button>
+                        </div>
+                      </div>
+                      <div className="stu-evidence-list">
+                        {[...insights.flash.bestEnemyFlashes]
+                          .sort((a, b) =>
+                            flashMode === 'net'
+                              ? b.netSeconds - a.netSeconds
+                              : b.enemySeconds - a.enemySeconds,
+                          )
+                          .slice(0, 5)
+                          .map((flash, i) => {
+                            const e = entryByMatchId.get(flash.matchId);
+                            const metric =
+                              flashMode === 'net'
+                                ? `净 ${flash.netSeconds.toFixed(1)}s`
+                                : `致盲 ${flash.enemySeconds.toFixed(1)}s`;
+                            return (
+                              <EvidenceActions
+                                key={`${flash.matchId}-${flash.roundNumber}-${i}`}
+                                entry={e}
+                                target={{ roundNumber: flash.roundNumber, tick: flash.tick }}
+
+                                onOpenEvidence={onOpenEvidence}
+                                onWatchDemo={onWatchDemo}
+                                reason={flash.reason}
+                                sourceKey={`players:flash:${flash.matchId}:${flash.roundNumber}:${i}`}
+                              >
+                                {e ? formatMatchLabel(e) : flash.matchId} · R{flash.roundNumber} ·
+                                致盲 {flash.victimCount} 人 · {metric}
+                              </EvidenceActions>
+                            );
+                          })}
+                      </div>
+                    </>
+                  )}
+                  {insights.flash.worstTeamFlashes.length > 0 && (
+                    <>
+                      <h4 className="stu-subhead">最严重队闪</h4>
+                      <div className="stu-evidence-list">
+                        {insights.flash.worstTeamFlashes.slice(0, 3).map((incident, i) => {
+                          const e = entryByMatchId.get(incident.matchId);
                           return (
                             <EvidenceActions
-                              key={`${flash.matchId}-${flash.roundNumber}-${i}`}
+                              key={`${incident.matchId}-${incident.roundNumber}-${i}`}
                               entry={e}
-                              target={{ roundNumber: flash.roundNumber, tick: flash.tick }}
+                              target={{ roundNumber: incident.roundNumber, tick: incident.tick }}
 
                               onOpenEvidence={onOpenEvidence}
                               onWatchDemo={onWatchDemo}
-                              reason={flash.reason}
-                              sourceKey={`players:flash:${flash.matchId}:${flash.roundNumber}:${i}`}
+                              reason={incident.reason}
+                              sourceKey={`players:team-flash:${incident.matchId}:${incident.roundNumber}:${i}`}
                             >
-                              {e ? formatMatchLabel(e) : flash.matchId} · R{flash.roundNumber} · 致盲 {flash.victimCount} 人 · {metric}
+                              {e ? formatMatchLabel(e) : incident.matchId} · R{incident.roundNumber}{' '}
+                              · 闪到 {incident.victimCount} 名队友{' '}
+                              {incident.totalSeconds.toFixed(1)}s
                             </EvidenceActions>
                           );
                         })}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {insights && (
+                <div className="stu-card">
+                  <h3>失误复盘</h3>
+                  <div className="stu-metric-grid">
+                    <div className="stu-metric">
+                      <span>
+                        长枪局首死
+                        <MetricInfo note="我方 full 局该选手首死——最值得复盘的失误信号" />
+                      </span>
+                      <b>
+                        {insights.mistakes.fullBuyFirstDeaths.count}/
+                        {insights.mistakes.fullBuyFirstDeaths.attempts} 局
+                      </b>
                     </div>
-                  </>
-                )}
-                {insights.flash.worstTeamFlashes.length > 0 && (
-                  <>
-                    <h4 className="stu-subhead">最严重队闪</h4>
+                    <div className="stu-metric">
+                      <span>
+                        Anti-eco 首死
+                        <MetricInfo note="对手 eco/semi 局该选手首死（优势局被换掉）" />
+                      </span>
+                      <b>
+                        {insights.mistakes.antiEcoFirstDeaths.count}/
+                        {insights.mistakes.antiEcoFirstDeaths.attempts} 局
+                      </b>
+                    </div>
+                    <div className="stu-metric">
+                      <span>
+                        劣势经济首死
+                        <MetricInfo note="eco/半起/强起局中该选手首死（劣势经济，参考为主）" />
+                      </span>
+                      <b>
+                        {insights.mistakes.lowBuyFirstDeaths.count}/
+                        {insights.mistakes.lowBuyFirstDeaths.attempts} 局
+                      </b>
+                    </div>
+                    <div className="stu-metric">
+                      <span>残局失利</span>
+                      <b>{insights.mistakes.clutchLosses.count}</b>
+                    </div>
+                    <div className="stu-metric">
+                      <span>
+                        死亡分布
+                        <MetricInfo note="按回合倒计时分段：1:30 前 / 1:30-1:00 / 1:00 后。分别对应开局送首杀或被前顶清掉、默认过程中没卡住、被反清或执行过程死亡。" />
+                      </span>
+                      <b>
+                        {insights.mistakes.deathTiming.total > 0
+                          ? `${insights.mistakes.deathTiming.early}开局/${insights.mistakes.deathTiming.mid}默认/${insights.mistakes.deathTiming.late}后段`
+                          : '—'}
+                      </b>
+                    </div>
+                  </div>
+                  {[
+                    ...insights.mistakes.fullBuyFirstDeaths.evidence,
+                    ...insights.mistakes.antiEcoFirstDeaths.evidence,
+                    ...insights.mistakes.clutchLosses.evidence,
+                  ].length > 0 && (
                     <div className="stu-evidence-list">
-                      {insights.flash.worstTeamFlashes.slice(0, 3).map((incident, i) => {
-                        const e = entryByMatchId.get(incident.matchId);
+                      {[
+                        ...insights.mistakes.fullBuyFirstDeaths.evidence.slice(0, 3),
+                        ...insights.mistakes.antiEcoFirstDeaths.evidence.slice(0, 3),
+                        ...insights.mistakes.clutchLosses.evidence.slice(0, 3),
+                      ].map((evidence, i) => {
+                        const e = entryByMatchId.get(evidence.matchId);
                         return (
                           <EvidenceActions
-                            key={`${incident.matchId}-${incident.roundNumber}-${i}`}
+                            key={`${evidence.matchId}-${evidence.roundNumber}-${i}`}
                             entry={e}
-                            target={{ roundNumber: incident.roundNumber, tick: incident.tick }}
+                            target={{ roundNumber: evidence.roundNumber, tick: evidence.tick }}
 
                             onOpenEvidence={onOpenEvidence}
                             onWatchDemo={onWatchDemo}
-                            reason={incident.reason}
-                            sourceKey={`players:team-flash:${incident.matchId}:${incident.roundNumber}:${i}`}
+                            reason={evidence.reason}
+                            sourceKey={`players:mistake:${evidence.matchId}:${evidence.roundNumber}:${i}`}
                           >
-                            {e ? formatMatchLabel(e) : incident.matchId} · R{incident.roundNumber} · 闪到 {incident.victimCount} 名队友 {incident.totalSeconds.toFixed(1)}s
+                            {e ? formatMatchLabel(e) : evidence.matchId} · R{evidence.roundNumber} ·{' '}
+                            {evidence.detail}
                           </EvidenceActions>
                         );
                       })}
                     </div>
-                  </>
-                )}
-              </div>
-            )}
-
-            {insights && (
-              <div className="stu-card">
-                <h3>失误复盘</h3>
-                <div className="stu-metric-grid">
-                  <div className="stu-metric">
-                    <span>长枪局首死<MetricInfo note="我方 full 局该选手首死——最值得复盘的失误信号" /></span>
-                    <b>{insights.mistakes.fullBuyFirstDeaths.count}/{insights.mistakes.fullBuyFirstDeaths.attempts} 局</b>
-                  </div>
-                  <div className="stu-metric">
-                    <span>Anti-eco 首死<MetricInfo note="对手 eco/semi 局该选手首死（优势局被换掉）" /></span>
-                    <b>{insights.mistakes.antiEcoFirstDeaths.count}/{insights.mistakes.antiEcoFirstDeaths.attempts} 局</b>
-                  </div>
-                  <div className="stu-metric">
-                    <span>劣势经济首死<MetricInfo note="eco/半起/强起局中该选手首死（劣势经济，参考为主）" /></span>
-                    <b>{insights.mistakes.lowBuyFirstDeaths.count}/{insights.mistakes.lowBuyFirstDeaths.attempts} 局</b>
-                  </div>
-                  <div className="stu-metric"><span>残局失利</span><b>{insights.mistakes.clutchLosses.count}</b></div>
-                  <div className="stu-metric">
-                    <span>死亡分布<MetricInfo note="按回合倒计时分段：1:30 前 / 1:30-1:00 / 1:00 后。分别对应开局送首杀或被前顶清掉、默认过程中没卡住、被反清或执行过程死亡。" /></span>
-                    <b>
-                      {insights.mistakes.deathTiming.total > 0
-                        ? `${insights.mistakes.deathTiming.early}开局/${insights.mistakes.deathTiming.mid}默认/${insights.mistakes.deathTiming.late}后段`
-                        : "—"}
-                    </b>
-                  </div>
+                  )}
                 </div>
-                {[...insights.mistakes.fullBuyFirstDeaths.evidence, ...insights.mistakes.antiEcoFirstDeaths.evidence, ...insights.mistakes.clutchLosses.evidence].length > 0 && (
-                  <div className="stu-evidence-list">
-                    {[...insights.mistakes.fullBuyFirstDeaths.evidence.slice(0, 3), ...insights.mistakes.antiEcoFirstDeaths.evidence.slice(0, 3), ...insights.mistakes.clutchLosses.evidence.slice(0, 3)].map((evidence, i) => {
-                      const e = entryByMatchId.get(evidence.matchId);
-                      return (
-                        <EvidenceActions
-                          key={`${evidence.matchId}-${evidence.roundNumber}-${i}`}
-                          entry={e}
-                          target={{ roundNumber: evidence.roundNumber, tick: evidence.tick }}
-
-                          onOpenEvidence={onOpenEvidence}
-                          onWatchDemo={onWatchDemo}
-                          reason={evidence.reason}
-                          sourceKey={`players:mistake:${evidence.matchId}:${evidence.roundNumber}:${i}`}
-                        >
-                          {e ? formatMatchLabel(e) : evidence.matchId} · R{evidence.roundNumber} · {evidence.detail}
-                        </EvidenceActions>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+              )}
+            </div>
           )}
 
-          {profileTab === "trend" && (
-          <div className="stu-profile-grid">
-            {insights && insights.trend.length > 1 && (
+          {profileTab === 'trend' && (
+            <div className="stu-profile-grid">
+              {insights && insights.trend.length > 1 && (
+                <div className="stu-card stu-card-wide">
+                  <h3>个人趋势</h3>
+                  <TrendChart
+                    metric={trendMetric}
+                    onMetricChange={setTrendMetric}
+                    trend={insights.trend}
+                    entryByMatchId={entryByMatchId}
+                    onOpenMatch={onOpenMatch}
+                  />
+                </div>
+              )}
+
               <div className="stu-card stu-card-wide">
-                <h3>个人趋势</h3>
-                <TrendChart metric={trendMetric} onMetricChange={setTrendMetric} trend={insights.trend} entryByMatchId={entryByMatchId} onOpenMatch={onOpenMatch} />
-              </div>
-            )}
-
-            <div className="stu-card stu-card-wide">
-              <h3>每场 RR 走势</h3>
-              <div className="stu-trend">
-                {selected.perMatch.map((point) => (
-                  <div className="stu-trend-col" key={point.matchId} title={`${point.matchId} · RR ${point.rivalhubRR.toFixed(2)}`}>
-                    <div className="stu-trend-bar" style={{ height: `${(point.rivalhubRR / trendMax) * 100}%` }} />
-                    <small>{point.rivalhubRR.toFixed(1)}</small>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="stu-card stu-card-wide">
-              <h3>该选手的比赛</h3>
-              <div className="stu-player-matches">
-                {playerMatches.map((point) => {
-                  const entry = entryByMatchId.get(point.matchId);
-                  const date = entry ? entryDate(entry) : null;
-                  const fact = matchStats.find(row => row.matchId === point.matchId);
-                  const mine = fact && entry ? (fact.teamKey === "teamA" ? entry.meta.teamAScore : entry.meta.teamBScore) : null;
-                  const theirs = fact && entry ? (fact.teamKey === "teamA" ? entry.meta.teamBScore : entry.meta.teamAScore) : null;
-                  const outcome = mine == null || theirs == null ? null : mine === theirs ? "平" : mine > theirs ? "胜" : "负";
-                  return (
-                    <button
+                <h3>每场 RR 走势</h3>
+                <div className="stu-trend">
+                  {selected.perMatch.map((point) => (
+                    <div
+                      className="stu-trend-col"
                       key={point.matchId}
-                      type="button"
-                      className="stu-player-match"
-                      disabled={!entry}
-                      title={entry ? "打开比赛工作台" : "不在当前资料库"}
-                      onClick={() => entry && onOpenMatch(entry.id)}
+                      title={`${point.matchId} · RR ${point.rivalhubRR.toFixed(2)}`}
                     >
-                      {entry ? (
-                        <>
-                          <span className="stu-map-badge">{entry.meta.mapName}</span>
-                          <span className="stu-player-match-title">
-                            {outcome && `${outcome} · `}{entry.meta.teamAName} {entry.meta.teamAScore}:{entry.meta.teamBScore} {entry.meta.teamBName}
-                          </span>
-                          {date && <small className="stu-dim">{date}</small>}
-                        </>
-                      ) : (
-                        <span className="stu-player-match-title">{point.matchId}</span>
-                      )}
-                      <span className="stu-player-match-rr">
-                        RR <b>{point.rivalhubRR.toFixed(2)}</b>
-                      </span>
-                      <span className="stu-player-match-rr">
-                        2.0 <b>{point.hltvRating.toFixed(2)}</b>
-                      </span>
-                    </button>
-                  );
-                })}
+                      <div
+                        className="stu-trend-bar"
+                        style={{ height: `${(point.rivalhubRR / trendMax) * 100}%` }}
+                      />
+                      <small>{point.rivalhubRR.toFixed(1)}</small>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="stu-card stu-card-wide">
+                <h3>该选手的比赛</h3>
+                <div className="stu-player-matches">
+                  {playerMatches.map((point) => {
+                    const entry = entryByMatchId.get(point.matchId);
+                    const date = entry ? entryDate(entry) : null;
+                    const fact = matchStats.find((row) => row.matchId === point.matchId);
+                    const mine =
+                      fact && entry
+                        ? fact.teamKey === 'teamA'
+                          ? entry.meta.teamAScore
+                          : entry.meta.teamBScore
+                        : null;
+                    const theirs =
+                      fact && entry
+                        ? fact.teamKey === 'teamA'
+                          ? entry.meta.teamBScore
+                          : entry.meta.teamAScore
+                        : null;
+                    const outcome =
+                      mine == null || theirs == null
+                        ? null
+                        : mine === theirs
+                          ? '平'
+                          : mine > theirs
+                            ? '胜'
+                            : '负';
+                    return (
+                      <button
+                        key={point.matchId}
+                        type="button"
+                        className="stu-player-match"
+                        disabled={!entry}
+                        title={entry ? '打开比赛工作台' : '不在当前资料库'}
+                        onClick={() => entry && onOpenMatch(entry.id)}
+                      >
+                        {entry ? (
+                          <>
+                            <span className="stu-map-badge">{entry.meta.mapName}</span>
+                            <span className="stu-player-match-title">
+                              {outcome && `${outcome} · `}
+                              {entry.meta.teamAName} {entry.meta.teamAScore}:{entry.meta.teamBScore}{' '}
+                              {entry.meta.teamBName}
+                            </span>
+                            {date && <small className="stu-dim">{date}</small>}
+                          </>
+                        ) : (
+                          <span className="stu-player-match-title">{point.matchId}</span>
+                        )}
+                        <span className="stu-player-match-rr">
+                          RR <b>{point.rivalhubRR.toFixed(2)}</b>
+                        </span>
+                        <span className="stu-player-match-rr">
+                          2.0 <b>{point.hltvRating.toFixed(2)}</b>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
-          </div>
           )}
         </section>
       </div>
@@ -712,9 +1151,18 @@ function WeaponBars({ weapons }: { weapons: PlayerWeaponStat[] }) {
         <div className="stu-bar-row" key={weapon.weapon}>
           <span>{weapon.label}</span>
           <div className="stu-bar-track">
-            <div className="stu-bar stu-bar-style" style={{ width: `${(weapon.kills / max) * 100}%` }} />
+            <div
+              className="stu-bar stu-bar-style"
+              style={{ width: `${(weapon.kills / max) * 100}%` }}
+            />
           </div>
-          <b title={weapon.headshotPercent == null ? undefined : `HS ${weapon.headshotPercent.toFixed(1)}%`}>
+          <b
+            title={
+              weapon.headshotPercent == null
+                ? undefined
+                : `HS ${weapon.headshotPercent.toFixed(1)}%`
+            }
+          >
             {weapon.kills}
           </b>
         </div>
@@ -724,24 +1172,127 @@ function WeaponBars({ weapons }: { weapons: PlayerWeaponStat[] }) {
 }
 
 // 概览卡（all/other 桶）展示全集；具体武器按类别只展示有意义的指标（与对枪实验室口径一致）。
-const OVERALL_METRIC_KEYS: MechanicsMetricKey[] = ["firstShotHit", "sprayHit", "counterStrafe", "ttk", "oneTap", "reaction", "preaim", "headshot", "killsPerMatch"];
+const OVERALL_METRIC_KEYS: MechanicsMetricKey[] = [
+  'firstShotHit',
+  'sprayHit',
+  'counterStrafe',
+  'ttk',
+  'oneTap',
+  'reaction',
+  'preaim',
+  'headshot',
+  'killsPerMatch',
+];
 
 function mechanicsKeysFor(weapon: string): MechanicsMetricKey[] {
-  if (weapon === "all" || weapon === "other") return OVERALL_METRIC_KEYS;
+  if (weapon === 'all' || weapon === 'other') return OVERALL_METRIC_KEYS;
   return mechanicsMetricsForWeapon(weapon);
 }
 
-function mechanicsMetricCell(key: MechanicsMetricKey, row: PlayerMechanicsProfile["weapons"][number]) {
+function mechanicsMetricCell(
+  key: MechanicsMetricKey,
+  row: PlayerMechanicsProfile['weapons'][number],
+) {
   switch (key) {
-    case "firstShotHit": return <MechanicsMetric key={key} label="首发命中率" value={row.firstShotAccuracyPercent} unit="%" note="干净交火开火段第一发命中 / 干净交火开火段数。" percentile={row.percentile.firstShotAccuracy} />;
-    case "sprayHit": return <MechanicsMetric key={key} label="扫射命中率" value={row.sprayAccuracyPercent} unit="%" note="干净全自动开火段长度 ≥5 时，从第 4 发起的命中率。" percentile={row.percentile.sprayAccuracy} />;
-    case "counterStrafe": return <MechanicsMetric key={key} label="急停成功率" value={row.counterStrafeSuccessPercent} unit="%" note="干净交火开火段中，开枪前在移动且开枪时已降到该武器判定用最大移动速度约 34% 以下的比例；AWP 按常见开镜开枪口径取 100u/s，其他开镜武器暂按基础移速口径展示。" percentile={row.percentile.counterStrafe} />;
-    case "oneTap": return <MechanicsMetric key={key} label="one tap 率" value={row.oneTapRatePercent} unit="%" note="在可一枪满血击杀的武器中，满血干净击杀是否由终结开火段的第一发直接完成。" percentile={row.percentile.oneTapRate} />;
-    case "ttk": return <MechanicsMetric key={key} label="击杀耗时" value={row.medianTtkMs} unit="ms" note="满血干净击杀中，击杀开火段第一枪到击杀的中位耗时，越低越好。" percentile={row.percentile.medianTtk} />;
-    case "reaction": return <MechanicsMetric key={key} label="反应时间" value={row.visualReactionMs} unit="ms" note="敌人进入有效视野到首发开枪的中位耗时；受预瞄、架点、信息、动画与 demo tick 影响，不等同于人体反应速度。" percentile={row.percentile.visualReaction} />;
-    case "preaim": return <MechanicsMetric key={key} label="预瞄误差" value={row.preaimErrorDegrees} unit="°" note="干净击杀中，捕获前准星与目标三维夹角中位。" percentile={row.percentile.preaimError} />;
-    case "headshot": return <MechanicsMetric key={key} label="爆头率" value={row.headshotPercent} unit="%" note="干净爆头击杀 / 干净击杀。" percentile={null} />;
-    case "killsPerMatch": return <MechanicsMetric key={key} label="场均击杀" value={row.killsPerMatch} unit="" note="该武器击杀 / 参与场数。" percentile={null} />;
+    case 'firstShotHit':
+      return (
+        <MechanicsMetric
+          key={key}
+          label="首发命中率"
+          value={row.firstShotAccuracyPercent}
+          unit="%"
+          note="干净交火开火段第一发命中 / 干净交火开火段数。"
+          percentile={row.percentile.firstShotAccuracy}
+        />
+      );
+    case 'sprayHit':
+      return (
+        <MechanicsMetric
+          key={key}
+          label="扫射命中率"
+          value={row.sprayAccuracyPercent}
+          unit="%"
+          note="干净全自动开火段长度 ≥5 时，从第 4 发起的命中率。"
+          percentile={row.percentile.sprayAccuracy}
+        />
+      );
+    case 'counterStrafe':
+      return (
+        <MechanicsMetric
+          key={key}
+          label="急停成功率"
+          value={row.counterStrafeSuccessPercent}
+          unit="%"
+          note="干净交火开火段中，开枪前在移动且开枪时已降到该武器判定用最大移动速度约 34% 以下的比例；AWP 按常见开镜开枪口径取 100u/s，其他开镜武器暂按基础移速口径展示。"
+          percentile={row.percentile.counterStrafe}
+        />
+      );
+    case 'oneTap':
+      return (
+        <MechanicsMetric
+          key={key}
+          label="one tap 率"
+          value={row.oneTapRatePercent}
+          unit="%"
+          note="在可一枪满血击杀的武器中，满血干净击杀是否由终结开火段的第一发直接完成。"
+          percentile={row.percentile.oneTapRate}
+        />
+      );
+    case 'ttk':
+      return (
+        <MechanicsMetric
+          key={key}
+          label="击杀耗时"
+          value={row.medianTtkMs}
+          unit="ms"
+          note="满血干净击杀中，击杀开火段第一枪到击杀的中位耗时，越低越好。"
+          percentile={row.percentile.medianTtk}
+        />
+      );
+    case 'reaction':
+      return (
+        <MechanicsMetric
+          key={key}
+          label="反应时间"
+          value={row.visualReactionMs}
+          unit="ms"
+          note="敌人进入有效视野到首发开枪的中位耗时；受预瞄、架点、信息、动画与 demo tick 影响，不等同于人体反应速度。"
+          percentile={row.percentile.visualReaction}
+        />
+      );
+    case 'preaim':
+      return (
+        <MechanicsMetric
+          key={key}
+          label="预瞄误差"
+          value={row.preaimErrorDegrees}
+          unit="°"
+          note="干净击杀中，捕获前准星与目标三维夹角中位。"
+          percentile={row.percentile.preaimError}
+        />
+      );
+    case 'headshot':
+      return (
+        <MechanicsMetric
+          key={key}
+          label="爆头率"
+          value={row.headshotPercent}
+          unit="%"
+          note="干净爆头击杀 / 干净击杀。"
+          percentile={null}
+        />
+      );
+    case 'killsPerMatch':
+      return (
+        <MechanicsMetric
+          key={key}
+          label="场均击杀"
+          value={row.killsPerMatch}
+          unit=""
+          note="该武器击杀 / 参与场数。"
+          percentile={null}
+        />
+      );
   }
 }
 
@@ -772,7 +1323,7 @@ function MechanicsMetric({
   value,
   unit,
   note,
-  percentile
+  percentile,
 }: {
   label: string;
   value: number | null;
@@ -782,60 +1333,92 @@ function MechanicsMetric({
 }) {
   return (
     <div className="stu-metric">
-      <span>{label}<MetricInfo note={note} /></span>
-      <b>{value == null ? "—" : `${value.toFixed(unit === "ms" ? 0 : 1)}${unit}`}</b>
+      <span>
+        {label}
+        <MetricInfo note={note} />
+      </span>
+      <b>{value == null ? '—' : `${value.toFixed(unit === 'ms' ? 0 : 1)}${unit}`}</b>
       {percentile && <small>{percentile}</small>}
     </div>
   );
 }
 
 /** 双选手并排对比：核心指标 + 六账户 + PRISM。条形以两人较大值归一。 */
-function CompareCard({ left, right, corpusCount }: { left: PlayerSeasonProfile; right: PlayerSeasonProfile; corpusCount: number }) {
+function CompareCard({
+  left,
+  right,
+  corpusCount,
+}: {
+  left: PlayerSeasonProfile;
+  right: PlayerSeasonProfile;
+  corpusCount: number;
+}) {
   const rows: { label: string; a: number | null; b: number | null; format: string }[] = [
     ...CORE_COLUMNS.map((col) => ({
       label: col.label,
       a: left.metrics[col.key] ?? null,
       b: right.metrics[col.key] ?? null,
-      format: col.format
+      format: col.format,
     })),
     ...left.rating.breakdown.map((part) => ({
       label: part.label,
       a: part.value,
       b: right.rating.breakdown.find((x) => x.key === part.key)?.value ?? null,
-      format: "rating"
+      format: 'rating',
     })),
     ...(left.style && right.style
       ? left.style.axes.flatMap((axis) => {
           const other = right.style!.axes.find((x) => x.key === axis.key);
           return [
-            { label: `${axis.label} · 行为`, a: axis.involvementPercentile, b: other?.involvementPercentile ?? null, format: "percent" },
-            { label: `${axis.label} · 效率`, a: axis.efficiencyPercentile, b: other?.efficiencyPercentile ?? null, format: "percent" }
+            {
+              label: `${axis.label} · 行为`,
+              a: axis.involvementPercentile,
+              b: other?.involvementPercentile ?? null,
+              format: 'percent',
+            },
+            {
+              label: `${axis.label} · 效率`,
+              a: axis.efficiencyPercentile,
+              b: other?.efficiencyPercentile ?? null,
+              format: 'percent',
+            },
           ];
         })
-      : [])
+      : []),
   ];
 
   return (
     <div className="stu-card stu-compare-card">
       <h3>
-        选手对比 · <em>{left.name}</em>（{left.mapCount} 场） vs <em>{right.name}</em>（{right.mapCount} 场） · 共享范围 {corpusCount} 场
+        选手对比 · <em>{left.name}</em>（{left.mapCount} 场） vs <em>{right.name}</em>（
+        {right.mapCount} 场） · 共享范围 {corpusCount} 场
       </h3>
       <div className="stu-compare-rows">
         {rows.map((row) => {
           const max = Math.max(Math.abs(row.a ?? 0), Math.abs(row.b ?? 0), 0.0001);
           return (
             <div className="stu-compare-row" key={row.label}>
-              <b className={row.a != null && row.b != null && row.a > row.b ? "stu-compare-win" : ""}>
+              <b
+                className={row.a != null && row.b != null && row.a > row.b ? 'stu-compare-win' : ''}
+              >
                 {formatMetric(row.a, row.format)}
               </b>
               <div className="stu-compare-track stu-compare-track-left">
-                <div className="stu-bar stu-bar-pos" style={{ width: `${(Math.abs(row.a ?? 0) / max) * 100}%` }} />
+                <div
+                  className="stu-bar stu-bar-pos"
+                  style={{ width: `${(Math.abs(row.a ?? 0) / max) * 100}%` }}
+                />
               </div>
               <span>{row.label}</span>
               <div className="stu-compare-track">
-                <div className="stu-bar stu-bar-vs" style={{ width: `${(Math.abs(row.b ?? 0) / max) * 100}%` }} />
+                <div
+                  className="stu-bar stu-bar-vs"
+                  style={{ width: `${(Math.abs(row.b ?? 0) / max) * 100}%` }}
+                />
               </div>
-              <b className={row.a != null && row.b != null && row.b > row.a ? "stu-compare-win" : ""}>
+              <b
+                className={row.a != null && row.b != null && row.b > row.a ? 'stu-compare-win' : ''}
+              >
                 {formatMetric(row.b, row.format)}
               </b>
             </div>

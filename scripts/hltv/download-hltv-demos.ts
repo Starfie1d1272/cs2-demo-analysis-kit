@@ -19,21 +19,21 @@
  *   4. Chrome 保持打开，脚本跑完后手动关闭即可
  */
 
-import { chromium, type Page } from "@playwright/test";
-import fs from "node:fs/promises";
-import path from "node:path";
-import { createInterface } from "node:readline/promises";
+import { chromium, type Page } from '@playwright/test';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { createInterface } from 'node:readline/promises';
 
 // ── 配置 ──────────────────────────────────────────────
 function argValue(name: string): string | null {
   const index = process.argv.indexOf(name);
-  return index >= 0 ? process.argv[index + 1] ?? null : null;
+  return index >= 0 ? (process.argv[index + 1] ?? null) : null;
 }
 
-const MATCHES_FILE = argValue("--matches") ?? "matches.txt";
-const CDP_URL = argValue("--cdp") ?? "http://127.0.0.1:9222";
-const DOWNLOAD_DIR = path.resolve(argValue("--download-dir") ?? "demos");
-const STATE_FILE = argValue("--state") ?? ".download-state.json";
+const MATCHES_FILE = argValue('--matches') ?? 'matches.txt';
+const CDP_URL = argValue('--cdp') ?? 'http://127.0.0.1:9222';
+const DOWNLOAD_DIR = path.resolve(argValue('--download-dir') ?? 'demos');
+const STATE_FILE = argValue('--state') ?? '.download-state.json';
 const DELAY_BASE_MS = 10_000;
 const DELAY_JITTER_MS = 5_000;
 const MAX_ACTIVE_DOWNLOADS = 3;
@@ -41,7 +41,7 @@ const MAX_CHALLENGES = 2;
 
 // ── 日志 & 工具 ───────────────────────────────────────
 
-const log = (...args: unknown[]) => process.stdout.write(args.map(String).join(" ") + "\n");
+const log = (...args: unknown[]) => process.stdout.write(args.map(String).join(' ') + '\n');
 
 function delay(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -75,27 +75,30 @@ function trackDownload(task: Promise<void>) {
 
 async function waitIfChallenge(page: Page): Promise<boolean> {
   try {
-    const title = await page.title().catch(() => "");
-    const body = await page.locator("body").innerText({ timeout: 5000 }).catch(() => "");
+    const title = await page.title().catch(() => '');
+    const body = await page
+      .locator('body')
+      .innerText({ timeout: 5000 })
+      .catch(() => '');
 
     const isChallenge =
-      title.toLowerCase().includes("just a moment") ||
-      body.toLowerCase().includes("verify you are human") ||
-      body.toLowerCase().includes("checking your browser") ||
-      body.toLowerCase().includes("cloudflare") ||
-      body.toLowerCase().includes("安全验证");
+      title.toLowerCase().includes('just a moment') ||
+      body.toLowerCase().includes('verify you are human') ||
+      body.toLowerCase().includes('checking your browser') ||
+      body.toLowerCase().includes('cloudflare') ||
+      body.toLowerCase().includes('安全验证');
 
     if (!isChallenge) return false;
 
-    log("\n⚠️  [CF] 检测到 Cloudflare 验证");
-    log("[CF] 请在 Chrome 窗口中手动完成验证");
-    log("[CF] 完成后回到终端按 Enter 继续...");
+    log('\n⚠️  [CF] 检测到 Cloudflare 验证');
+    log('[CF] 请在 Chrome 窗口中手动完成验证');
+    log('[CF] 完成后回到终端按 Enter 继续...');
 
     const rl = createInterface({ input: process.stdin, output: process.stdout });
-    await rl.question("");
+    await rl.question('');
     rl.close();
 
-    await page.waitForLoadState("domcontentloaded").catch(() => {});
+    await page.waitForLoadState('domcontentloaded').catch(() => {});
     await delay(3000);
     return true;
   } catch {
@@ -107,10 +110,10 @@ async function waitIfChallenge(page: Page): Promise<boolean> {
 
 async function clickDemoDownload(page: Page, baseName: string): Promise<boolean> {
   const selectors = [
-    page.locator("div.flexbox.left-right-padding").filter({ hasText: /demo download/i }),
-    page.getByRole("link", { name: /^demo$/i }),
-    page.getByRole("button", { name: /download demo/i }),
-    page.getByRole("button", { name: /^demo$/i }),
+    page.locator('div.flexbox.left-right-padding').filter({ hasText: /demo download/i }),
+    page.getByRole('link', { name: /^demo$/i }),
+    page.getByRole('button', { name: /download demo/i }),
+    page.getByRole('button', { name: /^demo$/i }),
     page.locator('a[href*="download"]').filter({ hasText: /demo/i }),
     page.locator('a[href*="demo"]').filter({ hasText: /download/i }),
     page.locator('a[href*="demo"]').first(),
@@ -127,12 +130,12 @@ async function clickDemoDownload(page: Page, baseName: string): Promise<boolean>
       await waitForDownloadSlot();
 
       // 触发下载
-      const downloadPromise = page.waitForEvent("download", { timeout: 60_000 });
+      const downloadPromise = page.waitForEvent('download', { timeout: 60_000 });
       await locator.first().click({ timeout: 10_000 });
       const download = await downloadPromise;
 
       const suggested = download.suggestedFilename() || `${baseName}.rar`;
-      const safeName = suggested.replace(/[<>:"/\\|?*]/g, "_");
+      const safeName = suggested.replace(/[<>:"/\\|?*]/g, '_');
       const savePath = path.join(DOWNLOAD_DIR, safeName);
 
       // 检查是否已存在
@@ -171,32 +174,32 @@ async function clickDemoDownload(page: Page, baseName: string): Promise<boolean>
 // ── 主流程 ────────────────────────────────────────────
 
 async function main() {
-  log("🚀 Demo 下载器启动（CDP + 并发下载池）");
+  log('🚀 Demo 下载器启动（CDP + 并发下载池）');
   log(`CDP: ${CDP_URL}`);
   log(`并发下载数：${MAX_ACTIVE_DOWNLOADS}`);
 
   await fs.mkdir(DOWNLOAD_DIR, { recursive: true });
 
   // 读取 URL 列表
-  const raw = await fs.readFile(MATCHES_FILE, "utf8");
+  const raw = await fs.readFile(MATCHES_FILE, 'utf8');
   const allUrls = raw
     .split(/\r?\n/)
     .map((s) => s.trim())
-    .filter((s) => s.startsWith("http"));
+    .filter((s) => s.startsWith('http'));
 
   if (allUrls.length === 0) {
-    log("❌ matches.txt 为空或无有效 URL");
+    log('❌ matches.txt 为空或无有效 URL');
     process.exit(1);
   }
 
   // ── 断点续跑 ──
   let done = new Set<string>();
   try {
-    const stateRaw = await fs.readFile(STATE_FILE, "utf8");
+    const stateRaw = await fs.readFile(STATE_FILE, 'utf8');
     done = new Set(JSON.parse(stateRaw));
     log(`📌 之前已触发下载 ${done.size} 个，继续未完成的`);
   } catch {
-    log("📌 全新运行");
+    log('📌 全新运行');
   }
 
   const urls = allUrls.filter((u) => !done.has(u));
@@ -206,7 +209,7 @@ async function main() {
   const browser = await chromium.connectOverCDP(CDP_URL);
   const context = browser.contexts()[0];
   if (!context) {
-    log("❌ 未找到已有浏览器上下文");
+    log('❌ 未找到已有浏览器上下文');
     await browser.close();
     process.exit(1);
   }
@@ -222,7 +225,7 @@ async function main() {
 
     // 导航
     try {
-      await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60_000 });
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 });
     } catch {
       log(`  ⚠️  导航超时`);
     }
@@ -242,7 +245,7 @@ async function main() {
     }
 
     // 触发下载
-    log("  查找 Demo 下载按钮...");
+    log('  查找 Demo 下载按钮...');
     const ok = await clickDemoDownload(page, baseName);
 
     if (!ok) {
@@ -255,7 +258,7 @@ async function main() {
 
     // 成功触发 → 写入断点
     done.add(url);
-    await fs.writeFile(STATE_FILE, JSON.stringify([...done], null, 2), "utf8");
+    await fs.writeFile(STATE_FILE, JSON.stringify([...done], null, 2), 'utf8');
 
     // 页面间隔（最后一个不用等）
     if (i < urls.length - 1) {
@@ -269,7 +272,7 @@ async function main() {
   if (activeDownloads.size > 0) {
     log(`\n⏳ 等待 ${activeDownloads.size} 个下载任务完成...`);
     const results = await Promise.allSettled([...activeDownloads]);
-    const failed = results.filter((r) => r.status === "rejected").length;
+    const failed = results.filter((r) => r.status === 'rejected').length;
     if (failed > 0) log(`  ⚠️ ${failed} 个下载失败`);
   }
 
@@ -278,6 +281,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  log("❌ 脚本异常：", err);
+  log('❌ 脚本异常：', err);
   process.exit(1);
 });

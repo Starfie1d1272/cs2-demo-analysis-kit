@@ -13,14 +13,14 @@
 
 /** 区域角色：决定该区域在分析里的语义分类（不限定地图）。 */
 export type ZoneRole =
-  | "site"        // 包点（A/B）
-  | "connector"   // 连接通道（mid-to-B、connector…）
-  | "mid"         // 中路
-  | "lane"        // 主路（banana / long / apps…）
-  | "spawn"       // 出生区
-  | "approach"    // 进攻方接近区
-  | "backsite"    // 包点后区 / 残余空间
-  | "other";
+  | 'site' // 包点（A/B）
+  | 'connector' // 连接通道（mid-to-B、connector…）
+  | 'mid' // 中路
+  | 'lane' // 主路（banana / long / apps…）
+  | 'spawn' // 出生区
+  | 'approach' // 进攻方接近区
+  | 'backsite' // 包点后区 / 残余空间
+  | 'other';
 
 export interface MapZone {
   /** 稳定唯一 id（如 "a_site" / "banana" / "mid"）。 */
@@ -29,7 +29,7 @@ export interface MapZone {
   name: string;
   role: ZoneRole;
   /** 该区域归属的包点（site/connector 常关联），无则 null。 */
-  bombsite?: "a" | "b" | null;
+  bombsite?: 'a' | 'b' | null;
   /** 世界坐标 XY 多边形顶点，首尾不必闭合（自动闭合）。至少 3 点。 */
   polygon: Array<[number, number]>;
   /** 多层地图的高度范围（含），单层地图省略。 */

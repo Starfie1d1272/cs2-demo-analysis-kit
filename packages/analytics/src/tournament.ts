@@ -1,15 +1,22 @@
-import type { TeamKey } from "@cs2dak/contract";
+import type { TeamKey } from '@cs2dak/contract';
 
-import { buildPlayerRoundPerformanceFacts, extractTournamentSourceFacts, projectTournamentMapFacts, observedTournamentIdentity, type TournamentIdentity, type TournamentSourceFacts } from "@cs2dak/core";
+import {
+  buildPlayerRoundPerformanceFacts,
+  extractTournamentSourceFacts,
+  projectTournamentMapFacts,
+  observedTournamentIdentity,
+  type TournamentIdentity,
+  type TournamentSourceFacts,
+} from '@cs2dak/core';
 import {
   buildTournamentAnalytics,
   type TournamentEntityLabels,
   type TournamentMapFacts,
   type TournamentManAdvantage,
-} from "@cs2dak/tournament";
-import { round } from "./season-metrics.js";
-import { displayWeaponName } from "@cs2dak/presentation";
-import type { SeasonInsightsDemo } from "./insights.js";
+} from '@cs2dak/tournament';
+import { round } from './season-metrics.js';
+import { displayWeaponName } from '@cs2dak/presentation';
+import type { SeasonInsightsDemo } from './insights.js';
 
 // Tournament dashboard projection over canonical frozen facts.
 
@@ -156,33 +163,50 @@ export interface TournamentFacts extends TournamentSourceFacts {
 export function extractTournamentFacts(
   input: SeasonInsightsDemo,
   suppliedPerformanceFacts?: ReturnType<typeof buildPlayerRoundPerformanceFacts>,
-  identity: TournamentIdentity = input.tournamentIdentity ?? observedTournamentIdentity(input.matchId, input.pkg.players),
+  identity: TournamentIdentity = input.tournamentIdentity ??
+    observedTournamentIdentity(input.matchId, input.pkg.players),
 ): TournamentFacts {
   const facts = extractTournamentSourceFacts(input, identity, suppliedPerformanceFacts);
   return {
     ...facts,
-    teams: { teamA: input.pkg.match.teamA.name ?? "Team A", teamB: input.pkg.match.teamB.name ?? "Team B" },
-    players: input.pkg.players.map(player => ({ steamId64: player.steamId64, name: player.name, teamKey: player.teamKey })),
+    teams: {
+      teamA: input.pkg.match.teamA.name ?? 'Team A',
+      teamB: input.pkg.match.teamB.name ?? 'Team B',
+    },
+    players: input.pkg.players.map((player) => ({
+      steamId64: player.steamId64,
+      name: player.name,
+      teamKey: player.teamKey,
+    })),
   };
 }
 
-function toTournamentMapFacts(facts: TournamentFacts): { facts: TournamentMapFacts; labels: TournamentEntityLabels } {
+function toTournamentMapFacts(facts: TournamentFacts): {
+  facts: TournamentMapFacts;
+  labels: TournamentEntityLabels;
+} {
   const projected = projectTournamentMapFacts(facts);
   return {
     facts: projected,
     labels: {
-      teams: { [facts.teamEntityKeys.teamA]: facts.teams.teamA, [facts.teamEntityKeys.teamB]: facts.teams.teamB },
-      players: Object.fromEntries(facts.players.map(player => [facts.playerEntityKeys[player.steamId64]!, player.name])),
+      teams: {
+        [facts.teamEntityKeys.teamA]: facts.teams.teamA,
+        [facts.teamEntityKeys.teamB]: facts.teams.teamB,
+      },
+      players: Object.fromEntries(
+        facts.players.map((player) => [facts.playerEntityKeys[player.steamId64]!, player.name]),
+      ),
     },
   };
 }
 
 function mergeLabels(target: TournamentEntityLabels, source: TournamentEntityLabels): void {
-  for (const kind of ["teams", "players"] as const) {
+  for (const kind of ['teams', 'players'] as const) {
     if (!source[kind]) continue;
     const labels = target[kind] ?? (target[kind] = {});
     for (const [entityKey, label] of Object.entries(source[kind]!)) {
-      if (labels[entityKey] == null || label.localeCompare(labels[entityKey]!) < 0) labels[entityKey] = label;
+      if (labels[entityKey] == null || label.localeCompare(labels[entityKey]!) < 0)
+        labels[entityKey] = label;
     }
   }
 }
@@ -192,8 +216,8 @@ function percent(value: number | null): number | null {
 }
 
 function teamManAdvantageState(
-  advantage: TournamentMapFacts["teamConversions"]["teamA"]["manAdvantage"]["5v4"],
-  disadvantage: TournamentMapFacts["teamConversions"]["teamA"]["manAdvantage"]["4v5"],
+  advantage: TournamentMapFacts['teamConversions']['teamA']['manAdvantage']['5v4'],
+  disadvantage: TournamentMapFacts['teamConversions']['teamA']['manAdvantage']['4v5'],
   advantageAlive: number,
   disadvantageAlive: number,
 ): TournamentTeamManAdvantageState {
@@ -204,44 +228,74 @@ function teamManAdvantageState(
     disadvantageLabel: `${disadvantageAlive}v${advantageAlive}`,
     advantageOpportunities: advantage.opportunities,
     advantageWins: advantage.wins,
-    advantageConversionPercent: percent(advantage.opportunities > 0 ? advantage.wins / advantage.opportunities : null),
+    advantageConversionPercent: percent(
+      advantage.opportunities > 0 ? advantage.wins / advantage.opportunities : null,
+    ),
     disadvantageOpportunities: disadvantage.opportunities,
     disadvantageWins: disadvantage.wins,
-    disadvantageConversionPercent: percent(disadvantage.opportunities > 0 ? disadvantage.wins / disadvantage.opportunities : null),
+    disadvantageConversionPercent: percent(
+      disadvantage.opportunities > 0 ? disadvantage.wins / disadvantage.opportunities : null,
+    ),
   };
 }
 
-function projectManAdvantageRows(analytics: ReturnType<typeof buildTournamentAnalytics>): TournamentManAdvantageStat[] {
-  return ([
-    ["5v4", 5, 4],
-    ["5v3", 5, 3],
-  ] as const).filter(([key]) => analytics.totals.manAdvantage[key].opportunities > 0).map(([key, advantageAlive, disadvantageAlive]) => {
-    const advantage = analytics.totals.manAdvantage[key];
-    const disadvantage = analytics.totals.manAdvantage[`${disadvantageAlive}v${advantageAlive}` as TournamentManAdvantage];
-    return {
-      advantageAlive,
-      disadvantageAlive,
-      advantageLabel: `${advantageAlive}v${disadvantageAlive}`,
-      disadvantageLabel: `${disadvantageAlive}v${advantageAlive}`,
-      opportunities: advantage.opportunities,
-      advantageWins: advantage.wins,
-      advantageConversionPercent: percent(advantage.rate),
-      disadvantageWins: disadvantage.wins,
-      disadvantageConversionPercent: percent(disadvantage.rate),
-    };
-  });
+function projectManAdvantageRows(
+  analytics: ReturnType<typeof buildTournamentAnalytics>,
+): TournamentManAdvantageStat[] {
+  return (
+    [
+      ['5v4', 5, 4],
+      ['5v3', 5, 3],
+    ] as const
+  )
+    .filter(([key]) => analytics.totals.manAdvantage[key].opportunities > 0)
+    .map(([key, advantageAlive, disadvantageAlive]) => {
+      const advantage = analytics.totals.manAdvantage[key];
+      const disadvantage =
+        analytics.totals.manAdvantage[
+          `${disadvantageAlive}v${advantageAlive}` as TournamentManAdvantage
+        ];
+      return {
+        advantageAlive,
+        disadvantageAlive,
+        advantageLabel: `${advantageAlive}v${disadvantageAlive}`,
+        disadvantageLabel: `${disadvantageAlive}v${advantageAlive}`,
+        opportunities: advantage.opportunities,
+        advantageWins: advantage.wins,
+        advantageConversionPercent: percent(advantage.rate),
+        disadvantageWins: disadvantage.wins,
+        disadvantageConversionPercent: percent(disadvantage.rate),
+      };
+    });
 }
 
-function projectTeamManAdvantage(teamName: string, analyticsTeam: ReturnType<typeof buildTournamentAnalytics>["teams"][number]): TournamentTeamManAdvantageStat {
+function projectTeamManAdvantage(
+  teamName: string,
+  analyticsTeam: ReturnType<typeof buildTournamentAnalytics>['teams'][number],
+): TournamentTeamManAdvantageStat {
   const states: TournamentTeamManAdvantageState[] = [];
-  const state54 = teamManAdvantageState(analyticsTeam.manAdvantage["5v4"], analyticsTeam.manAdvantage["4v5"], 5, 4);
-  const state53 = teamManAdvantageState(analyticsTeam.manAdvantage["5v3"], analyticsTeam.manAdvantage["3v5"], 5, 3);
-  if (state54.advantageOpportunities > 0 || state54.disadvantageOpportunities > 0) states.push(state54);
-  if (state53.advantageOpportunities > 0 || state53.disadvantageOpportunities > 0) states.push(state53);
+  const state54 = teamManAdvantageState(
+    analyticsTeam.manAdvantage['5v4'],
+    analyticsTeam.manAdvantage['4v5'],
+    5,
+    4,
+  );
+  const state53 = teamManAdvantageState(
+    analyticsTeam.manAdvantage['5v3'],
+    analyticsTeam.manAdvantage['3v5'],
+    5,
+    3,
+  );
+  if (state54.advantageOpportunities > 0 || state54.disadvantageOpportunities > 0)
+    states.push(state54);
+  if (state53.advantageOpportunities > 0 || state53.disadvantageOpportunities > 0)
+    states.push(state53);
   return { teamEntityKey: analyticsTeam.team.entityKey, teamName, states };
 }
 
-function projectTournamentInsights(analytics: ReturnType<typeof buildTournamentAnalytics>): TournamentInsights {
+function projectTournamentInsights(
+  analytics: ReturnType<typeof buildTournamentAnalytics>,
+): TournamentInsights {
   const maps = analytics.maps.map((map) => ({
     mapName: map.mapName,
     matches: map.mapCount,
@@ -273,7 +327,12 @@ function projectTournamentInsights(analytics: ReturnType<typeof buildTournamentA
       lowEconomyWins: cell.lowEconomyWins,
       lowWinRatePercent: percent(cell.lowWinRate),
     }))
-    .sort((a, b) => b.rounds - a.rounds || a.lowEconomy.localeCompare(b.lowEconomy) || a.highEconomy.localeCompare(b.highEconomy));
+    .sort(
+      (a, b) =>
+        b.rounds - a.rounds ||
+        a.lowEconomy.localeCompare(b.lowEconomy) ||
+        a.highEconomy.localeCompare(b.highEconomy),
+    );
   const ecoUpsets = analytics.teams
     .map((team) => ({
       teamEntityKey: team.team.entityKey,
@@ -283,7 +342,12 @@ function projectTournamentInsights(analytics: ReturnType<typeof buildTournamentA
       winRatePercent: percent(team.ecoSemiUpset.rate),
     }))
     .filter((row) => row.opportunities > 0)
-    .sort((a, b) => b.wins - a.wins || b.opportunities - a.opportunities || a.teamName.localeCompare(b.teamName));
+    .sort(
+      (a, b) =>
+        b.wins - a.wins ||
+        b.opportunities - a.opportunities ||
+        a.teamName.localeCompare(b.teamName),
+    );
   const teamManAdvantageConversions = analytics.teams
     .map((team) => projectTeamManAdvantage(team.team.displayName, team))
     .filter((team) => team.states.length > 0)
@@ -316,7 +380,11 @@ function projectTournamentInsights(analytics: ReturnType<typeof buildTournamentA
         winRatePercent: percent(team.ecoSemiUpset.rate),
       },
     }))
-    .sort((a, b) => (b.roundWinPercent ?? -1) - (a.roundWinPercent ?? -1) || a.teamName.localeCompare(b.teamName));
+    .sort(
+      (a, b) =>
+        (b.roundWinPercent ?? -1) - (a.roundWinPercent ?? -1) ||
+        a.teamName.localeCompare(b.teamName),
+    );
   const weaponKills = analytics.weapons.slice(0, 10).map((weapon) => ({
     weapon: weapon.weapon,
     label: displayWeaponName(weapon.weapon),

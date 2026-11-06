@@ -1,4 +1,7 @@
-import { OPENING_RESPONSIBILITY_WINDOW_VERSION, type ResponsibilityWindow } from "../models/map-intelligence.js";
+import {
+  OPENING_RESPONSIBILITY_WINDOW_VERSION,
+  type ResponsibilityWindow,
+} from '../models/map-intelligence.js';
 
 /**
  * Default-position/responsibility evidence ends before normal mid-round rotations dominate.
@@ -13,7 +16,10 @@ export function openingResponsibilityWindow(
   return {
     version: OPENING_RESPONSIBILITY_WINDOW_VERSION,
     startTick: round.freezeEndTick,
-    endTick: Math.min(round.endTick, round.freezeEndTick + Math.round(OPENING_RESPONSIBILITY_SECONDS * (tickrate || 64))),
+    endTick: Math.min(
+      round.endTick,
+      round.freezeEndTick + Math.round(OPENING_RESPONSIBILITY_SECONDS * (tickrate || 64)),
+    ),
     configuredSeconds: OPENING_RESPONSIBILITY_SECONDS,
   };
 }

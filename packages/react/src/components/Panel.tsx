@@ -1,6 +1,14 @@
-import type { ReactNode } from "react";
+import type { ReactNode } from 'react';
 
-export function Panel({ title, eyebrow, children }: { title: string; eyebrow?: string; children: ReactNode }) {
+export function Panel({
+  title,
+  eyebrow,
+  children,
+}: {
+  title: string;
+  eyebrow?: string;
+  children: ReactNode;
+}) {
   return (
     <section className="dak-panel">
       <div className="dak-panel-header">

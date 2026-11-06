@@ -1,5 +1,5 @@
-import { z } from "zod";
-import { matchWorkspaceModelSchema } from "./workspace.js";
+import { z } from 'zod';
+import { matchWorkspaceModelSchema } from './workspace.js';
 
 export const mvpCandidateSchema = z.object({
   playerKey: z.string(),
@@ -9,18 +9,18 @@ export const mvpCandidateSchema = z.object({
   rivalhubRR: z.number().nonnegative(),
   hltvRating: z.number().nonnegative(),
   confidence: z.number().min(0).max(1),
-  explanation: z.array(z.string())
+  explanation: z.array(z.string()),
 });
 
 export const mvpRecommendationSchema = z.object({
-  version: z.literal("cs2-demo-analysis-kit/mvp-recommendation-0.1"),
+  version: z.literal('cs2-demo-analysis-kit/mvp-recommendation-0.1'),
   recommended: mvpCandidateSchema,
-  candidates: z.array(mvpCandidateSchema).min(1)
+  candidates: z.array(mvpCandidateSchema).min(1),
 });
 
 export const seriesMatchInputSchema = z.object({
   matchId: z.string(),
-  model: matchWorkspaceModelSchema
+  model: matchWorkspaceModelSchema,
 });
 
 export const seriesPlayerMapTrendSchema = z.object({
@@ -29,7 +29,7 @@ export const seriesPlayerMapTrendSchema = z.object({
   rivalhubRR: z.number().nonnegative(),
   hltvRating: z.number().nonnegative(),
   adr: z.number().nonnegative(),
-  kast: z.number().min(0).max(100)
+  kast: z.number().min(0).max(100),
 });
 
 export const seriesPlayerRowSchema = z.object({
@@ -46,27 +46,31 @@ export const seriesPlayerRowSchema = z.object({
   rivalhubRR: z.number().nonnegative(),
   hltvRating: z.number().nonnegative(),
   confidence: z.number().min(0).max(1),
-  perMap: z.array(seriesPlayerMapTrendSchema)
+  perMap: z.array(seriesPlayerMapTrendSchema),
 });
 
 export const seriesSummarySchema = z.object({
-  version: z.literal("cs2-demo-analysis-kit/series-summary-0.1"),
+  version: z.literal('cs2-demo-analysis-kit/series-summary-0.1'),
   mapCount: z.number().int().positive(),
-  maps: z.array(z.object({
-    matchId: z.string(),
-    mapName: z.string(),
-    scoreline: z.string(),
-    teamAName: z.string(),
-    teamBName: z.string(),
-    winnerName: z.string().nullable()
-  })),
-  teams: z.array(z.object({
-    teamKey: z.string(),
-    name: z.string(),
-    mapsWon: z.number().int().nonnegative()
-  })),
+  maps: z.array(
+    z.object({
+      matchId: z.string(),
+      mapName: z.string(),
+      scoreline: z.string(),
+      teamAName: z.string(),
+      teamBName: z.string(),
+      winnerName: z.string().nullable(),
+    }),
+  ),
+  teams: z.array(
+    z.object({
+      teamKey: z.string(),
+      name: z.string(),
+      mapsWon: z.number().int().nonnegative(),
+    }),
+  ),
   scoreboard: z.array(seriesPlayerRowSchema),
-  mvpCandidates: z.array(mvpCandidateSchema)
+  mvpCandidates: z.array(mvpCandidateSchema),
 });
 
 export type MvpCandidate = z.infer<typeof mvpCandidateSchema>;

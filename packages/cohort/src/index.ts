@@ -1,11 +1,28 @@
 import {
-  computeFrozenProBaselineRR, computePrism, computeRR, prismWeightsV1,
-  rrSixAccountProBaselineV0, rrToPercentile, hltv2BaselineWeightsV1, rrSixAccountWeightsV1,
-  type ProBaselineConfig, type PrismComputeInput, type PrismWeights, type RRWeights,
-  type AccountContextAvailability, type RRIndicators, type RRSignals, type RRSixAccountWeights
-} from "@cs2dak/rating";
-import { seasonCohortBundleSchema, type SeasonCohortBundle, type CohortTeamKey, type CohortWeaponHighlightFacts } from "./models.js";
-export * from "./models.js";
+  computeFrozenProBaselineRR,
+  computePrism,
+  computeRR,
+  prismWeightsV1,
+  rrSixAccountProBaselineV0,
+  rrToPercentile,
+  hltv2BaselineWeightsV1,
+  rrSixAccountWeightsV1,
+  type ProBaselineConfig,
+  type PrismComputeInput,
+  type PrismWeights,
+  type RRWeights,
+  type AccountContextAvailability,
+  type RRIndicators,
+  type RRSignals,
+  type RRSixAccountWeights,
+} from '@cs2dak/rating';
+import {
+  seasonCohortBundleSchema,
+  type SeasonCohortBundle,
+  type CohortTeamKey,
+  type CohortWeaponHighlightFacts,
+} from './models.js';
+export * from './models.js';
 
 export interface SeasonCohortOptions {
   rrWeights?: RRWeights;
@@ -50,10 +67,11 @@ interface PlayerAccumulator {
 
 export function buildSeasonCohortFromRows(
   rows: SeasonCohortFactRow[],
-  opts: SeasonCohortOptions & { matchCount?: number } = {}
+  opts: SeasonCohortOptions & { matchCount?: number } = {},
 ): SeasonCohortBundle {
   const rrWeights = opts.rrWeights ?? (hltv2BaselineWeightsV1 as unknown as RRWeights);
-  const valueWeights = opts.valueWeights ?? (rrSixAccountWeightsV1 as unknown as RRSixAccountWeights);
+  const valueWeights =
+    opts.valueWeights ?? (rrSixAccountWeightsV1 as unknown as RRSixAccountWeights);
   const proBaseline = rrSixAccountProBaselineV0 as unknown as ProBaselineConfig;
   const prismWeights = opts.prismWeights ?? (prismWeightsV1 as unknown as PrismWeights);
   const identityMap = opts.identityMap ?? {};
@@ -74,7 +92,7 @@ export function buildSeasonCohortFromRows(
       signals: [],
       indicators: [],
       weaponHighlights: [],
-      perMatch: []
+      perMatch: [],
     }));
 
     acc.steamIds.add(row.steamId64);
@@ -92,7 +110,7 @@ export function buildSeasonCohortFromRows(
       matchId: row.matchId,
       steamId64: row.steamId64,
       accountRR: round(accountRR.rr, 3),
-      rrV1: round(rrV1.rr, 3)
+      rrV1: round(rrV1.rr, 3),
     });
   }
 
@@ -107,68 +125,76 @@ export function buildSeasonCohortFromRows(
     seasonRows.map((row) => {
       const scored = computeFrozenProBaselineRR(row.signals, valueWeights, proBaseline);
       return [scored.steamId64, scored] as const;
-    })
+    }),
   );
   const rrV1Scores = seasonRows.map((row) => row.rrV1.rr);
   const prismInputs: PrismComputeInput[] = seasonRows.map((row) => ({
     indicators: row.indicators,
     mapCount: row.acc.mapCount,
-    rrPercentile: rrToPercentile(rrV1Scores, row.rrV1.rr)
+    rrPercentile: rrToPercentile(rrV1Scores, row.rrV1.rr),
   }));
-  const prismResults = new Map(computePrism(prismInputs, prismWeights).map((row) => [row.steamId64, row]));
+  const prismResults = new Map(
+    computePrism(prismInputs, prismWeights).map((row) => [row.steamId64, row]),
+  );
 
   return seasonCohortBundleSchema.parse({
-    version: "cs2-demo-analysis-kit/cohort-1.0",
+    version: 'cs2-demo-analysis-kit/cohort-1.0',
     matchCount: opts.matchCount ?? new Set(rows.map((row) => row.matchId)).size,
     weightsVersion: `${rrWeights.version}+${valueWeights.version}+${prismWeights.version}`,
     provenance: {
-      cohortVersion: "cs2-demo-analysis-kit/cohort-1.0",
-      sourceSchemaVersion: "cs2-demo-format/3.0",
-      matches: [...new Map(rows.map((row) => [row.matchId, {
-        matchId: row.matchId,
-        sourceDemoHash: row.sourceDemoHash
-      }])).values()]
+      cohortVersion: 'cs2-demo-analysis-kit/cohort-1.0',
+      sourceSchemaVersion: 'cs2-demo-format/3.0',
+      matches: [
+        ...new Map(
+          rows.map((row) => [
+            row.matchId,
+            {
+              matchId: row.matchId,
+              sourceDemoHash: row.sourceDemoHash,
+            },
+          ]),
+        ).values(),
+      ],
     },
-    players: seasonRows
-      .map((row) => {
-        const balanced = balancedByKey.get(row.acc.playerKey)!;
-        const contextStatus = accountContextStatus(row.acc.signals);
-        const steamIds = [...row.acc.steamIds].sort();
-        return {
-          playerKey: row.acc.playerKey,
-          steamIds,
-          primarySteamId64: row.acc.primarySteamId64,
-          externalUserId: row.acc.externalUserId,
-          name: row.acc.displayName ?? mostCommonName(row.acc.names),
-          teamKeys: [...row.acc.teamKeys],
-          mapCount: row.acc.mapCount,
-          rrV1: round(row.rrV1.rr, 3),
-          rrV1Percentile: round(rrToPercentile(rrV1Scores, row.rrV1.rr), 1),
-          indicators: row.indicators,
-          weaponHighlights: aggregateWeaponHighlights(row.acc.playerKey, row.acc.weaponHighlights),
-          accountRR: round(balanced.rr, 3),
-          accountRRRaw: round(balanced.rrRaw, 3),
-          accountBreakdown: {
-            combat: round(balanced.accounts.combat, 4),
-            trade: round(balanced.accounts.trade, 4),
-            mapControl: round(balanced.accounts.mapControl, 4),
-            clutch: round(balanced.accounts.clutch, 4),
-            objective: round(balanced.accounts.objective, 4),
-            utility: round(balanced.accounts.utility, 4)
-          },
-          accountContextStatus: contextStatus,
-          prism: prismResults.get(row.acc.playerKey) ?? null,
-          confidence: confidence(row.acc.mapCount, contextStatus),
-          perMatch: row.acc.perMatch.sort((a, b) => a.matchId.localeCompare(b.matchId))
-        };
-      })
+    players: seasonRows.map((row) => {
+      const balanced = balancedByKey.get(row.acc.playerKey)!;
+      const contextStatus = accountContextStatus(row.acc.signals);
+      const steamIds = [...row.acc.steamIds].sort();
+      return {
+        playerKey: row.acc.playerKey,
+        steamIds,
+        primarySteamId64: row.acc.primarySteamId64,
+        externalUserId: row.acc.externalUserId,
+        name: row.acc.displayName ?? mostCommonName(row.acc.names),
+        teamKeys: [...row.acc.teamKeys],
+        mapCount: row.acc.mapCount,
+        rrV1: round(row.rrV1.rr, 3),
+        rrV1Percentile: round(rrToPercentile(rrV1Scores, row.rrV1.rr), 1),
+        indicators: row.indicators,
+        weaponHighlights: aggregateWeaponHighlights(row.acc.playerKey, row.acc.weaponHighlights),
+        accountRR: round(balanced.rr, 3),
+        accountRRRaw: round(balanced.rrRaw, 3),
+        accountBreakdown: {
+          combat: round(balanced.accounts.combat, 4),
+          trade: round(balanced.accounts.trade, 4),
+          mapControl: round(balanced.accounts.mapControl, 4),
+          clutch: round(balanced.accounts.clutch, 4),
+          objective: round(balanced.accounts.objective, 4),
+          utility: round(balanced.accounts.utility, 4),
+        },
+        accountContextStatus: contextStatus,
+        prism: prismResults.get(row.acc.playerKey) ?? null,
+        confidence: confidence(row.acc.mapCount, contextStatus),
+        perMatch: row.acc.perMatch.sort((a, b) => a.matchId.localeCompare(b.matchId)),
+      };
+    }),
   });
 }
 
 function resolveIdentity(steamId64: string, identityMap: PlayerIdentityMap): PlayerIdentity {
   const value = identityMap[steamId64];
   if (!value) return { playerKey: `steam:${steamId64}` };
-  if (typeof value === "string") return { playerKey: value };
+  if (typeof value === 'string') return { playerKey: value };
   return value;
 }
 
@@ -176,7 +202,7 @@ function aggregateAccountSignals(steamId64: string, rows: RRSignals[]): RRSignal
   return {
     steamId64,
     rounds: sum(rows, (row) => row.rounds),
-    sourceVersion: "cs2-demo-analysis-kit/cohort-1.0",
+    sourceVersion: 'cs2-demo-analysis-kit/cohort-1.0',
     combat: {
       kills: sum(rows, (row) => row.combat.kills),
       deaths: sum(rows, (row) => row.combat.deaths),
@@ -188,50 +214,64 @@ function aggregateAccountSignals(steamId64: string, rows: RRSignals[]): RRSignal
         two: sum(rows, (row) => row.combat.multiKills.two),
         three: sum(rows, (row) => row.combat.multiKills.three),
         four: sum(rows, (row) => row.combat.multiKills.four),
-        five: sum(rows, (row) => row.combat.multiKills.five)
+        five: sum(rows, (row) => row.combat.multiKills.five),
       },
       headshotKills: sum(rows, (row) => row.combat.headshotKills),
       wallbangKills: sumNullable(rows.map((row) => row.combat.wallbangKills)),
       killsByBuyDelta: sumBuyDelta(rows.map((row) => row.combat.killsByBuyDelta)),
-      killsByManState: sumManState(rows.map((row) => row.combat.killsByManState))
+      killsByManState: sumManState(rows.map((row) => row.combat.killsByManState)),
     },
     trade: {
       tradeKills: sum(rows, (row) => row.trade.tradeKills),
       tradedDeaths: sum(rows, (row) => row.trade.tradedDeaths),
       deaths: sum(rows, (row) => row.trade.deaths),
       tradedOpeningDeaths: sumNullable(rows.map((row) => row.trade.tradedOpeningDeaths)),
-      strategicIsolationDeaths: sumNullable(rows.map((row) => row.trade.strategicIsolationDeaths))
+      strategicIsolationDeaths: sumNullable(rows.map((row) => row.trade.strategicIsolationDeaths)),
     },
     mapControl: {
-      uniqueStrategicControlSeconds: sumNullable(rows.map((row) => row.mapControl.uniqueStrategicControlSeconds)),
-      contestedFrontierControlSeconds: sumNullable(rows.map((row) => row.mapControl.contestedFrontierControlSeconds)),
+      uniqueStrategicControlSeconds: sumNullable(
+        rows.map((row) => row.mapControl.uniqueStrategicControlSeconds),
+      ),
+      contestedFrontierControlSeconds: sumNullable(
+        rows.map((row) => row.mapControl.contestedFrontierControlSeconds),
+      ),
       routeDenialSeconds: sumNullable(rows.map((row) => row.mapControl.routeDenialSeconds)),
       teammateAdvanceUnits: sumNullable(rows.map((row) => row.mapControl.teammateAdvanceUnits)),
-      firstControlEvents: sumNullable(rows.map((row) => row.mapControl.firstControlEvents))
+      firstControlEvents: sumNullable(rows.map((row) => row.mapControl.firstControlEvents)),
     },
     clutch: {
       vsOne: sumSplit(rows, (row) => row.clutch.vsOne),
       vsTwo: sumSplit(rows, (row) => row.clutch.vsTwo),
       vsThree: sumSplit(rows, (row) => row.clutch.vsThree),
       vsFour: sumSplit(rows, (row) => row.clutch.vsFour),
-      vsFive: sumSplit(rows, (row) => row.clutch.vsFive)
+      vsFive: sumSplit(rows, (row) => row.clutch.vsFive),
     },
     objective: {
       plants: sum(rows, (row) => row.objective.plants),
       defuses: sum(rows, (row) => row.objective.defuses),
-      plantsConverted: sumNullable(rows.map((row) => row.objective.plantsConverted))
+      plantsConverted: sumNullable(rows.map((row) => row.objective.plantsConverted)),
     },
     utility: {
       flashAssists: sum(rows, (row) => row.utility.flashAssists),
-      effectiveEnemyFlashSeconds: sumNullable(rows.map((row) => row.utility.effectiveEnemyFlashSeconds)),
-      teamFlashSuppressionSeconds: sumNullable(rows.map((row) => row.utility.teamFlashSuppressionSeconds)),
+      effectiveEnemyFlashSeconds: sumNullable(
+        rows.map((row) => row.utility.effectiveEnemyFlashSeconds),
+      ),
+      teamFlashSuppressionSeconds: sumNullable(
+        rows.map((row) => row.utility.teamFlashSuppressionSeconds),
+      ),
       smokeProtectedCrossings: sumNullable(rows.map((row) => row.utility.smokeProtectedCrossings)),
-      smokeSightlineDenialSeconds: sumNullable(rows.map((row) => row.utility.smokeSightlineDenialSeconds)),
+      smokeSightlineDenialSeconds: sumNullable(
+        rows.map((row) => row.utility.smokeSightlineDenialSeconds),
+      ),
       smokeIsolationSeconds: sumNullable(rows.map((row) => row.utility.smokeIsolationSeconds)),
-      incendiaryPathDelayUnits: sumNullable(rows.map((row) => row.utility.incendiaryPathDelayUnits)),
-      incendiaryDisplacementEvents: sumNullable(rows.map((row) => row.utility.incendiaryDisplacementEvents)),
-      utilityDamage: sum(rows, (row) => row.utility.utilityDamage)
-    }
+      incendiaryPathDelayUnits: sumNullable(
+        rows.map((row) => row.utility.incendiaryPathDelayUnits),
+      ),
+      incendiaryDisplacementEvents: sumNullable(
+        rows.map((row) => row.utility.incendiaryDisplacementEvents),
+      ),
+      utilityDamage: sum(rows, (row) => row.utility.utilityDamage),
+    },
   };
 }
 
@@ -242,7 +282,10 @@ function aggregateAccountSignals(steamId64: string, rows: RRSignals[]): RRSignal
  * cross-match metrics belong in @cs2dak/tournament.
  */
 function aggregateRatingIndicators(steamId64: string, rows: RRIndicators[]): RRIndicators {
-  const totalRounds = Math.max(sum(rows, (row) => row.totalRounds), 1);
+  const totalRounds = Math.max(
+    sum(rows, (row) => row.totalRounds),
+    1,
+  );
   const kills = sum(rows, (row) => row.kills);
   const deaths = sum(rows, (row) => row.deaths);
   const assists = sum(rows, (row) => row.assists);
@@ -285,7 +328,13 @@ function aggregateRatingIndicators(steamId64: string, rows: RRIndicators[]): RRI
     threeKillRounds: sum(rows, (row) => row.threeKillRounds),
     fourKillRounds: sum(rows, (row) => row.fourKillRounds),
     fiveKillRounds: sum(rows, (row) => row.fiveKillRounds),
-    multiKillRate: round(sum(rows, (row) => row.twoKillRounds + row.threeKillRounds + row.fourKillRounds + row.fiveKillRounds) / totalRounds, 4),
+    multiKillRate: round(
+      sum(
+        rows,
+        (row) => row.twoKillRounds + row.threeKillRounds + row.fourKillRounds + row.fiveKillRounds,
+      ) / totalRounds,
+      4,
+    ),
     firstKillCount,
     firstDeathCount,
     firstKillRate: round(firstKillCount / totalRounds, 4),
@@ -312,38 +361,44 @@ function aggregateRatingIndicators(steamId64: string, rows: RRIndicators[]): RRI
     awpKillRate: kills > 0 ? round(awpKills / kills, 4) : 0,
     sniperKills,
     sniperKillRate: kills > 0 ? round(sniperKills / kills, 4) : 0,
-    awpMultiKillRate: weightedNullableRate(rows, "awpMultiKillRate"),
-    awpDuelWinRate: weightedNullableRate(rows, "awpDuelWinRate"),
+    awpMultiKillRate: weightedNullableRate(rows, 'awpMultiKillRate'),
+    awpDuelWinRate: weightedNullableRate(rows, 'awpDuelWinRate'),
     utilityDamage,
     utilityDamagePerRound: round(utilityDamage / totalRounds, 2),
     flashAssistCount,
     flashAssistPerRound: round(flashAssistCount / totalRounds, 4),
     blindDurationTotal: round(blindDurationTotal, 2),
     blindDurationPerRound: round(blindDurationTotal / totalRounds, 2),
-    enemyFlashDurationSeconds: enemyFlashDurationSeconds == null ? null : round(enemyFlashDurationSeconds, 2),
-    enemyFlashDurationPerRound: enemyFlashDurationSeconds == null ? null : round(enemyFlashDurationSeconds / totalRounds, 2),
-    teamFlashDurationSeconds: teamFlashDurationSeconds == null ? null : round(teamFlashDurationSeconds, 2),
-    teamFlashDurationPerRound: teamFlashDurationSeconds == null ? null : round(teamFlashDurationSeconds / totalRounds, 2),
+    enemyFlashDurationSeconds:
+      enemyFlashDurationSeconds == null ? null : round(enemyFlashDurationSeconds, 2),
+    enemyFlashDurationPerRound:
+      enemyFlashDurationSeconds == null ? null : round(enemyFlashDurationSeconds / totalRounds, 2),
+    teamFlashDurationSeconds:
+      teamFlashDurationSeconds == null ? null : round(teamFlashDurationSeconds, 2),
+    teamFlashDurationPerRound:
+      teamFlashDurationSeconds == null ? null : round(teamFlashDurationSeconds / totalRounds, 2),
     grenadeCount,
     grenadeCountPerRound: round(grenadeCount / totalRounds, 4),
     ecoRoundCount: sum(rows, (row) => row.ecoRoundCount),
     forceRoundCount: sum(rows, (row) => row.forceRoundCount),
     fullBuyRoundCount: sum(rows, (row) => row.fullBuyRoundCount),
     pistolRoundCount: sum(rows, (row) => row.pistolRoundCount),
-    avgEquipmentValue: weightedAverage(rows.map((row) => ({ value: row.avgEquipmentValue, weight: row.totalRounds }))),
+    avgEquipmentValue: weightedAverage(
+      rows.map((row) => ({ value: row.avgEquipmentValue, weight: row.totalRounds })),
+    ),
     combatDeathCount,
     bombDeathCount,
     wallbangKillCount,
     roundSwingTotal: sumNullable(rows.map((row) => row.roundSwingTotal)),
-    roundSwingPerKill: weightedNullableRate(rows, "roundSwingPerKill")
+    roundSwingPerKill: weightedNullableRate(rows, 'roundSwingPerKill'),
   };
 }
 
 function aggregateWeaponHighlights(
   steamId64: string,
-  rows: CohortWeaponHighlightFacts[]
+  rows: CohortWeaponHighlightFacts[],
 ): CohortWeaponHighlightFacts {
-  const weapons = new Map<string, CohortWeaponHighlightFacts["weapons"][number]>();
+  const weapons = new Map<string, CohortWeaponHighlightFacts['weapons'][number]>();
   for (const row of rows) {
     for (const weapon of row.weapons) {
       const current = weapons.get(weapon.weapon) ?? {
@@ -354,7 +409,7 @@ function aggregateWeaponHighlights(
         noScopeKills: 0,
         throughSmokeKills: 0,
         wallbangKills: 0,
-        penetratedObjects: 0
+        penetratedObjects: 0,
       };
       current.kills += weapon.kills;
       current.headshotKills += weapon.headshotKills;
@@ -369,67 +424,82 @@ function aggregateWeaponHighlights(
   return {
     steamId64,
     totalKills: sum(rows, (row) => row.totalKills),
-    weapons: [...weapons.values()]
-      .sort((a, b) => b.kills - a.kills || a.weapon.localeCompare(b.weapon)),
+    weapons: [...weapons.values()].sort(
+      (a, b) => b.kills - a.kills || a.weapon.localeCompare(b.weapon),
+    ),
     highlights: {
       wallbangKills: sumNullable(rows.map((row) => row.highlights.wallbangKills)),
       noScopeKills: sumNullable(rows.map((row) => row.highlights.noScopeKills)),
       throughSmokeKills: sumNullable(rows.map((row) => row.highlights.throughSmokeKills)),
-      collateralKills: sumNullable(rows.map((row) => row.highlights.collateralKills))
-    }
+      collateralKills: sumNullable(rows.map((row) => row.highlights.collateralKills)),
+    },
   };
 }
 
-function accountContextStatus(rows: RRSignals[]): { buyDelta: AccountContextAvailability; manState: AccountContextAvailability } {
+function accountContextStatus(rows: RRSignals[]): {
+  buyDelta: AccountContextAvailability;
+  manState: AccountContextAvailability;
+} {
   return {
     buyDelta: availability(rows.map((row) => row.combat.killsByBuyDelta != null)),
-    manState: availability(rows.map((row) => row.combat.killsByManState != null))
+    manState: availability(rows.map((row) => row.combat.killsByManState != null)),
   };
 }
 
-function confidence(mapCount: number, status: { buyDelta: AccountContextAvailability; manState: AccountContextAvailability }): number {
-  const completeness = (availabilityScore(status.buyDelta) + availabilityScore(status.manState)) / 2;
+function confidence(
+  mapCount: number,
+  status: { buyDelta: AccountContextAvailability; manState: AccountContextAvailability },
+): number {
+  const completeness =
+    (availabilityScore(status.buyDelta) + availabilityScore(status.manState)) / 2;
   const sample = mapCount / (mapCount + 3);
   return round(0.7 * completeness + 0.3 * sample, 3);
 }
 
 function availability(values: boolean[]): AccountContextAvailability {
   const available = values.filter(Boolean).length;
-  if (available === 0) return "missing";
-  if (available === values.length) return "available";
-  return "partial";
+  if (available === 0) return 'missing';
+  if (available === values.length) return 'available';
+  return 'partial';
 }
 
 function availabilityScore(value: AccountContextAvailability): number {
-  if (value === "available") return 1;
-  if (value === "partial") return 0.5;
+  if (value === 'available') return 1;
+  if (value === 'partial') return 0.5;
   return 0;
 }
 
-function sumBuyDelta(values: RRSignals["combat"]["killsByBuyDelta"][]): RRSignals["combat"]["killsByBuyDelta"] {
+function sumBuyDelta(
+  values: RRSignals['combat']['killsByBuyDelta'][],
+): RRSignals['combat']['killsByBuyDelta'] {
   const present = values.filter((value): value is NonNullable<typeof value> => value != null);
   if (present.length === 0) return null;
   return {
     disadvantage: sum(present, (value) => value.disadvantage),
     even: sum(present, (value) => value.even),
-    advantage: sum(present, (value) => value.advantage)
+    advantage: sum(present, (value) => value.advantage),
   };
 }
 
-function sumManState(values: RRSignals["combat"]["killsByManState"][]): RRSignals["combat"]["killsByManState"] {
+function sumManState(
+  values: RRSignals['combat']['killsByManState'][],
+): RRSignals['combat']['killsByManState'] {
   const present = values.filter((value): value is NonNullable<typeof value> => value != null);
   if (present.length === 0) return null;
   return {
     manDown: sum(present, (value) => value.manDown),
     even: sum(present, (value) => value.even),
-    manUp: sum(present, (value) => value.manUp)
+    manUp: sum(present, (value) => value.manUp),
   };
 }
 
-function sumSplit<T>(rows: T[], select: (row: T) => { count: number; won: number }): { count: number; won: number } {
+function sumSplit<T>(
+  rows: T[],
+  select: (row: T) => { count: number; won: number },
+): { count: number; won: number } {
   return {
     count: sum(rows, (row) => select(row).count),
-    won: sum(rows, (row) => select(row).won)
+    won: sum(rows, (row) => select(row).won),
   };
 }
 
@@ -439,7 +509,10 @@ function sumNullable(values: Array<number | null>): number | null {
   return sum(present, (value) => value);
 }
 
-function weightedNullableRate(rows: RRIndicators[], field: "awpMultiKillRate" | "awpDuelWinRate" | "roundSwingPerKill"): number | null {
+function weightedNullableRate(
+  rows: RRIndicators[],
+  field: 'awpMultiKillRate' | 'awpDuelWinRate' | 'roundSwingPerKill',
+): number | null {
   const present = rows
     .filter((row) => row[field] != null)
     .map((row) => ({ value: row[field] ?? 0, weight: row.totalRounds }));
@@ -453,7 +526,10 @@ function weightedAverage(values: Array<{ value: number; weight: number }>): numb
 }
 
 function mostCommonName(names: Map<string, number>): string {
-  return [...names.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ?? "Unknown";
+  return (
+    [...names.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ??
+    'Unknown'
+  );
 }
 
 function getOrInit<K, V>(map: Map<K, V>, key: K, create: () => V): V {

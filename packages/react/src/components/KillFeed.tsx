@@ -1,5 +1,5 @@
-import { displayWeaponName } from "@cs2dak/presentation/weapons";
-import type { WorkspaceKillEvent } from "@cs2dak/presentation";
+import { displayWeaponName } from '@cs2dak/presentation/weapons';
+import type { WorkspaceKillEvent } from '@cs2dak/presentation';
 
 export interface KillFeedProps {
   kills: WorkspaceKillEvent[];
@@ -23,8 +23,8 @@ export function KillFeed({ kills, currentTick, tickrate }: KillFeedProps) {
     <div className="dak-killfeed" aria-label="Kill feed">
       {visible.map((k) => (
         <div key={k.id} className="dak-killfeed-row">
-          <span className={`dak-killfeed-name dak-killfeed-name-${k.killerTeamKey ?? "none"}`}>
-            {k.killerName ?? "环境"}
+          <span className={`dak-killfeed-name dak-killfeed-name-${k.killerTeamKey ?? 'none'}`}>
+            {k.killerName ?? '环境'}
           </span>
           <span className="dak-killfeed-weapon">{displayWeaponName(k.weapon)}</span>
           <span className="dak-killfeed-victim">{k.victimName}</span>

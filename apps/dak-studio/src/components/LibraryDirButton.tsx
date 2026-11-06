@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
-import { FolderOpen } from "lucide-react";
-import { canOpenLibraryDir, getLibraryDir, openLibraryDir } from "../lib/library-dir";
+import { useEffect, useState } from 'react';
+import { FolderOpen } from 'lucide-react';
+import { canOpenLibraryDir, getLibraryDir, openLibraryDir } from '../lib/library-dir';
 
 /**
  * 侧栏「打开数据目录」入口。仅桌面壳（pywebview）显示——浏览器无本地目录概念。
@@ -19,7 +19,7 @@ export function LibraryDirButton({ onError }: { onError?: (msg: string) => void 
 
   async function run() {
     const res = await openLibraryDir();
-    if (!res.ok) onError?.(res.error ?? "打开数据目录失败");
+    if (!res.ok) onError?.(res.error ?? '打开数据目录失败');
   }
 
   return (

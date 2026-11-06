@@ -1,16 +1,16 @@
-import { FileDown, Film, FolderOpen, Play, RefreshCw, Tag as TagIcon, Trash2 } from "lucide-react";
-import { useMemo, useRef, useState, type ChangeEvent } from "react";
-import { isFactsStale} from "../lib/library";
-import { entryDate, type StudioDemoEntry } from "../lib/demo-entry";
-import { parseTags } from "../lib/tags";
-import { EmptyState } from "@cs2dak/react";
-import { EventManager } from "../components/EventManager";
-import { LibraryMaintenance } from "../components/LibraryMaintenance";
-import type { MatchesPageState } from "../lib/studio-page-state";
-import type { BuiltinEvent } from "../lib/builtin-events";
+import { FileDown, Film, FolderOpen, Play, RefreshCw, Tag as TagIcon, Trash2 } from 'lucide-react';
+import { useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { isFactsStale } from '../lib/library';
+import { entryDate, type StudioDemoEntry } from '../lib/demo-entry';
+import { parseTags } from '../lib/tags';
+import { EmptyState } from '@cs2dak/react';
+import { EventManager } from '../components/EventManager';
+import { LibraryMaintenance } from '../components/LibraryMaintenance';
+import type { MatchesPageState } from '../lib/studio-page-state';
+import type { BuiltinEvent } from '../lib/builtin-events';
 
 export interface LibraryViewProps {
-  mode: "browse" | "maintenance";
+  mode: 'browse' | 'maintenance';
   state: MatchesPageState;
   onStateChange: (state: MatchesPageState) => void;
   entries: StudioDemoEntry[];
@@ -47,15 +47,22 @@ export interface LibraryViewProps {
 function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = Math.round(seconds % 60);
-  return `${m}:${String(s).padStart(2, "0")}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
 }
 
 function formatImportedAt(ts: number): string {
-  return new Date(ts).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+  return new Date(ts).toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 export function LibraryView({
-  mode, state, onStateChange,
+  mode,
+  state,
+  onStateChange,
   entries,
   importing,
   importTagsRaw,
@@ -83,26 +90,35 @@ export function LibraryView({
   const setSearch = (search: string) => onStateChange({ ...state, search });
   const setMapFilter = (mapFilter: string | null) => onStateChange({ ...state, mapFilter });
   const setTagFilter = (tagFilter: string | null) => onStateChange({ ...state, tagFilter });
-  const setServerFilter = (serverFilter: string | null) => onStateChange({ ...state, serverFilter });
+  const setServerFilter = (serverFilter: string | null) =>
+    onStateChange({ ...state, serverFilter });
   const setDateFrom = (dateFrom: string) => onStateChange({ ...state, dateFrom });
   const setDateTo = (dateTo: string) => onStateChange({ ...state, dateTo });
   const fileInput = useRef<HTMLInputElement>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
 
-  const allTags = useMemo(() => [...new Set(entries.flatMap((entry) => entry.tags))].sort(), [entries]);
+  const allTags = useMemo(
+    () => [...new Set(entries.flatMap((entry) => entry.tags))].sort(),
+    [entries],
+  );
   const servers = useMemo(
-    () => [...new Set(entries.map((entry) => entry.meta.serverName).filter((s): s is string => Boolean(s)))].sort(),
-    [entries]
+    () =>
+      [
+        ...new Set(
+          entries.map((entry) => entry.meta.serverName).filter((s): s is string => Boolean(s)),
+        ),
+      ].sort(),
+    [entries],
   );
 
   const editTags = (entry: StudioDemoEntry) => {
-    const raw = window.prompt(`编辑「${entry.fileName}」的标签（逗号分隔）`, entry.tags.join(", "));
+    const raw = window.prompt(`编辑「${entry.fileName}」的标签（逗号分隔）`, entry.tags.join(', '));
     if (raw != null) onUpdateTags(entry.id, parseTags(raw));
   };
 
   const maps = useMemo(
     () => [...new Set(entries.map((entry) => entry.meta.mapName))].sort(),
-    [entries]
+    [entries],
   );
   const playerCount = useMemo(() => {
     // 粗略口径：同名队伍跨场重复不去重，仅作资料库规模提示
@@ -122,24 +138,37 @@ export function LibraryView({
         if (dateTo && date > dateTo) return false;
       }
       if (!term) return true;
-      return [entry.fileName, entry.meta.mapName, entry.meta.teamAName, entry.meta.teamBName, entry.meta.serverName ?? "", ...entry.tags]
-        .join(" ")
+      return [
+        entry.fileName,
+        entry.meta.mapName,
+        entry.meta.teamAName,
+        entry.meta.teamBName,
+        entry.meta.serverName ?? '',
+        ...entry.tags,
+      ]
+        .join(' ')
         .toLowerCase()
         .includes(term);
     });
   }, [entries, search, mapFilter, tagFilter, serverFilter, dateFrom, dateTo]);
 
   const onPick = (e: ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) onImportFiles(e.target.files, parseTags(importTagsRaw));
-    e.target.value = "";
+    if (e.target.files && e.target.files.length > 0)
+      onImportFiles(e.target.files, parseTags(importTagsRaw));
+    e.target.value = '';
   };
 
   const selectedVisible = filtered.filter((entry) => selectedIds.has(entry.id));
-  const allVisibleSelected = filtered.length > 0 && filtered.every((entry) => selectedIds.has(entry.id));
+  const allVisibleSelected =
+    filtered.length > 0 && filtered.every((entry) => selectedIds.has(entry.id));
   const selectedTags = [...new Set(selectedVisible.flatMap((entry) => entry.tags))].sort();
-  const selectedReexportable = entries.filter((entry) => selectedIds.has(entry.id) && entry.sourceDemPath).length;
+  const selectedReexportable = entries.filter(
+    (entry) => selectedIds.has(entry.id) && entry.sourceDemPath,
+  ).length;
   const staleCount = useMemo(() => entries.filter(isFactsStale).length, [entries]);
-  const selectedStale = entries.filter((entry) => selectedIds.has(entry.id) && isFactsStale(entry)).length;
+  const selectedStale = entries.filter(
+    (entry) => selectedIds.has(entry.id) && isFactsStale(entry),
+  ).length;
 
   const toggleSelected = (id: string) => {
     setSelectedIds((current) => {
@@ -164,16 +193,16 @@ export function LibraryView({
 
   const addBatchTags = () => {
     const raw = window.prompt(`给 ${selectedIds.size} 场 demo 添加标签（逗号分隔）`);
-    const tags = parseTags(raw ?? "");
+    const tags = parseTags(raw ?? '');
     if (tags.length > 0) onBulkUpdateTags([...selectedIds], tags, []);
   };
 
   const removeBatchTags = () => {
     const raw = window.prompt(
       `从 ${selectedIds.size} 场 demo 移除标签（逗号分隔）`,
-      selectedTags.join(", ")
+      selectedTags.join(', '),
     );
-    const tags = parseTags(raw ?? "");
+    const tags = parseTags(raw ?? '');
     if (tags.length > 0) onBulkUpdateTags([...selectedIds], [], tags);
   };
 
@@ -181,13 +210,14 @@ export function LibraryView({
     <div className="stu-view">
       <header className="stu-view-header">
         <div>
-          <h1>{mode === "browse" ? "比赛库" : "比赛库维护"}</h1>
+          <h1>{mode === 'browse' ? '比赛库' : '比赛库维护'}</h1>
           <p>
-            导入 .dem（自动经 cs2df 转 v3 ZIP）或 cs2-demo-format/3.x ZIP，本地管理、检索并进入分析。支持拖拽到窗口任意位置。
+            导入 .dem（自动经 cs2df 转 v3 ZIP）或 cs2-demo-format/3.x
+            ZIP，本地管理、检索并进入分析。支持拖拽到窗口任意位置。
           </p>
         </div>
         <div className="stu-header-actions">
-          {mode === "maintenance" && onRebuildStale && staleCount > 0 && (
+          {mode === 'maintenance' && onRebuildStale && staleCount > 0 && (
             <button
               type="button"
               className="stu-button stu-button-ghost"
@@ -198,17 +228,19 @@ export function LibraryView({
               <RefreshCw size={15} /> 重建旧口径（{staleCount}）
             </button>
           )}
-          {mode === "maintenance" && onReexportAll && entries.some((entry) => entry.sourceDemPath) && (
-            <button
-              type="button"
-              className="stu-button stu-button-ghost"
-              onClick={onReexportAll}
-              disabled={importing}
-              title="逐场重新导出所有记录了原始 .dem 路径的条目（cs2df 升级后刷新数据）"
-            >
-              <FileDown size={15} /> 全部重新导出
-            </button>
-          )}
+          {mode === 'maintenance' &&
+            onReexportAll &&
+            entries.some((entry) => entry.sourceDemPath) && (
+              <button
+                type="button"
+                className="stu-button stu-button-ghost"
+                onClick={onReexportAll}
+                disabled={importing}
+                title="逐场重新导出所有记录了原始 .dem 路径的条目（cs2df 升级后刷新数据）"
+              >
+                <FileDown size={15} /> 全部重新导出
+              </button>
+            )}
           <input
             className="stu-search stu-import-tags"
             type="text"
@@ -218,19 +250,50 @@ export function LibraryView({
             title="本次导入的 demo 都会附加这些标签"
           />
           {onNativeImport && (
-            <button type="button" className="stu-button" onClick={onNativeImport} disabled={importing}>
-              <FolderOpen size={15} /> {importing ? "导入中…" : "导入 demo"}
+            <button
+              type="button"
+              className="stu-button"
+              onClick={onNativeImport}
+              disabled={importing}
+            >
+              <FolderOpen size={15} /> {importing ? '导入中…' : '导入 demo'}
             </button>
           )}
           {!onNativeImport && (
-            <><button type="button" className="stu-button" disabled={importing} onClick={() => fileInput.current?.click()}><FolderOpen size={15} /> {importing ? "导入中…" : "导入 demo"}</button>
-              <input ref={fileInput} type="file" accept=".zip,.dem" multiple hidden onChange={onPick} disabled={importing} /></>
+            <>
+              <button
+                type="button"
+                className="stu-button"
+                disabled={importing}
+                onClick={() => fileInput.current?.click()}
+              >
+                <FolderOpen size={15} /> {importing ? '导入中…' : '导入 demo'}
+              </button>
+              <input
+                ref={fileInput}
+                type="file"
+                accept=".zip,.dem"
+                multiple
+                hidden
+                onChange={onPick}
+                disabled={importing}
+              />
+            </>
           )}
         </div>
       </header>
 
-      {mode === "maintenance" && <LibraryMaintenance onNotice={onNotice} onLibraryChanged={onLibraryChanged} />}
-      {mode === "maintenance" && <EventManager entries={entries} onNotice={onNotice} onLibraryChanged={onLibraryChanged} onLoadBuiltin={onLoadBuiltin} />}
+      {mode === 'maintenance' && (
+        <LibraryMaintenance onNotice={onNotice} onLibraryChanged={onLibraryChanged} />
+      )}
+      {mode === 'maintenance' && (
+        <EventManager
+          entries={entries}
+          onNotice={onNotice}
+          onLibraryChanged={onLibraryChanged}
+          onLoadBuiltin={onLoadBuiltin}
+        />
+      )}
 
       <div className="stu-stat-strip">
         <div className="stu-stat">
@@ -259,16 +322,28 @@ export function LibraryView({
               <button type="button" className="stu-button stu-button-ghost" onClick={addBatchTags}>
                 添加标签
               </button>
-              <button type="button" className="stu-button stu-button-ghost" onClick={removeBatchTags} disabled={selectedTags.length === 0}>
+              <button
+                type="button"
+                className="stu-button stu-button-ghost"
+                onClick={removeBatchTags}
+                disabled={selectedTags.length === 0}
+              >
                 移除标签
               </button>
               {onReexportSelected && (
                 <button
                   type="button"
                   className="stu-button stu-button-ghost"
-                  onClick={() => { onReexportSelected([...selectedIds]); setSelectedIds(new Set()); }}
+                  onClick={() => {
+                    onReexportSelected([...selectedIds]);
+                    setSelectedIds(new Set());
+                  }}
                   disabled={importing || selectedReexportable === 0}
-                  title={selectedReexportable === 0 ? "选中条目都没有记录原始 .dem 路径" : `重新导出选中且有原始路径的 ${selectedReexportable} 场`}
+                  title={
+                    selectedReexportable === 0
+                      ? '选中条目都没有记录原始 .dem 路径'
+                      : `重新导出选中且有原始路径的 ${selectedReexportable} 场`
+                  }
                 >
                   <FileDown size={15} /> 重新导出（{selectedReexportable}）
                 </button>
@@ -277,24 +352,35 @@ export function LibraryView({
                 <button
                   type="button"
                   className="stu-button stu-button-ghost"
-                  onClick={() => { onRebuildSelected([...selectedIds]); setSelectedIds(new Set()); }}
+                  onClick={() => {
+                    onRebuildSelected([...selectedIds]);
+                    setSelectedIds(new Set());
+                  }}
                   disabled={importing}
                   title="从已存 ZIP 重建选中条目的 facts（无需原始 .dem）"
                 >
-                  <RefreshCw size={15} /> 重建 facts（{selectedIds.size}）{selectedStale > 0 ? `· ${selectedStale} 旧` : ""}
+                  <RefreshCw size={15} /> 重建 facts（{selectedIds.size}）
+                  {selectedStale > 0 ? `· ${selectedStale} 旧` : ''}
                 </button>
               )}
               {onRemoveMany && (
                 <button
                   type="button"
                   className="stu-button stu-button-ghost stu-button-danger"
-                  onClick={() => { onRemoveMany([...selectedIds]); setSelectedIds(new Set()); }}
+                  onClick={() => {
+                    onRemoveMany([...selectedIds]);
+                    setSelectedIds(new Set());
+                  }}
                   disabled={importing}
                 >
                   <Trash2 size={15} /> 删除（{selectedIds.size}）
                 </button>
               )}
-              <button type="button" className="stu-button stu-button-ghost" onClick={() => setSelectedIds(new Set())}>
+              <button
+                type="button"
+                className="stu-button stu-button-ghost"
+                onClick={() => setSelectedIds(new Set())}
+              >
                 取消
               </button>
             </>
@@ -310,7 +396,7 @@ export function LibraryView({
               <div className="stu-chip-row">
                 <button
                   type="button"
-                  className={mapFilter === null ? "stu-chip stu-chip-active" : "stu-chip"}
+                  className={mapFilter === null ? 'stu-chip stu-chip-active' : 'stu-chip'}
                   onClick={() => setMapFilter(null)}
                 >
                   全部
@@ -319,7 +405,7 @@ export function LibraryView({
                   <button
                     key={map}
                     type="button"
-                    className={mapFilter === map ? "stu-chip stu-chip-active" : "stu-chip"}
+                    className={mapFilter === map ? 'stu-chip stu-chip-active' : 'stu-chip'}
                     onClick={() => setMapFilter(mapFilter === map ? null : map)}
                   >
                     {map}
@@ -334,7 +420,7 @@ export function LibraryView({
                 <button
                   key={tag}
                   type="button"
-                  className={tagFilter === tag ? "stu-chip stu-chip-active" : "stu-chip"}
+                  className={tagFilter === tag ? 'stu-chip stu-chip-active' : 'stu-chip'}
                   onClick={() => setTagFilter(tagFilter === tag ? null : tag)}
                 >
                   #{tag}
@@ -349,7 +435,7 @@ export function LibraryView({
                 <button
                   key={server}
                   type="button"
-                  className={serverFilter === server ? "stu-chip stu-chip-active" : "stu-chip"}
+                  className={serverFilter === server ? 'stu-chip stu-chip-active' : 'stu-chip'}
                   onClick={() => setServerFilter(serverFilter === server ? null : server)}
                   title={server}
                 >
@@ -381,7 +467,13 @@ export function LibraryView({
                 />
               </span>
               {(dateFrom || dateTo) && (
-                <button type="button" className="stu-chip" onClick={() => { onStateChange({ ...state, dateFrom: "", dateTo: "" }); }}>
+                <button
+                  type="button"
+                  className="stu-chip"
+                  onClick={() => {
+                    onStateChange({ ...state, dateFrom: '', dateTo: '' });
+                  }}
+                >
                   清除
                 </button>
               )}
@@ -401,7 +493,11 @@ export function LibraryView({
           <table className="stu-table">
             <thead>
               <tr>
-                {mode === "maintenance" && <th aria-label="选择"><input type="checkbox" checked={allVisibleSelected} onChange={toggleVisible} /></th>}
+                {mode === 'maintenance' && (
+                  <th aria-label="选择">
+                    <input type="checkbox" checked={allVisibleSelected} onChange={toggleVisible} />
+                  </th>
+                )}
                 <th>地图</th>
                 <th>对阵</th>
                 <th>日期</th>
@@ -416,14 +512,16 @@ export function LibraryView({
             <tbody>
               {filtered.map((entry) => (
                 <tr key={entry.id} onClick={() => onOpenDemo(entry.id)}>
-                  {mode === "maintenance" && <td onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(entry.id)}
-                      onChange={() => toggleSelected(entry.id)}
-                      aria-label={`选择 ${entry.fileName}`}
-                    />
-                  </td>}
+                  {mode === 'maintenance' && (
+                    <td onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(entry.id)}
+                        onChange={() => toggleSelected(entry.id)}
+                        aria-label={`选择 ${entry.fileName}`}
+                      />
+                    </td>
+                  )}
                   <td>
                     <span className="stu-map-badge">{entry.meta.mapName}</span>
                   </td>
@@ -440,79 +538,123 @@ export function LibraryView({
                         </span>
                       ))}
                       {isFactsStale(entry) && (
-                        <span className="stu-tag stu-tag-warn" title="facts 为旧分析口径，可从 ZIP 重建">旧口径</span>
+                        <span
+                          className="stu-tag stu-tag-warn"
+                          title="facts 为旧分析口径，可从 ZIP 重建"
+                        >
+                          旧口径
+                        </span>
                       )}
                     </div>
                     <small className="stu-filename">{entry.fileName}</small>
                   </td>
-                  <td className="stu-dim">{entryDate(entry) ?? "—"}</td>
-                  <td className="stu-dim" title={entry.meta.serverName ?? undefined}>{entry.meta.serverName ?? "—"}</td>
+                  <td className="stu-dim">{entryDate(entry) ?? '—'}</td>
+                  <td className="stu-dim" title={entry.meta.serverName ?? undefined}>
+                    {entry.meta.serverName ?? '—'}
+                  </td>
                   <td className="stu-num">{entry.meta.roundCount}</td>
                   <td className="stu-num">{formatDuration(entry.meta.durationSeconds)}</td>
-                  <td>{entry.meta.hasReplay ? <span className="stu-tag stu-tag-ok">8Hz</span> : <span className="stu-tag">无</span>}</td>
+                  <td>
+                    {entry.meta.hasReplay ? (
+                      <span className="stu-tag stu-tag-ok">8Hz</span>
+                    ) : (
+                      <span className="stu-tag">无</span>
+                    )}
+                  </td>
                   <td className="stu-dim">{formatImportedAt(entry.importedAt)}</td>
                   <td className="stu-row-actions" onClick={(e) => e.stopPropagation()}>
-                    {mode === "maintenance" && <button type="button" className="stu-icon-button" title="编辑标签" onClick={() => editTags(entry)}>
-                      <TagIcon size={14} />
-                    </button>}
+                    {mode === 'maintenance' && (
+                      <button
+                        type="button"
+                        className="stu-icon-button"
+                        title="编辑标签"
+                        onClick={() => editTags(entry)}
+                      >
+                        <TagIcon size={14} />
+                      </button>
+                    )}
                     <button
                       type="button"
-                      className={isFactsStale(entry) ? "stu-icon-button stu-icon-button-warn" : "stu-icon-button"}
+                      className={
+                        isFactsStale(entry)
+                          ? 'stu-icon-button stu-icon-button-warn'
+                          : 'stu-icon-button'
+                      }
                       title="更新这场比赛的分析数据"
                       disabled={importing}
                       onClick={() => onRebuildFacts(entry.id)}
                     >
                       <RefreshCw size={14} />
                     </button>
-                    {mode === "maintenance" && <><button
-                      type="button"
-                      className="stu-icon-button"
-                      title={entry.sourceDemPath ? "重新导出并替换（从 .dem）" : "未记录原始 .dem 路径"}
-                      disabled={!entry.sourceDemPath || importing}
-                      onClick={() => onReexportDemo(entry)}
-                    >
-                      <FileDown size={14} />
-                    </button>
-                    {onLinkRawDemo && (
-                      <button
-                        type="button"
-                        className="stu-icon-button"
-                        title={entry.sourceDemPath ? `重新关联原始 .dem：${entry.sourceDemPath}` : "关联原始 .dem 路径"}
-                        disabled={importing}
-                        onClick={() => onLinkRawDemo(entry)}
-                      >
-                        <FolderOpen size={14} />
-                      </button>
+                    {mode === 'maintenance' && (
+                      <>
+                        <button
+                          type="button"
+                          className="stu-icon-button"
+                          title={
+                            entry.sourceDemPath
+                              ? '重新导出并替换（从 .dem）'
+                              : '未记录原始 .dem 路径'
+                          }
+                          disabled={!entry.sourceDemPath || importing}
+                          onClick={() => onReexportDemo(entry)}
+                        >
+                          <FileDown size={14} />
+                        </button>
+                        {onLinkRawDemo && (
+                          <button
+                            type="button"
+                            className="stu-icon-button"
+                            title={
+                              entry.sourceDemPath
+                                ? `重新关联原始 .dem：${entry.sourceDemPath}`
+                                : '关联原始 .dem 路径'
+                            }
+                            disabled={importing}
+                            onClick={() => onLinkRawDemo(entry)}
+                          >
+                            <FolderOpen size={14} />
+                          </button>
+                        )}
+                      </>
                     )}
-                    </>}
                     {onWatchRawDemo && (
                       <button
                         type="button"
                         className="stu-icon-button"
-                        title={entry.sourceDemPath ? "在 CS2 中播放原始 demo" : "未记录原始 .dem 路径"}
+                        title={
+                          entry.sourceDemPath ? '在 CS2 中播放原始 demo' : '未记录原始 .dem 路径'
+                        }
                         disabled={!entry.sourceDemPath || importing}
                         onClick={() => onWatchRawDemo(entry)}
                       >
                         <Film size={14} />
                       </button>
                     )}
-                    <button type="button" className="stu-icon-button" title="打开工作台" onClick={() => onOpenDemo(entry.id)}>
+                    <button
+                      type="button"
+                      className="stu-icon-button"
+                      title="打开工作台"
+                      onClick={() => onOpenDemo(entry.id)}
+                    >
                       <Play size={14} />
                     </button>
-                    {mode === "maintenance" && <button
-                      type="button"
-                      className="stu-icon-button stu-icon-button-danger"
-                      title="从比赛库删除"
-                      onClick={() => onRemoveDemo(entry.id)}
-                    >
-                      <Trash2 size={14} />
-                    </button>}
+                    {mode === 'maintenance' && (
+                      <button
+                        type="button"
+                        className="stu-icon-button stu-icon-button-danger"
+                        title="从比赛库删除"
+                        onClick={() => onRemoveDemo(entry.id)}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="stu-dim" style={{ textAlign: "center" }}>
+                  <td colSpan={10} className="stu-dim" style={{ textAlign: 'center' }}>
                     没有匹配的 demo
                   </td>
                 </tr>

@@ -1,13 +1,15 @@
-import type { SeasonPlayerRow } from "@cs2dak/cohort";
-import type { LeaderboardMetricKey } from "@cs2dak/presentation";
-import { round } from "@cs2dak/presentation";
-export { round } from "@cs2dak/presentation";
+import type { SeasonPlayerRow } from '@cs2dak/cohort';
+import type { LeaderboardMetricKey } from '@cs2dak/presentation';
+import { round } from '@cs2dak/presentation';
+export { round } from '@cs2dak/presentation';
 
 /**
  * 把一行赛季 cohort 结果转换为展示指标。纯转换：不重算聚合（cohort 已 sum→recompute），
  * 不算评分公式。缺失保持 null。
  */
-export function computeSeasonMetrics(player: SeasonPlayerRow): Record<LeaderboardMetricKey, number | null> {
+export function computeSeasonMetrics(
+  player: SeasonPlayerRow,
+): Record<LeaderboardMetricKey, number | null> {
   const ind = player.indicators;
   return {
     maps: player.mapCount,
@@ -28,6 +30,6 @@ export function computeSeasonMetrics(player: SeasonPlayerRow): Record<Leaderboar
     awpKillsPerRound: ind.awpKillsPerRound,
     awpKillRate: round(ind.awpKillRate * 100, 2),
     flashAssistPerRound: ind.flashAssistPerRound,
-    tradeKillRate: ind.tradeKillRate
+    tradeKillRate: ind.tradeKillRate,
   };
 }

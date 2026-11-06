@@ -1,5 +1,11 @@
-import { z } from "zod";
-import { teamKeySchema, sideSchema, economyTypeSchema, teamEconomySchema, grenadeTypeSchema } from "./primitives.js";
+import { z } from 'zod';
+import {
+  teamKeySchema,
+  sideSchema,
+  economyTypeSchema,
+  teamEconomySchema,
+  grenadeTypeSchema,
+} from './primitives.js';
 
 /** Displayed numeric explanations; no rating implementation or input contract. */
 const indicatorValueSchema = z.union([z.number(), z.null(), z.record(z.string(), z.number())]);
@@ -19,10 +25,10 @@ export const playerRoundFactSchema = z.object({
   flashAssists: z.number().int().nonnegative(),
   tradeKills: z.number().int().nonnegative(),
   tradedDeaths: z.number().int().nonnegative(),
-  openingDuel: z.enum(["none", "won", "lost"]),
-  kastTags: z.array(z.enum(["kill", "assist", "survive", "trade"])),
+  openingDuel: z.enum(['none', 'won', 'lost']),
+  kastTags: z.array(z.enum(['kill', 'assist', 'survive', 'trade'])),
   equipmentValue: z.number().int().nonnegative().nullable(),
-  economyType: economyTypeSchema.nullable()
+  economyType: economyTypeSchema.nullable(),
 });
 
 export const playerScoreboardRowSchema = z.object({
@@ -50,12 +56,12 @@ export const playerScoreboardRowSchema = z.object({
   bombDefuseCount: z.number().int().nonnegative().nullable(),
   confidence: z.number().min(0).max(1),
   fieldAvailability: z.object({
-    playerStats: z.enum(["available", "missing"]),
-    economy: z.enum(["available", "missing"]),
-    rounds: z.enum(["available", "missing"]),
-    richKills: z.enum(["available", "partial", "missing"]),
-    damages: z.enum(["available", "missing"]),
-    bombs: z.enum(["available", "missing"])
+    playerStats: z.enum(['available', 'missing']),
+    economy: z.enum(['available', 'missing']),
+    rounds: z.enum(['available', 'missing']),
+    richKills: z.enum(['available', 'partial', 'missing']),
+    damages: z.enum(['available', 'missing']),
+    bombs: z.enum(['available', 'missing']),
   }),
   // rrBase（clamp 前的基础分）：被碾压方 KAST/KPR 低、死亡惩罚大时可为负，
   // 不能强制非负，否则一边倒的真实比赛整场导入失败。最终 rr 才被 clamp 到非负。
@@ -75,7 +81,7 @@ export const playerScoreboardRowSchema = z.object({
     mapControl: z.number(),
     clutch: z.number(),
     objective: z.number(),
-    utility: z.number()
+    utility: z.number(),
   }),
   /**
    * Combat context 分桶的可用性。
@@ -83,24 +89,24 @@ export const playerScoreboardRowSchema = z.object({
    * "missing" = 数据源缺失（parser 未产出），乘子已降级为 1.0，前端应显示"未启用"。
    */
   accountContextStatus: z.object({
-    buyDelta: z.enum(["available", "missing"]),
-    manState: z.enum(["available", "missing"])
-  })
+    buyDelta: z.enum(['available', 'missing']),
+    manState: z.enum(['available', 'missing']),
+  }),
 });
 
-export const accountContextAvailabilitySchema = z.enum(["available", "partial", "missing"]);
+export const accountContextAvailabilitySchema = z.enum(['available', 'partial', 'missing']);
 
 export const timelineEventSchema = z.object({
   id: z.string(),
   roundNumber: z.number().int().positive(),
   tick: z.number().int().positive(),
   timeSeconds: z.number().nonnegative(),
-  clockPhase: z.enum(["freeze", "round", "bomb", "round-end"]),
+  clockPhase: z.enum(['freeze', 'round', 'bomb', 'round-end']),
   clockSeconds: z.number().nonnegative(),
   clockLabel: z.string(),
-  type: z.enum(["kill", "bomb", "grenade", "round-end"]),
+  type: z.enum(['kill', 'bomb', 'grenade', 'round-end']),
   label: z.string(),
-  teamKey: teamKeySchema.nullable()
+  teamKey: teamKeySchema.nullable(),
 });
 
 export const economyPointSchema = z.object({
@@ -110,7 +116,7 @@ export const economyPointSchema = z.object({
   advantage: z.number().int(),
   teamAEconomy: teamEconomySchema,
   teamBEconomy: teamEconomySchema,
-  winnerTeamKey: teamKeySchema
+  winnerTeamKey: teamKeySchema,
 });
 
 export const heatmapPointSchema = z.object({
@@ -121,8 +127,8 @@ export const heatmapPointSchema = z.object({
   teamKey: teamKeySchema.nullable(),
   steamId64: z.string().nullable(),
   side: sideSchema.nullable(),
-  kind: z.enum(["kill", "death", "grenade"]),
-  grenadeType: grenadeTypeSchema.nullable()
+  kind: z.enum(['kill', 'death', 'grenade']),
+  grenadeType: grenadeTypeSchema.nullable(),
 });
 
 export const mapViewSchema = z.object({
@@ -130,15 +136,14 @@ export const mapViewSchema = z.object({
   radarImageUrl: z.string().nullable(),
   /** 双层地图（de_nuke / de_vertigo）的下层底图；单层地图为 null。 */
   lowerRadarImageUrl: z.string().nullable().optional().default(null),
-  calibrated: z.boolean()
+  calibrated: z.boolean(),
 });
 
-
 export const qaIssueSchema = z.object({
-  severity: z.enum(["info", "warning", "error"]),
+  severity: z.enum(['info', 'warning', 'error']),
   code: z.string().min(1),
   message: z.string().min(1),
-  path: z.string().optional()
+  path: z.string().optional(),
 });
 
 export const qaReportSchema = z.object({
@@ -146,19 +151,30 @@ export const qaReportSchema = z.object({
   summary: z.object({
     issueCount: z.number().int().nonnegative(),
     errorCount: z.number().int().nonnegative(),
-    warningCount: z.number().int().nonnegative()
+    warningCount: z.number().int().nonnegative(),
   }),
-  issues: z.array(qaIssueSchema)
+  issues: z.array(qaIssueSchema),
 });
 
 export type QaIssue = z.infer<typeof qaIssueSchema>;
 export type QaReport = z.infer<typeof qaReportSchema>;
 
-export const teamsViewSchema = z.object({ teamA: z.object({ name: z.string(), score: z.number() }), teamB: z.object({ name: z.string(), score: z.number() }) });
+export const teamsViewSchema = z.object({
+  teamA: z.object({ name: z.string(), score: z.number() }),
+  teamB: z.object({ name: z.string(), score: z.number() }),
+});
 export const demoViewModelSchema = z.object({
-  title: z.string(), subtitle: z.string(), map: mapViewSchema, scoreline: z.string(), teams: teamsViewSchema,
-  scoreboard: z.array(playerScoreboardRowSchema), playerRoundFacts: z.array(playerRoundFactSchema),
-  timeline: z.array(timelineEventSchema), economy: z.array(economyPointSchema), heatmap: z.array(heatmapPointSchema), qa: qaReportSchema
+  title: z.string(),
+  subtitle: z.string(),
+  map: mapViewSchema,
+  scoreline: z.string(),
+  teams: teamsViewSchema,
+  scoreboard: z.array(playerScoreboardRowSchema),
+  playerRoundFacts: z.array(playerRoundFactSchema),
+  timeline: z.array(timelineEventSchema),
+  economy: z.array(economyPointSchema),
+  heatmap: z.array(heatmapPointSchema),
+  qa: qaReportSchema,
 });
 export type DemoViewModel = z.infer<typeof demoViewModelSchema>;
 export type PlayerScoreboardRow = z.infer<typeof playerScoreboardRowSchema>;
@@ -168,9 +184,21 @@ export type EconomyPoint = z.infer<typeof economyPointSchema>;
 export type HeatmapPoint = z.infer<typeof heatmapPointSchema>;
 
 /** Minimal input for the standalone scoreboard; ratings may be unavailable. */
-export type ScoreboardTableRow = Pick<PlayerScoreboardRow,
-  "steamId64" | "name" | "teamKey" | "kills" | "deaths" | "assists" | "adr" | "kast" |
-  "headshotPercent" | "entryKills" | "tradeKills" | "awpKills" | "utilityDamage"
+export type ScoreboardTableRow = Pick<
+  PlayerScoreboardRow,
+  | 'steamId64'
+  | 'name'
+  | 'teamKey'
+  | 'kills'
+  | 'deaths'
+  | 'assists'
+  | 'adr'
+  | 'kast'
+  | 'headshotPercent'
+  | 'entryKills'
+  | 'tradeKills'
+  | 'awpKills'
+  | 'utilityDamage'
 > & { accountRR: number | null; rr: number | null };
 
 export type MapView = z.infer<typeof mapViewSchema>;

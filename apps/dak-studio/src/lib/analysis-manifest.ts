@@ -1,6 +1,6 @@
-import { PLAYER_INSIGHT_FACT_VERSION } from "@cs2dak/analytics";
-import { CORE_ANALYSIS_VERSION } from "@cs2dak/core";
-import { MAP_INTELLIGENCE_FACT_VERSION, TACTICAL_FACT_VERSION } from "@cs2dak/tactics";
+import { PLAYER_INSIGHT_FACT_VERSION } from '@cs2dak/analytics';
+import { CORE_ANALYSIS_VERSION } from '@cs2dak/core';
+import { MAP_INTELLIGENCE_FACT_VERSION, TACTICAL_FACT_VERSION } from '@cs2dak/tactics';
 
 /**
  * 分析能力的版本中枢：把 ZIP 合同、facts 存储布局和各 facts producer 分开记录。
@@ -17,7 +17,7 @@ import { MAP_INTELLIGENCE_FACT_VERSION, TACTICAL_FACT_VERSION } from "@cs2dak/ta
 
 declare const __APP_VERSION__: string;
 
-const appVersion = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "0.0.0-dev";
+const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0-dev';
 
 /** facts 行/命名空间及持久观察有效性语义版本；改变时递增。 */
 export const FACTS_STORAGE_VERSION = 7;
@@ -36,11 +36,11 @@ export const FACTS_REVISION = [
   ...Object.entries(FACTS_PRODUCER_VERSIONS)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([name, version]) => `${name}:${version}`),
-].join("|");
+].join('|');
 
 export const ANALYSIS_MANIFEST = {
   /** v3 ZIP 合同；落后 → 需要从 .dem 重新 export（cs2df）。 */
-  formatVersion: "cs2-demo-format/3.0",
+  formatVersion: 'cs2-demo-format/3.0',
   /** facts 存储与 producer revision；不一致 → 从已存 ZIP 重榨 facts 即可。 */
   factsRevision: FACTS_REVISION,
   /** 报告模板版本。 */

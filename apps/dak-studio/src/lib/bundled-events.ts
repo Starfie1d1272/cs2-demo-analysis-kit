@@ -12,7 +12,7 @@
  *   赛事仅来自 BUILTIN_EVENTS（sample）+ R2 在线清单。
  */
 
-import type { EventsManifest } from "@cs2dak/contract";
+import type { EventsManifest } from '@cs2dak/contract';
 
 interface NativeBundledEventsApi {
   bundled_events_manifest(): Promise<Record<string, unknown> | null>;
@@ -21,9 +21,10 @@ interface NativeBundledEventsApi {
 
 function nativeApi(): NativeBundledEventsApi | null {
   const api =
-    typeof window === "undefined"
+    typeof window === 'undefined'
       ? undefined
-      : (window as unknown as { pywebview?: { api?: Partial<NativeBundledEventsApi> } }).pywebview?.api;
+      : (window as unknown as { pywebview?: { api?: Partial<NativeBundledEventsApi> } }).pywebview
+          ?.api;
   return api?.bundled_events_manifest ? (api as NativeBundledEventsApi) : null;
 }
 
@@ -43,7 +44,7 @@ export async function loadBundledEventsManifest(): Promise<EventsManifest | null
   if (api) {
     try {
       const raw = await api.bundled_events_manifest();
-      if (raw && typeof raw === "object" && Array.isArray(raw.events)) {
+      if (raw && typeof raw === 'object' && Array.isArray(raw.events)) {
         return raw as unknown as EventsManifest;
       }
       return null;
@@ -52,10 +53,10 @@ export async function loadBundledEventsManifest(): Promise<EventsManifest | null
     }
   }
   try {
-    const response = await fetch("./bundled-events/manifest.json", { cache: "no-cache" });
+    const response = await fetch('./bundled-events/manifest.json', { cache: 'no-cache' });
     if (!response.ok) return null;
-    const contentType = response.headers.get("content-type") ?? "";
-    if (!contentType.includes("json")) return null;
+    const contentType = response.headers.get('content-type') ?? '';
+    if (!contentType.includes('json')) return null;
     return (await response.json()) as EventsManifest;
   } catch {
     return null;

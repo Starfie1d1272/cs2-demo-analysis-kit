@@ -1,4 +1,4 @@
-import type { TeamComparisonModel } from "@cs2dak/presentation";
+import type { TeamComparisonModel } from '@cs2dak/presentation';
 
 /**
  * 队伍对比（赛前侦察）：选 A/B 两队 → 各自跨全部己方比赛的状态对比。
@@ -7,7 +7,7 @@ import type { TeamComparisonModel } from "@cs2dak/presentation";
 export function TeamComparisonPanel({
   model,
   onSelectPair,
-  onOpenMatch
+  onOpenMatch,
 }: {
   model: TeamComparisonModel;
   /** 选定 A/B 两队（触发重新聚合）；不传则下拉只读。 */
@@ -18,8 +18,8 @@ export function TeamComparisonPanel({
   if (model.availableTeams.length < 2) {
     return <div className="dak-empty">至少需要两个队伍的比赛才能生成对比。</div>;
   }
-  const selectedA = model.teams[0]?.teamKey ?? model.teams[0]?.teamName ?? "";
-  const selectedB = model.teams[1]?.teamKey ?? model.teams[1]?.teamName ?? "";
+  const selectedA = model.teams[0]?.teamKey ?? model.teams[0]?.teamName ?? '';
+  const selectedB = model.teams[1]?.teamKey ?? model.teams[1]?.teamName ?? '';
 
   const picker = (
     <div className="dak-team-picker">
@@ -59,10 +59,10 @@ export function TeamComparisonPanel({
           {model.radar.map((row) => (
             <div key={row.metric} className="dak-team-radar-row">
               <span>{row.label}</span>
-              <b>{row.a == null ? "—" : row.a}</b>
+              <b>{row.a == null ? '—' : row.a}</b>
               <i />
-              <b>{row.b == null ? "—" : row.b}</b>
-              <em>{row.delta == null ? "—" : row.delta > 0 ? `+${row.delta}` : row.delta}</em>
+              <b>{row.b == null ? '—' : row.b}</b>
+              <em>{row.delta == null ? '—' : row.delta > 0 ? `+${row.delta}` : row.delta}</em>
             </div>
           ))}
         </section>
@@ -77,10 +77,10 @@ function TeamSelect({
   teams,
   exclude,
   disabled,
-  onChange
+  onChange,
 }: {
   value: string;
-  teams: TeamComparisonModel["availableTeams"];
+  teams: TeamComparisonModel['availableTeams'];
   exclude: string;
   disabled?: boolean;
   onChange: (next: string) => void;
@@ -94,7 +94,11 @@ function TeamSelect({
       aria-label="选择对比队伍"
     >
       {teams.map((team) => (
-        <option key={team.key ?? team.name} value={team.key ?? team.name} disabled={(team.key ?? team.name) === exclude}>
+        <option
+          key={team.key ?? team.name}
+          value={team.key ?? team.name}
+          disabled={(team.key ?? team.name) === exclude}
+        >
           {team.label ?? team.name}（{team.matches} 场）
         </option>
       ))}
@@ -104,9 +108,9 @@ function TeamSelect({
 
 function TeamSide({
   side,
-  onOpenMatch
+  onOpenMatch,
 }: {
-  side: TeamComparisonModel["teams"][number];
+  side: TeamComparisonModel['teams'][number];
   onOpenMatch?: (matchId: string) => void;
 }) {
   return (
@@ -116,7 +120,14 @@ function TeamSide({
       </h3>
       <table>
         <thead>
-          <tr><th>选手</th><th>RR</th><th>ADR</th><th>KAST</th><th>KPR</th><th>DPR</th></tr>
+          <tr>
+            <th>选手</th>
+            <th>RR</th>
+            <th>ADR</th>
+            <th>KAST</th>
+            <th>KPR</th>
+            <th>DPR</th>
+          </tr>
         </thead>
         <tbody>
           {side.players.slice(0, 8).map((row) => (
@@ -133,12 +144,18 @@ function TeamSide({
       </table>
       <div className="dak-team-weapons">
         {side.weaponPreference.slice(0, 5).map((weapon) => (
-          <span key={weapon.weapon}>{weapon.label}<b>{weapon.sharePercent.toFixed(1)}%</b></span>
+          <span key={weapon.weapon}>
+            {weapon.label}
+            <b>{weapon.sharePercent.toFixed(1)}%</b>
+          </span>
         ))}
       </div>
       <div className="dak-team-economy">
         {side.economyWinRate.map((row) => (
-          <span key={row.economyType}>{row.economyType}<b>{row.winRatePercent == null ? "—" : `${row.winRatePercent.toFixed(1)}%`}</b></span>
+          <span key={row.economyType}>
+            {row.economyType}
+            <b>{row.winRatePercent == null ? '—' : `${row.winRatePercent.toFixed(1)}%`}</b>
+          </span>
         ))}
       </div>
       {side.matches.length > 0 && (
@@ -152,9 +169,13 @@ function TeamSide({
               onClick={() => onOpenMatch?.(match.matchId)}
               title={`${match.mapName} · vs ${match.opponent} · ${match.roundsWon}-${match.roundsLost}`}
             >
-              <span className={match.won ? "dak-team-match-win" : "dak-team-match-loss"}>{match.won ? "胜" : "负"}</span>
+              <span className={match.won ? 'dak-team-match-win' : 'dak-team-match-loss'}>
+                {match.won ? '胜' : '负'}
+              </span>
               <span className="dak-team-match-opp">vs {match.opponent}</span>
-              <small>{match.mapName} · {match.roundsWon}-{match.roundsLost}</small>
+              <small>
+                {match.mapName} · {match.roundsWon}-{match.roundsLost}
+              </small>
             </button>
           ))}
         </div>
@@ -164,5 +185,5 @@ function TeamSide({
 }
 
 function fmt(value: number | null): string {
-  return value == null ? "—" : value.toFixed(value >= 10 ? 1 : 2);
+  return value == null ? '—' : value.toFixed(value >= 10 ? 1 : 2);
 }

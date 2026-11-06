@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
-import { buildPlayerRoundPerformanceFacts } from "@cs2dak/core";
-import { buildRatingSpatialContext } from "@cs2dak/pipeline";
+import { buildPlayerRoundPerformanceFacts } from '@cs2dak/core';
+import { buildRatingSpatialContext } from '@cs2dak/pipeline';
 /**
  * freeze-pro-baseline — 从一批职业 demo 的 v3 ZIP 冻结固定职业基准曲线参数。
  *
@@ -25,18 +25,18 @@ import { buildRatingSpatialContext } from "@cs2dak/pipeline";
  * 用法：
  *   pnpm exec tsx scripts/freeze-pro-baseline.ts <zip-dir> --out <baseline.json> [--version <tag>]
  */
-import { readFile, readdir, mkdir, writeFile } from "node:fs/promises";
-import { dirname, extname, join, parse } from "node:path";
-import { deriveRRIndicators, deriveRRSignals } from "@cs2dak/analytics";
-import { computeAccountRatings } from "@cs2dak/rating";
-import { loadDemoPackageFromZip } from "@cs2dak/demo-io";
+import { readFile, readdir, mkdir, writeFile } from 'node:fs/promises';
+import { dirname, extname, join, parse } from 'node:path';
+import { deriveRRIndicators, deriveRRSignals } from '@cs2dak/analytics';
+import { computeAccountRatings } from '@cs2dak/rating';
+import { loadDemoPackageFromZip } from '@cs2dak/demo-io';
 import {
   computeRR,
   hltv2BaselineWeightsV1,
   rrSixAccountWeightsV1,
-  RR_ACCOUNTS
-} from "@cs2dak/rating";
-import type { RRAccountKey, RRSixAccountWeights } from "@cs2dak/rating";
+  RR_ACCOUNTS,
+} from '@cs2dak/rating';
+import type { RRAccountKey, RRSixAccountWeights } from '@cs2dak/rating';
 
 const ACCOUNTS = RR_ACCOUNTS;
 type Account = RRAccountKey;
@@ -81,22 +81,29 @@ function skewness(xs: number[]): number {
 async function main() {
   const [zipDir, ...rest] = process.argv.slice(2);
   if (!zipDir) {
-    console.error("usage: freeze-pro-baseline.ts <zip-dir> --out <baseline.json> [--version <tag>]");
+    console.error(
+      'usage: freeze-pro-baseline.ts <zip-dir> --out <baseline.json> [--version <tag>]',
+    );
     process.exit(1);
   }
-  const outIdx = rest.indexOf("--out");
-  const outPath = outIdx >= 0 ? rest[outIdx + 1] : "rr-v2-pro-baseline-v0.json";
-  const verIdx = rest.indexOf("--version");
-  const version = verIdx >= 0 ? rest[verIdx + 1] : "pro_baseline_cs2_2026H1_v0_provisional";
+  const outIdx = rest.indexOf('--out');
+  const outPath = outIdx >= 0 ? rest[outIdx + 1] : 'rr-v2-pro-baseline-v0.json';
+  const verIdx = rest.indexOf('--version');
+  const version = verIdx >= 0 ? rest[verIdx + 1] : 'pro_baseline_cs2_2026H1_v0_provisional';
 
   const weights = rrSixAccountWeightsV1 as unknown as RRSixAccountWeights;
   const w = weights.accountWeights;
 
-  const zipNames = (await readdir(zipDir)).filter((n) => extname(n).toLowerCase() === ".zip").sort();
+  const zipNames = (await readdir(zipDir))
+    .filter((n) => extname(n).toLowerCase() === '.zip')
+    .sort();
   if (zipNames.length === 0) throw new Error(`No .zip in ${zipDir}`);
 
   // ── 采集每个 player-map 的 raw 账户 + rrV1 ──────────────────────────────
-  const raw = Object.fromEntries(ACCOUNTS.map((account) => [account, []])) as Record<Account, number[]>;
+  const raw = Object.fromEntries(ACCOUNTS.map((account) => [account, []])) as Record<
+    Account,
+    number[]
+  >;
   const rrV1: number[] = [];
   const mapsByName = new Map<string, number>();
 
@@ -106,8 +113,10 @@ async function main() {
     const signals = deriveRRSignals(pkg, facts, buildRatingSpatialContext(pkg));
     const ratings = computeAccountRatings(signals);
     const indicators = deriveRRIndicators(pkg, facts);
-    const rrBySt = new Map(indicators.map((row) => [row.steamId64, computeRR(row, hltv2BaselineWeightsV1 as never).rr]));
-    const mapName = parse(name).name.split("_").slice(0, 3).join("_"); // date_de_map
+    const rrBySt = new Map(
+      indicators.map((row) => [row.steamId64, computeRR(row, hltv2BaselineWeightsV1 as never).rr]),
+    );
+    const mapName = parse(name).name.split('_').slice(0, 3).join('_'); // date_de_map
     mapsByName.set(mapName, (mapsByName.get(mapName) ?? 0) + 1);
     for (const { signals, rr } of ratings) {
       const v1 = rrBySt.get(signals.steamId64);
@@ -119,8 +128,10 @@ async function main() {
   const n = rrV1.length;
 
   // ── 冻结 standardize 参数 + 残差化斜率 ─────────────────────────────────
-  const params: Record<Account, { mean: number; std: number; slope: number; skew: number; percentiles: number[] }> =
-    {} as never;
+  const params: Record<
+    Account,
+    { mean: number; std: number; slope: number; skew: number; percentiles: number[] }
+  > = {} as never;
   const z: Record<Account, number[]> = {} as never;
   for (const a of ACCOUNTS) {
     const m = mean(raw[a]);
@@ -132,7 +143,7 @@ async function main() {
   }
   const zc = z.combat;
   for (const a of ACCOUNTS) {
-    if (a === "combat") continue;
+    if (a === 'combat') continue;
     params[a].slope = corr(z[a], zc); // 两者标准化 → corr = 残差化斜率
   }
 
@@ -140,13 +151,13 @@ async function main() {
   const used: Record<Account, number[]> = {} as never;
   used.combat = zc;
   for (const a of ACCOUNTS) {
-    if (a === "combat") continue;
+    if (a === 'combat') continue;
     const sl = params[a].slope;
     const denom = Math.sqrt(Math.max(1e-9, 1 - sl * sl));
     used[a] = z[a].map((v, i) => (v - sl * zc[i]) / denom);
   }
   const composite = Array.from({ length: n }, (_, i) =>
-    ACCOUNTS.reduce((s, a) => s + w[a] * used[a][i], 0)
+    ACCOUNTS.reduce((s, a) => s + w[a] * used[a][i], 0),
   );
   const targetStd = pstd(rrV1);
   const scale = pstd(composite) > 1e-9 ? targetStd / pstd(composite) : 0;
@@ -159,13 +170,16 @@ async function main() {
   const baseline = {
     version,
     generatedAt: new Date().toISOString(),
-    note: "PROVISIONAL v0 — 24 张职业 map / " + n + " player-map 行；仅供 R0 接口工程验证，非权威职业标尺。扩到 100–200 张后出 v1。",
+    note:
+      'PROVISIONAL v0 — 24 张职业 map / ' +
+      n +
+      ' player-map 行；仅供 R0 接口工程验证，非权威职业标尺。扩到 100–200 张后出 v1。',
     source: {
       maps: zipNames.length,
       playerMapRows: n,
       mapCoverage: Object.fromEntries([...mapsByName.entries()].sort()),
       weightsVersion: weights.version,
-      rrV1WeightsVersion: (hltv2BaselineWeightsV1 as { version: string }).version
+      rrV1WeightsVersion: (hltv2BaselineWeightsV1 as { version: string }).version,
     },
     accountWeights: w,
     clamp: weights.clamp,
@@ -173,21 +187,23 @@ async function main() {
     targetStd,
     anchor: 1.0,
     accounts: params,
-    selfCheck: { frozenMean: selfMean, frozenStd: selfStd, targetStd }
+    selfCheck: { frozenMean: selfMean, frozenStd: selfStd, targetStd },
   };
 
   await mkdir(dirname(outPath), { recursive: true });
-  await writeFile(outPath, JSON.stringify(baseline, null, 2) + "\n", "utf-8");
+  await writeFile(outPath, JSON.stringify(baseline, null, 2) + '\n', 'utf-8');
 
   // ── 报告 ────────────────────────────────────────────────────────────────
   console.log(`maps=${zipNames.length}  player-map rows=${n}`);
   console.log(`scale=${scale.toFixed(4)}  targetStd=${targetStd.toFixed(4)}`);
-  console.log(`self-check  frozenMean=${selfMean.toFixed(4)} (期望≈1.0)  frozenStd=${selfStd.toFixed(4)} (期望≈${targetStd.toFixed(4)})`);
-  console.log("\n账户 raw 分布 + 残差化斜率 + 偏度：");
+  console.log(
+    `self-check  frozenMean=${selfMean.toFixed(4)} (期望≈1.0)  frozenStd=${selfStd.toFixed(4)} (期望≈${targetStd.toFixed(4)})`,
+  );
+  console.log('\n账户 raw 分布 + 残差化斜率 + 偏度：');
   for (const a of ACCOUNTS) {
     const p = params[a];
     console.log(
-      `  ${a.padEnd(9)} mean=${p.mean.toFixed(4)} std=${p.std.toFixed(4)} slope(vs combat)=${p.slope.toFixed(3)} skew=${p.skew.toFixed(2)}`
+      `  ${a.padEnd(9)} mean=${p.mean.toFixed(4)} std=${p.std.toFixed(4)} slope(vs combat)=${p.slope.toFixed(3)} skew=${p.skew.toFixed(2)}`,
     );
   }
   console.log(`\nwrote ${outPath}`);

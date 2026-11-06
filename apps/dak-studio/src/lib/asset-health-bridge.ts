@@ -5,10 +5,10 @@
  * AssetHealthBanner（自动提醒）和 AssetsPanel（手动管理）共用。
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
 
 export interface AssetStatus {
-  status: "ok" | "not_installed" | "incomplete" | "corrupt";
+  status: 'ok' | 'not_installed' | 'incomplete' | 'corrupt';
   noManifest?: boolean;
   /** 清单来源："local"（已写入本地）| "remote"（R2 拉取）| "none"（不可用） */
   manifestSource?: string;
@@ -40,8 +40,8 @@ export interface NativeAssetApi {
 /** 仅 pywebview 桌面环境可用（同步检查，可能 bridge 尚未 ready）。 */
 export function supportsAssetHealth(): boolean {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const api = typeof window === "undefined" ? undefined : (window as any).pywebview?.api;
-  return typeof api?.check_assets === "function";
+  const api = typeof window === 'undefined' ? undefined : (window as any).pywebview?.api;
+  return typeof api?.check_assets === 'function';
 }
 
 /**
@@ -66,14 +66,16 @@ export function useAssetHealthAvailable(): boolean {
       if (tries < 40) setTimeout(tick, 250);
     };
     tick();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [available]);
   return available;
 }
 
 function getApi(): NativeAssetApi | null {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const api = typeof window === "undefined" ? undefined : (window as any).pywebview?.api;
+  const api = typeof window === 'undefined' ? undefined : (window as any).pywebview?.api;
   return api?.check_assets ? (api as NativeAssetApi) : null;
 }
 
@@ -90,7 +92,7 @@ export async function checkAssets(deep = false): Promise<AssetStatus | null> {
 
 /** 批量修复 + 自动轮询。返回最终 job 或 null。onTick 每 800ms 回调进度。 */
 export async function repairAssets(
-  items: Array<{ type: "event" | "tri"; slug?: string; mapName?: string }>,
+  items: Array<{ type: 'event' | 'tri'; slug?: string; mapName?: string }>,
   onTick?: (job: RepairJob) => void,
 ): Promise<RepairJob | null> {
   const api = getApi();
@@ -100,9 +102,13 @@ export async function repairAssets(
     const poll = setInterval(async () => {
       try {
         const job = await api.asset_repair_status(jobId);
-        if (!job) { clearInterval(poll); resolve(null); return; }
+        if (!job) {
+          clearInterval(poll);
+          resolve(null);
+          return;
+        }
         onTick?.(job);
-        if (job.state === "done" || job.state === "error") {
+        if (job.state === 'done' || job.state === 'error') {
           clearInterval(poll);
           resolve(job);
         }

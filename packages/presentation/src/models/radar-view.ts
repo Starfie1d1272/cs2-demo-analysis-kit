@@ -1,13 +1,10 @@
 export type RadarFieldBaseView =
-  | "ctVis" | "tVis"
-  | "ctAim" | "tAim"
-  | "ctPres" | "tPres"
-  | "ctSound" | "tSound";
+  'ctVis' | 'tVis' | 'ctAim' | 'tAim' | 'ctPres' | 'tPres' | 'ctSound' | 'tSound';
 
 /** Counts and geometry needed to compose a radar frame; calculation metadata stays with the producer. */
 export interface RadarFieldView {
   scope: {
-    kind: "league" | "team";
+    kind: 'league' | 'team';
     team: string | null;
     roundCount: number;
   };
