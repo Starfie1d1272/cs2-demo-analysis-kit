@@ -18,7 +18,7 @@
 - **Chrome 浏览器**（只要还能正常上 HLTV 就行）
 - **终端**（macOS 自带 Terminal；Windows 用 **Git Bash** 或 **WSL**）
 - **一个 HLTV 账号**（已经在 Chrome 里登录过，过了一次 Cloudflare 验证就行）
-- 本仓库 clone 到本地，依赖已装（`pnpm install`、`uv sync`）
+- 本仓库 clone 到本地，依赖已装（`pnpm install --frozen-lockfile`、`uv sync`）
 
 > **Windows 用户注意**：Chrome 和 Node 在 Windows 上都正常跑，但管线的最后一步——`event-export.sh` 当前是 bash 脚本，
 > 需要用 **Git Bash** 或 **WSL** 来跑。如果都没有，只跑"下载 + BP 提取"两步也行（把 .rar 和 bp 文本交给 macOS 侧出包）。
