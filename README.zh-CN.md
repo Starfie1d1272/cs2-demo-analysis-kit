@@ -80,7 +80,7 @@ v3 ZIP 是 Python 与 TypeScript 之间唯一的接缝。输入、事实、评�
 ## 开发
 
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
 pnpm dev:studio        # DAK Studio（端口 5178，.dem 导入走本地 uv 环境）
 pnpm dev               # pnpm dev:studio 的别名
 pnpm test              # 快速 Vitest 测试（排除 *.integration.test.ts）

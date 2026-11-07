@@ -99,7 +99,7 @@ For raw DemoPackage input, use `pipeline.analyzeMatchWorkspace(input, options?)`
 ## Develop
 
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
 pnpm typecheck         # builds compiled workspace packages and checks types
 pnpm dev:studio        # DAK Studio (port 5178, .dem import via local uv env)
 pnpm dev               # alias for pnpm dev:studio
