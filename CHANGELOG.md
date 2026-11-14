@@ -4,6 +4,17 @@ DAK Studio、RivalHub Demo Uploader 及 `@cs2dak/*` 分析管道面向用户的�
 
 > 0.1.3 起面向 Studio 用户维护。`@cs2dak/*` npm 包版本由 changesets 独立管理（见各包的 CHANGELOG.md）；本文件聚焦 DAK Studio 桌面应用变更。
 
+## [0.8.10] — 2026-11-15
+
+### 修复
+
+- **完美平台 Demo 解析**：将 demoparser2 升级并固定为 0.42.2，修复 2026 年 11 月新 Demo 读取回合和击杀事件时的 `EntityNotFound`，恢复选手与回合数据导出，避免上传器因此提交空数据被拒绝。
+
+### 内部与维护
+
+- **依赖安全更新**：更新 Zod、Vite 与 launch-editor 安全补丁及相关锁定依赖。
+- **依赖维护与检查**：修复 Dependabot 更新锁文件受阻的问题，保留日常与 CI 冻结安装；统一源码格式并加入格式与基础 lint 检查。
+
 ## [0.8.9] — 2026-11-03
 
 ### 新增
