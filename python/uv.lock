@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.12"
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'win32'",
@@ -108,6 +108,7 @@ version = "0.8.9"
 source = { editable = "." }
 dependencies = [
     { name = "cs2df" },
+    { name = "demoparser2" },
     { name = "typer" },
     { name = "urllib3" },
 ]
@@ -127,6 +128,7 @@ gui = [
 [package.metadata]
 requires-dist = [
     { name = "cs2df", specifier = ">=3.1.0" },
+    { name = "demoparser2", specifier = "==0.42.2" },
     { name = "pyinstaller", marker = "extra == 'build'", specifier = ">=6.22.3" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.1.1" },
     { name = "pywebview", marker = "extra == 'gui'", specifier = ">=6.2.1" },
@@ -154,7 +156,7 @@ wheels = [
 
 [[package]]
 name = "demoparser2"
-version = "0.42.0"
+version = "0.42.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
@@ -164,24 +166,24 @@ dependencies = [
     { name = "tqdm" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/87/41/bd7eef19380be1f06d1ca924c08fe2ab9d3f6c68b6e762aae84b10457ba5/demoparser2-0.42.0-cp312-cp312-macosx_10_12_x86_64.whl", hash = "sha256:fb6fb7bd8ab7d49ac9a8b3f4eb08436f6a917cfb2dc5af4fd26138cc0729a153", size = 4127019, upload-time = "2026-08-08T15:36:23.822Z" },
-    { url = "https://files.pythonhosted.org/packages/43/20/a964629083098e463837677aa342bbf56d52a1e37060654820761fb98a0d/demoparser2-0.42.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:b13077541c30aead994127a114a434f32c5ab62ad901c1ff42e11fc29ccdffaa", size = 3817242, upload-time = "2026-08-08T15:39:40.63Z" },
-    { url = "https://files.pythonhosted.org/packages/ff/9b/107ac2267177a0a62aa45eb85b701f9f5e32bde19e331872b7a93aea5a0c/demoparser2-0.42.0-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:74436ea78765a3e61f36c50a92e1539abf976940f66f07552093a2a307a2bf05", size = 3993452, upload-time = "2026-08-08T15:29:57.337Z" },
-    { url = "https://files.pythonhosted.org/packages/a7/e4/5c6aba828d3e67db32676cadc1c9e230a96e8407be836285b898d0d5d01f/demoparser2-0.42.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:63bae3c3c45fe2c30d408699d41f87fa3a286633b12f81ecf57cea09c2a135a1", size = 4356773, upload-time = "2026-08-08T15:29:28.322Z" },
-    { url = "https://files.pythonhosted.org/packages/23/eb/e761a6bedd4b7deb5a69774b2519a56dbac1a227aba6f4fe8125a3fbb83e/demoparser2-0.42.0-cp312-cp312-win32.whl", hash = "sha256:f4a04f0b095550554eb16e68e00c7008d8189f47e9d29ce91a863c48042f7f16", size = 4035803, upload-time = "2026-08-08T15:41:11.894Z" },
-    { url = "https://files.pythonhosted.org/packages/37/89/577e67ee3692f4322f8bcb50be65cffccc788fd1407f6561eeaf459886a2/demoparser2-0.42.0-cp312-cp312-win_amd64.whl", hash = "sha256:81b489396f32e9d9084aae2e4bf9887ea2be9db4b91781b6cb3a77722fbc8f19", size = 4580290, upload-time = "2026-08-08T15:33:01.659Z" },
-    { url = "https://files.pythonhosted.org/packages/61/d6/c2008f2b1dd991919cced281ece3125926406ae737c7badd00320c9cac87/demoparser2-0.42.0-cp313-cp313-macosx_10_12_x86_64.whl", hash = "sha256:3931ae561fd7b77f31f21cafd8d4905a8447741538d5b05134ead88d9c082a34", size = 4127044, upload-time = "2026-08-08T15:28:42.958Z" },
-    { url = "https://files.pythonhosted.org/packages/e4/df/53da0f4c68814c724638cccda57ecb300fe810a07af7cea78361d2c26372/demoparser2-0.42.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:1204262603afd003a2589d4d2e6a85b47e9360b8d6fadbefe6d8f45aab787f8e", size = 3816997, upload-time = "2026-08-08T15:40:57.65Z" },
-    { url = "https://files.pythonhosted.org/packages/2a/40/62b771893d1aee0f795aec4c26ebaef0457a40609b1a4a0591adfe298c74/demoparser2-0.42.0-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:8e0196aaf2faff5afd64a61373d5193fd7766ccaf2ddd9b00c5f6a8b1c8c8702", size = 3993333, upload-time = "2026-08-08T15:38:39.702Z" },
-    { url = "https://files.pythonhosted.org/packages/68/3c/d1b63c525229d500dfb5f2d1f7605da3142844770e6244d9da1752109dae/demoparser2-0.42.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:cb4e9a7ec5869af085ac81828150f0bf2fe2f06bb07dd23409600ed2b1f3edd9", size = 4357002, upload-time = "2026-08-08T15:29:39.341Z" },
-    { url = "https://files.pythonhosted.org/packages/41/c2/6a8d7a23d8d66c7a167532d8cd0fe02bbe9335b7f64013ea265c67240720/demoparser2-0.42.0-cp313-cp313-win32.whl", hash = "sha256:d05234925bbf742a13a5ccb99aa9af0b03d9c2b795130189a01157fedcd7867b", size = 4036444, upload-time = "2026-08-08T15:39:23.78Z" },
-    { url = "https://files.pythonhosted.org/packages/f6/5d/996c78e1f1332a6722088dab9f33c9e354e413c04006bb81f2b137d63cc2/demoparser2-0.42.0-cp313-cp313-win_amd64.whl", hash = "sha256:2df147197bb51d495281bc3286f971978715d87442473f35f8bdd694d2ec8ddf", size = 4579758, upload-time = "2026-08-08T15:33:10.084Z" },
-    { url = "https://files.pythonhosted.org/packages/ad/c9/7261fa6a9027b94537e874d42a1a9b3e6b3fa20a74d4e50dbbd1bfdfdf54/demoparser2-0.42.0-cp314-cp314-macosx_10_12_x86_64.whl", hash = "sha256:5756972105e1760c5752e96fa8a520d7c07b5393031af1951a7b3815d2bf278c", size = 4126972, upload-time = "2026-08-08T15:39:09.168Z" },
-    { url = "https://files.pythonhosted.org/packages/77/25/b94b455bf62854bffeea56e2d593ad02d54707dbf87ce433f18b0ea12cf9/demoparser2-0.42.0-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:d5bf46b1ec7a396236ba9b3533f1148ab9b7379399a8e17b5efe469ffff49557", size = 3841676, upload-time = "2026-08-08T15:35:46.463Z" },
-    { url = "https://files.pythonhosted.org/packages/46/c5/674257569758eaea570888e26fdc43267b5e82471934f06718fc8e9e9aaf/demoparser2-0.42.0-cp314-cp314-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:6da9052cb331a26e162b20fec252ad4094eda3cb4bd0694a029ec089508bf6fd", size = 3993790, upload-time = "2026-08-08T15:29:49.384Z" },
-    { url = "https://files.pythonhosted.org/packages/d6/84/2a13be6b44f2aaa0861d17278ccaed850c286f52185e76f72c2259e5516b/demoparser2-0.42.0-cp314-cp314-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4db59e532183ab91530e0f2c13336214ba39cb4a5f1facac1cda6ff224c3e5f8", size = 4357337, upload-time = "2026-08-08T15:28:47.918Z" },
-    { url = "https://files.pythonhosted.org/packages/d0/5b/2510a334af19ec0a1ecba2317a6153b256cc9e0ea9335390e27462529324/demoparser2-0.42.0-cp314-cp314-win32.whl", hash = "sha256:d5d149c8c7586dcef95e7015fd273f77986318a77d3f1c9886ab09b103935b09", size = 4037067, upload-time = "2026-08-08T15:38:03.508Z" },
-    { url = "https://files.pythonhosted.org/packages/3a/e5/9354595446a9af18c5637670f69b8a5619a4c368848ae9ae6fc4162a1234/demoparser2-0.42.0-cp314-cp314-win_amd64.whl", hash = "sha256:2f88f39600bd5c793606db229d6534b59017d9f9ae2da90c6e732ad79e3ba002", size = 4580988, upload-time = "2026-08-08T15:41:59.258Z" },
+    { url = "https://files.pythonhosted.org/packages/9a/ed/239a2e20e32eda1ebd57c9929131caed7e22fec0615add0ff179aa3c11b2/demoparser2-0.42.2-cp312-cp312-macosx_10_12_x86_64.whl", hash = "sha256:e87d458a9022331b98f93a0634e04cd1939cb1af8916cd24e29a65ee042d360b", size = 4157819, upload-time = "2026-11-12T14:44:44.707Z" },
+    { url = "https://files.pythonhosted.org/packages/f1/36/fd1df47857e268d137b68bb4cf2c6c3c994e31ed5e82ffac871a0d9c7063/demoparser2-0.42.2-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:d3c921884c6c50491e2a2942081c715b27fddd33789bf81262763a8762890845", size = 3873735, upload-time = "2026-11-12T14:48:31.65Z" },
+    { url = "https://files.pythonhosted.org/packages/f0/6e/82ba3960c3b6b3ade2047a10f77bf864d010b5faf130180737cf7d0d34e1/demoparser2-0.42.2-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:1067d112072869e4fda055d58813af9522feaf64a87cb8aa6c2bd949bb8345c4", size = 4045485, upload-time = "2026-11-12T14:34:28.562Z" },
+    { url = "https://files.pythonhosted.org/packages/15/18/8dcf751424ccf1473debca32af1f303feffcf9f143a1b95a92f94a7ad34e/demoparser2-0.42.2-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:20ec9d21daf51c6d634cf544b931fedff584dcc8d0173405c1fc07015abe6bca", size = 4404681, upload-time = "2026-11-12T14:33:06.738Z" },
+    { url = "https://files.pythonhosted.org/packages/1b/3a/8026a7732e903510fb287cc1fff2c636f46cfa301cef498daed2751727b1/demoparser2-0.42.2-cp312-cp312-win32.whl", hash = "sha256:ab9d4055e4f456bb44c9bd3c5105e96189247cbe6142746d472b64f1b80bcc88", size = 4056121, upload-time = "2026-11-12T14:32:52.52Z" },
+    { url = "https://files.pythonhosted.org/packages/66/de/9a4b4c6401845ce141404fc07581b181f02a8f0aaf253dcba400ab4f25f0/demoparser2-0.42.2-cp312-cp312-win_amd64.whl", hash = "sha256:42a066226f000ed7d0a117722acda3d5de42635aa0e3b730fc74475e959afdae", size = 4624894, upload-time = "2026-11-12T14:32:22.606Z" },
+    { url = "https://files.pythonhosted.org/packages/2c/b1/e72dfac017f73bee4943b457ac289e630053ae966b80209d2c4091af6af2/demoparser2-0.42.2-cp313-cp313-macosx_10_12_x86_64.whl", hash = "sha256:ed4ae11b0d76a5ad22f9587cee4e9d0e32aced4186cf665314b8fc1f0043bbd5", size = 4158133, upload-time = "2026-11-12T15:04:56.04Z" },
+    { url = "https://files.pythonhosted.org/packages/16/17/da9256722bbc42e6391dd0dbe680658e4c47a443a9ec0970df2dd349759c/demoparser2-0.42.2-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:3b3800dfb28e49538e1122b68760061d378e3ab1d4a45b3a9fee05a7f3eae030", size = 3874001, upload-time = "2026-11-12T14:43:44.762Z" },
+    { url = "https://files.pythonhosted.org/packages/f5/ad/07a2780ebfaa4c0a481ab76a612e6e0908d7793c518b79c7ea37353ce701/demoparser2-0.42.2-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:b163e5dc591cafa5419b676baffe40a4718712650eca8af6f8c69a1a5842fdd9", size = 4045521, upload-time = "2026-11-12T14:30:06.735Z" },
+    { url = "https://files.pythonhosted.org/packages/52/9a/021ce5e3df7e7d712b73159b8336f62350dcf508559653201b8c971d291a/demoparser2-0.42.2-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:757a3ad8174c6137325f65b5e035cb066d609364ab10706942060f2075fa0df7", size = 4404088, upload-time = "2026-11-12T14:28:41.502Z" },
+    { url = "https://files.pythonhosted.org/packages/8b/e5/f271c8e062a6691429c8c21ec9109d429e4707a4db56aa127598405dba58/demoparser2-0.42.2-cp313-cp313-win32.whl", hash = "sha256:f3bd6287ca3125762d043fc4ee9ba12f8abb821a69dfd78cf0efd6c930e382a9", size = 4056041, upload-time = "2026-11-12T14:37:07.054Z" },
+    { url = "https://files.pythonhosted.org/packages/89/9a/ea0035fe88372919c788f7a79a82d36ac1e8d79b6fefbbd8a0e647136531/demoparser2-0.42.2-cp313-cp313-win_amd64.whl", hash = "sha256:bf553070c72dc992d9c0e5a3961864ae0ba66920402e07c6de99f3325ec0b406", size = 4624865, upload-time = "2026-11-12T14:32:30.132Z" },
+    { url = "https://files.pythonhosted.org/packages/71/d0/c2c2ab86e7383bbc4ac73f10d102cfa47c0ece1d4f5ebf84ab94c4dd8883/demoparser2-0.42.2-cp314-cp314-macosx_10_12_x86_64.whl", hash = "sha256:28c1ed70117f083c000655408eabb246465bc194a3b1ade4d994f6338a9f5ddb", size = 4157899, upload-time = "2026-11-12T14:55:02.502Z" },
+    { url = "https://files.pythonhosted.org/packages/5c/58/9cc76b777eed5bef10faf1be93d4b48abca556d0c0b27e6b3b6832648fa5/demoparser2-0.42.2-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:cc66af677feaf5be1920d0f4556cd92aa86224f2b6cfb91dcaf3171aca6c07d5", size = 3874204, upload-time = "2026-11-12T15:03:30.71Z" },
+    { url = "https://files.pythonhosted.org/packages/85/7c/3519f5f0e5892154527347dc375bae83df0efd77cfa7e7bfe67106a8ee85/demoparser2-0.42.2-cp314-cp314-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:0b8cd6ec29862f3609cb9921d5bae2072a3fd3a7ec1a773708e6713dec45a3a6", size = 4045409, upload-time = "2026-11-12T14:29:53.664Z" },
+    { url = "https://files.pythonhosted.org/packages/1c/66/65714f5ea1e317f66526bd1b38bbae555f637dca81ed77ff3eafadf368f7/demoparser2-0.42.2-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:1d87ab96cdcdc58b4ca899a1d64abe4fdb846a79ed4f9c62a4c5f630cd15f510", size = 4405360, upload-time = "2026-11-12T14:34:08.714Z" },
+    { url = "https://files.pythonhosted.org/packages/2c/48/a53aeb38c3bc1839361a16f3bbdea75a83c60b96e0dfeb3ee3fbcc9fb3c8/demoparser2-0.42.2-cp314-cp314-win32.whl", hash = "sha256:6db4aaf2445ce6bf0b89f00e8a5fcd7403c37cd05248a2601de5e70bf05237ec", size = 4054507, upload-time = "2026-11-12T14:32:53.644Z" },
+    { url = "https://files.pythonhosted.org/packages/fd/f3/a4379d80be591b924e686f135838cd660a2b87a971691ac965e0f020fd71/demoparser2-0.42.2-cp314-cp314-win_amd64.whl", hash = "sha256:3e9183c6c9aefebd538145d37ef6e76b6e39c735823e4101123bbd60f56e287f", size = 4626314, upload-time = "2026-11-12T14:32:40.885Z" },
 ]
 
 [[package]]
