@@ -4,6 +4,12 @@ DAK Studio、RivalHub Demo Uploader 及 `@cs2dak/*` 分析管道面向用户的�
 
 > 0.1.3 起面向 Studio 用户维护。`@cs2dak/*` npm 包版本由 changesets 独立管理（见各包的 CHANGELOG.md）；本文件聚焦 DAK Studio 桌面应用变更。
 
+## [0.8.11] — 2026-11-26
+
+### 修复
+
+- **Demo 回合重开和回档**：上传器与 Studio 导出完美平台等赛事 Demo 时保留最终计分的回合，排除被作废尝试的事件，避免因回合缺号或事件时间错位而拒绝上传。
+
 ## [0.8.10] — 2026-11-15
 
 ### 修复
