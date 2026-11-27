@@ -6,7 +6,7 @@ param(
 $ErrorActionPreference = 'Stop'
 if ($Version -notmatch '^\d+\.\d+\.\d+$') { throw 'Expected a numeric desktop version' }
 $PayloadDir = (Resolve-Path $PayloadDir).Path
-if (!(Test-Path "$PayloadDir/rivalhub-demo-uploader.exe") -or !(Test-Path "$PayloadDir/_internal/python312.dll")) {
+if (!(Test-Path "$PayloadDir/rivalhub-demo-uploader.exe") -or !(Test-Path "$PayloadDir/_internal/python314.dll")) {
     throw 'Complete Windows PyInstaller onedir payload required'
 }
 New-Item -ItemType Directory -Force $OutputDir | Out-Null
