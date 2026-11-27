@@ -82,7 +82,7 @@ jobs:
       - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
         with:
           enable-cache: true
-          python-version: "3.12"
+          python-version: "3.14"
       - run: pnpm install --frozen-lockfile
       - name: Package Apple Silicon candidate
         shell: bash
@@ -148,7 +148,7 @@ jobs:
       - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
         with:
           enable-cache: true
-          python-version: "3.12"
+          python-version: "3.14"
       - run: pnpm install --frozen-lockfile
       - name: Package Windows candidate runtime
         shell: bash

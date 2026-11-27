@@ -382,8 +382,8 @@ importers:
         version: 4.6.7
     devDependencies:
       cs2-demo-format:
-        specifier: 3.1.0
-        version: 3.1.0(zod@4.6.7)
+        specifier: 4.0.0
+        version: 4.0.0(zod@4.6.7)
 
   packages/core:
     dependencies:
@@ -1155,10 +1155,10 @@ packages:
   core-util-is@1.0.3:
     resolution: {integrity: sha512-ZQBvi1DcpJ4GDqanjucZ2Hj3wEO5pZDS89BWbkcrvdxksJorwUDDZamX9ldFkp9aw2lmBDLgkObEA4DWNJ9FYQ==}
 
-  cs2-demo-format@3.1.0:
-    resolution: {integrity: sha512-o998DZl5slsTPYea4hUdJ/S6b2TE4joIuslO8E2X7k+Dazd63guf1o2EftGlZb2CD2uzn2sILLM4tIAreNgu6w==}
+  cs2-demo-format@4.0.0:
+    resolution: {integrity: sha512-ENn87+lsBbHD21K4xO4P7BPD5o08rnuTOWcfGLw6ARwktTfkxTFOFURv6WhUBTZ/Js0p2n11bLbNz1kST3YiwA==}
     peerDependencies:
-      zod: '>=3.0.0'
+      zod: '>=4.6.6 <5'
 
   csstype@3.2.3:
     resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
@@ -1967,7 +1967,7 @@ snapshots:
 
   core-util-is@1.0.3: {}
 
-  cs2-demo-format@3.1.0(zod@4.6.7):
+  cs2-demo-format@4.0.0(zod@4.6.7):
     dependencies:
       jszip: 3.10.2
       zod: 4.6.7

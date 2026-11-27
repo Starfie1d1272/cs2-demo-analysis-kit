@@ -74,7 +74,7 @@ for ($launch = 1; $launch -le 2; $launch++) {
         $window = [Windows.Automation.AutomationElement]::FromHandle($process.MainWindowHandle)
         $condition = New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::NameProperty, '导出诊断日志')
         $button = $null
-        for ($attempt = 0; $attempt -lt 30; $attempt++) {
+        for ($attempt = 0; $attempt -lt 60; $attempt++) {
             if (![UploaderMessages]::Responsive($process.MainWindowHandle)) { throw 'Native UI became unresponsive before bridge ready' }
             $button = $window.FindFirst([Windows.Automation.TreeScope]::Descendants, $condition)
             if ($button -and $button.Current.IsEnabled) { break }

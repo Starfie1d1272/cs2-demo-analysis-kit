@@ -7,9 +7,9 @@ cd "$(dirname "$0")/.."
 export UV_FROZEN=true
 if [[ "$OSTYPE" == msys* || "$OSTYPE" == cygwin* ]]; then
   export UV_MANAGED_PYTHON=true
-  uv python install 3.12.15 --no-bin --no-registry
+  uv python install 3.14.4 --no-bin --no-registry
   export UV_PYTHON
-  UV_PYTHON="$(uv python find --managed-python 3.12.15)"
+  UV_PYTHON="$(uv python find --managed-python 3.14.4)"
 fi
 pnpm build:uploader
 python3 - <<'PY'

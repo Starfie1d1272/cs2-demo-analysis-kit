@@ -43,7 +43,7 @@ Run-Setup $Installer $foreign $false -DefaultLog
 if ((Get-Content "$foreign/keep.txt") -ne 'foreign data') { throw 'Foreign file changed' }
 Run-Setup $Installer $target -DefaultLog
 $exe = Join-Path $target 'rivalhub-demo-uploader.exe'
-$dll = Join-Path $target '_internal/python312.dll'
+$dll = Join-Path $target '_internal/python314.dll'
 if (!(Test-Path $dll)) { throw 'Missing onedir DLL' }
 # WScript's shortcut reader may return ANSI paths on an English worker. Read IShellLinkW.
 Add-Type @'

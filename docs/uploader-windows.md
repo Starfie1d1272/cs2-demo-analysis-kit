@@ -10,7 +10,7 @@
 | 项目 | 随包 / 检测 | 操作 |
 |---|---|---|
 | 原生 Windows x64、Windows 10 1809+ / Windows 11 | 安装器平台限制 | ARM64 和更早系统未验收 |
-| Python 3.12、VC/UCRT 与原生扩展 | PyInstaller 完整 onedir 随包 | 无需安装 Python；损坏时重运行安装器 |
+| Python 3.14、VC/UCRT 与原生扩展 | PyInstaller 完整 onedir 随包 | 无需安装 Python；损坏时重运行安装器 |
 | pythonnet / clr-loader 桥接 DLL | 随包 | 桥接 DLL 不包含完整 .NET 运行时 |
 | .NET Framework 4.7.2+ | 安装和启动读注册表 Release >= 461808 | [微软 .NET Framework 4.8 安装/修复](https://dotnet.microsoft.com/en-us/download/dotnet-framework/net48)；现代 .NET SDK/Runtime 不能替代它 |
 | Microsoft Edge WebView2 Evergreen Runtime | 检测用户/机器官方 `pv` 注册表值 | [微软下载页](https://developer.microsoft.com/en-us/microsoft-edge/webview2/#download-section)，选择 Evergreen Standalone Installer x64；安装 Edge 浏览器不等同于 Runtime |
@@ -81,7 +81,7 @@ DAK Studio 的资料库维护区也提供诊断日志导出。以上能力仅说
 
 启动异常提示日志位置；先保存日志和报错全文，再根据明确缺失提示从官方修复运行库。
 重运行安装器可修复应用文件，但不保证解决未知机器上的 CLR 故障。
-PyInstaller 在 Python 启动前就找不到 `python312.dll` 时，应用代码尚未执行，无法创建应用日志，
+PyInstaller 在 Python 启动前就找不到对应版本的 `python314.dll` 时，应用代码尚未执行，无法创建应用日志，
 需同时保存系统弹窗和目录结构。已打开后未响应时，保留现场并记录版本、进程/线程、任务管理器
 状态和日志；关闭进程会丢失挂起现场。该空启动挂起已由后续本机线程证据定位为公开 window 引用导致的桥接反射死锁，
 最小源码修复和独立回归在 PR #73；该修复已合入 main。详情见
@@ -89,7 +89,7 @@ PyInstaller 在 Python 启动前就找不到 `python312.dll` 时，应用代码�
 
 ## 构建与验收
 
-Windows 上传器使用 uv-managed Python 3.12.15；`scripts/package-uploader.sh` 固定运行库并在
+Windows 上传器使用 uv-managed Python 3.14.4；`scripts/package-uploader.sh` 固定运行库并在
 打包前检查 OpenSSL 3.5+ / TLS 1.3。**Uploader Windows** 验证 workflow 使用相同版本，升级时一并更新。
 使用该入口构建的 Release、候选安装器和 ZIP 均包含此运行库；用户无需另装 Python。
 HTTPS 由原生桥内的 urllib3 会话连接池持有，沿用默认 TLS 协商、系统信任链和主机名验证。
