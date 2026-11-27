@@ -4,6 +4,16 @@ DAK Studio、RivalHub Demo Uploader 及 `@cs2dak/*` 分析管道面向用户的�
 
 > 0.1.3 起面向 Studio 用户维护。`@cs2dak/*` npm 包版本由 changesets 独立管理（见各包的 CHANGELOG.md）；本文件聚焦 DAK Studio 桌面应用变更。
 
+## [0.8.12] — 2026-11-28
+
+### 变更
+
+- **cs2df 4.0.0 与 Python 3.14**：将内置 `cs2df` 导出器与合同依赖升级至 `4.0.0`（保持 `cs2-demo-format/3.0` 契约并兼容既有 `3.x` 导出 ZIP），并将桌面应用与 Windows 上传器运行环境升级至 Python `3.14.4`，同步更新安装器、动态运行库诊断及文档。
+
+### 内部与维护
+
+- **CI 工作流整理**：将 `astral-sh/setup-uv` 升级至 `10.4.0`，并移除旧版独立 Windows 上传器启动工作流。
+
 ## [0.8.11] — 2026-11-26
 
 ### 修复
