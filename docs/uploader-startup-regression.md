@@ -23,11 +23,11 @@ EXE SHA-256：`09c86d08cbfebb7c26f1cccfefeb9ee91a705d383c825bc4019e1c2b50d8ed64`
 - `test_uploader_webview_bridge.py` 驱动真实生产 main 的窗口绑定和当前 pywebview 的反射
   代码，只替换 native backend / JS 执行环境；证明不会读取原生 getter、保留前端 API 和
   文件打开/日志保存取消语义。这是无 GUI 回归，不是 Windows 实机证据。
-- **Uploader Windows startup** workflow 从源码构建完整 PyInstaller onedir ZIP，连续两次
-  启动新的空 LOCALAPPDATA。外部 Win32 `WM_NULL` 测消息响应，UI Automation 检查前端
-  导出日志按钮 enabled（该按钮受 14-method bridge-ready 合同控制），再实际打开原生
+- **Uploader Windows** workflow 从源码构建完整 PyInstaller onedir、安装 EXE 和完整 ZIP，
+  连续两次启动新的空 LOCALAPPDATA。外部 Win32 `WM_NULL` 测消息响应，UI Automation 检查
+  前端导出日志按钮 enabled（该按钮受 14-method bridge-ready 合同控制），再实际打开原生
   保存对话框、取消并正常关闭。保存 JSON 结果和该测试用户目录的应用日志。
-- artifact：`uploader-startup-windows-review`。它来自 PR commit，沿用 main 的桌面版本号，
+- artifact：`uploader-windows-review`。它来自 PR commit，沿用 main 的桌面版本号，
   不是历史官方 ZIP，也不创建 tag、Release 或 R2 发布。
 
 Windows CI 结果须以对应 run 的成功状态和 JSON 为准，测试实现本身不代表通过。

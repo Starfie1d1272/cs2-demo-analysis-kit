@@ -1,4 +1,4 @@
-name: Uploader Windows installer
+name: Uploader Windows
 on:
   pull_request:
     paths:
@@ -7,14 +7,24 @@ on:
       - 'apps/rivalhub-uploader/**'
       - 'packages/rivalhub-upload/**'
       - 'scripts/*uploader*'
+      - 'scripts/check-package-boundaries.mjs'
+      - 'scripts/package-boundaries.test.mjs'
+      - 'scripts/lib/package-files.mjs'
+      - 'scripts/lib/package-imports.mjs'
       - 'pnpm-lock.yaml'
   workflow_dispatch:
+    inputs:
+      live_network_smoke:
+        description: Verify public production HTTPS and reject an empty pairing poll (no writes)
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
-  installer:
+  uploader:
+    name: Startup smoke and installer
     runs-on: windows-latest
-    timeout-minutes: 12
+    timeout-minutes: 15
     env:
       UV_MANAGED_PYTHON: 'true'
     steps:
@@ -29,9 +39,30 @@ jobs:
           python-version: '3.12.15'
           enable-cache: true
       - run: pnpm install --frozen-lockfile
+      - name: Check dependency boundaries on Windows
+        run: pnpm check:package-boundaries
+      - name: Legacy first-hop manifest and safe native capability
+        run: node --test scripts/legacy-update-first-hop.test.mjs
+      - name: Real pywebview reflection regression
+        shell: bash
+        run: |
+          cd python
+          uv sync --frozen --extra dev --extra gui --extra build
+          uv run --frozen pytest
+      - name: Verify uploader transport against the current RivalHub server
+        if: github.event_name == 'workflow_dispatch' && inputs.live_network_smoke
+        shell: bash
+        run: |
+          cd python
+          uv run --frozen python ../scripts/smoke-uploader-network.py --output "$RUNNER_TEMP/uploader-startup-evidence/network.json"
       - name: Build complete uploader and installer
         shell: bash
+        env:
+          UV_FROZEN: 'true'
         run: bash scripts/package-uploader.sh
+      - name: Frozen empty startup, message response, bridge ready, save dialog and cancel (twice)
+        shell: powershell
+        run: ./scripts/smoke-uploader-windows.ps1 -Exe "$pwd/python/dist/rivalhub-demo-uploader/rivalhub-demo-uploader.exe" -EvidenceDir "$env:RUNNER_TEMP/uploader-startup-evidence"
       - name: Build upgrade fixture and verify isolated installation
         shell: pwsh
         run: |
@@ -48,6 +79,7 @@ jobs:
           path: |
             python/dist/RivalHub-Demo-Uploader-Setup-*.exe
             python/dist/rivalhub-demo-uploader-windows-*.zip
+            ${{ runner.temp }}/uploader-startup-evidence/**
             ${{ runner.temp }}/Uploader 安装 验证/*.log
             ${{ runner.temp }}/Uploader 安装 验证/startup/**
             ${{ runner.temp }}/Uploader 安装 验证/*.json

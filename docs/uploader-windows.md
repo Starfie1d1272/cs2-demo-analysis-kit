@@ -90,7 +90,7 @@ PyInstaller 在 Python 启动前就找不到 `python312.dll` 时，应用代码�
 ## 构建与验收
 
 Windows 上传器使用 uv-managed Python 3.12.15；`scripts/package-uploader.sh` 固定运行库并在
-打包前检查 OpenSSL 3.5+ / TLS 1.3。两个 Windows 验证 workflow 使用相同版本，升级时一并更新。
+打包前检查 OpenSSL 3.5+ / TLS 1.3。**Uploader Windows** 验证 workflow 使用相同版本，升级时一并更新。
 使用该入口构建的 Release、候选安装器和 ZIP 均包含此运行库；用户无需另装 Python。
 HTTPS 由原生桥内的 urllib3 会话连接池持有，沿用默认 TLS 协商、系统信任链和主机名验证。
 保留 urllib 的系统/环境代理发现、绕过规则及代理认证；变更网站或代理后关闭旧连接池。
@@ -100,7 +100,7 @@ HTTPS 由原生桥内的 urllib3 会话连接池持有，沿用默认 TLS 协商
 这些值限制 socket 等待，不代表包含排队、DNS 和整个响应读取在内的总耗时上限。
 启动日志记录实际 Python/OpenSSL 版本及 TLS 1.3 支持，便于核对安装包和连接故障。
 
-**Uploader Windows startup** 的手动 dispatch 可启用 `live_network_smoke`：对正式域名对照
+**Uploader Windows** 的手动 dispatch 可启用 `live_network_smoke`：对正式域名对照
 默认 urllib、TLS 1.2 和 TLS 1.3，并由真实 `UploaderApi` 发送缺少必需字段的 pairing poll，
 要求版本接口返回 200、空 poll 返回 422 VALIDATION_FAILED。它不建立授权、不提交 Demo、
 不写业务数据。报告保存在该 run artifact 的 `network.json`。本地可在 `python/` 中执行
@@ -113,7 +113,7 @@ Windows 安装 Inno Setup 6.4+（[官方](https://jrsoftware.org/isdl.php)），
 bash scripts/package-uploader.sh
 ```
 
-产物在 `python/dist/`：安装 EXE + 完整 ZIP。PR 的 **Uploader Windows installer** workflow
+产物在 `python/dist/`：安装 EXE + 完整 ZIP。PR 的 **Uploader Windows** workflow
 只构建并保存 Actions artifact，不创建 Release、不推 tag、不上传 R2。用
 `uploader-windows-review` artifact 的当前版本安装器验收；较高版本 CI fixture 只用于安装版本
 升级规则检查，不代表另一个真实应用版本。PR 审阅构建沿用 main 的桌面版本号，
