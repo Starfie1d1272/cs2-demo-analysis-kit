@@ -10,4 +10,4 @@ workspace 不设置全局 `frozenLockfile`，让依赖更新工具能正常生�
 
 验证安装稳定性：保存锁文件 SHA-256，连续执行冻结安装与日常 `pnpm exec` / `pnpm run`，确认哈希不变。需要新增、移除或升级依赖时重新生成锁文件；冻结安装不承担版本更新。
 
-`infra/event-upload-worker` 不属于根 workspace，独立运行 `npm ci`，由 npm 自动生成其 `package-lock.json`。Python 使用 `uv lock --upgrade` 有意升级，再用 `uv sync --locked --all-extras` 安装；锁文件自动生成。Python 最低版本为 3.12。云环境可用绝对路径 `DAK_STUDIO_DATA_DIR` 指定 Studio userdata，避免依赖可写 home；未设置时沿用默认平台目录。
+`infra/event-upload-worker` 不属于根 workspace，独立运行 `npm ci`，由 npm 自动生成其 `package-lock.json`。Python 使用 `uv lock --upgrade` 有意升级，再用 `uv sync --locked --all-extras` 安装；锁文件自动生成。Python 最低版本为 3.14。云环境可用绝对路径 `DAK_STUDIO_DATA_DIR` 指定 Studio userdata，避免依赖可写 home；未设置时沿用默认平台目录。

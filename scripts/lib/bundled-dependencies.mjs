@@ -2,18 +2,18 @@
 // Pin build inputs; publish generated runtime and declarations from their registry bytes.
 export const bundledDependencies = {
   'cs2-demo-format': {
-    version: '3.1.0',
+    version: '4.0.0',
     file: 'cs2-demo-format.js',
     license: 'cs2-demo-format.LICENSE',
     licenseSha256: 'b0aa7086ca919451b7ec7e7ef8b2f4b4de354770bda77e1e830b734aa9798def',
-    tarball: 'https://registry.npmjs.org/cs2-demo-format/-/cs2-demo-format-3.1.0.tgz',
+    tarball: 'https://registry.npmjs.org/cs2-demo-format/-/cs2-demo-format-4.0.0.tgz',
     integrity:
-      'sha512-o998DZl5slsTPYea4hUdJ/S6b2TE4joIuslO8E2X7k+Dazd63guf1o2EftGlZb2CD2uzn2sILLM4tIAreNgu6w==',
+      'sha512-ENn87+lsBbHD21K4xO4P7BPD5o08rnuTOWcfGLw6ARwktTfkxTFOFURv6WhUBTZ/Js0p2n11bLbNz1kST3YiwA==',
     licenseSource:
-      'https://github.com/Starfie1d1272/cs2-demo-format/blob/aea485d8163e1b0caa729157cf2f137159a94ff0/LICENSE',
+      'https://github.com/Starfie1d1272/cs2-demo-format/blob/7de35da7453bcd26d9d75071d366718afa58996a/LICENSE',
     sourceHashes: {
-      'parser/index.ts': 'be454cb7fd24560aa8daf97523d01473978a2e94340dcce67d79a73633b87ddb',
-      'schemas/index.ts': '10191d8cf14ddb5b089a9ed2598bcddc2e05f464ddc5898c6e24a04c46c1c1af',
+      'parser/index.ts': '3287662fb51fab63619673a1e3f9b03a52f89d78418635ec981a8be0d85c8415',
+      'schemas/index.ts': '1e65737fa33b91ecacae8481da8e89a947e1fc1fa3cba2b232bdd7cc1784f4b9',
     },
   },
   '@rivalhub/rival-rating': {
