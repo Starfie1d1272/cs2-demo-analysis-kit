@@ -105,7 +105,7 @@ def log_environment(logger: logging.Logger):
     root = Path(getattr(sys, "_MEIPASS", Path(__file__).parent))
     logger.info("runtime root=%s PYTHONNET_RUNTIME=%s", root, os.environ.get("PYTHONNET_RUNTIME"))
     if getattr(sys, "frozen", False):
-        for name in ("python312.dll", "Python.Runtime.dll", "ClrLoader.dll", "netstandard.dll"):
+        for name in ("python314.dll", "Python.Runtime.dll", "ClrLoader.dll", "netstandard.dll"):
             try:
                 files = list(root.rglob(name))
             except OSError:
