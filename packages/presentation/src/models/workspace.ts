@@ -314,7 +314,7 @@ export const workspaceReplaySchema = z.object({
 
 export const matchWorkspaceModelSchema = z.object({
   version: z.literal('cs2-demo-analysis-kit/workspace-0.2'),
-  sourceSchemaVersion: z.literal('cs2-demo-format/3.0'),
+  sourceSchemaVersion: z.enum(['cs2-demo-format/3.0', 'cs2-demo-format/3.1']),
   title: z.string(),
   subtitle: z.string(),
   scoreline: z.string(),

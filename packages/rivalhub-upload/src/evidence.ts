@@ -17,6 +17,16 @@ import { buildTournamentAnalytics } from '@cs2dak/tournament';
 import type { RivalHubRemoteMap, RivalHubRemotePlayer, RivalHubRemoteTeam } from './contract';
 import { resolveRivalHubEventRoster } from './match';
 
+const RIVALHUB_EVIDENCE_V1_OBJECTIVE_TYPES = new Set<string>([
+  'plant_begin',
+  'planted',
+  'defuse_begin',
+  'defused',
+  'exploded',
+  'dropped',
+  'picked_up',
+]);
+
 export type RivalHubEvidenceTarget = {
   seasonId: string;
   stageKey: string;
@@ -683,13 +693,15 @@ export function buildRivalHubDemoEvidenceV1(
         weapon: row.weapon,
         headshot: row.headshot,
       })),
-      objectives: pkg.bombs.map((row) => ({
-        roundSeq: roundSeq.get(row.roundNumber)!,
-        tick: row.tick,
-        type: row.type,
-        site: row.site,
-        actorSteamId64: mappedSteam(pkg, identities, row.actorIndex),
-      })),
+      objectives: pkg.bombs
+        .filter((row) => RIVALHUB_EVIDENCE_V1_OBJECTIVE_TYPES.has(row.type))
+        .map((row) => ({
+          roundSeq: roundSeq.get(row.roundNumber)!,
+          tick: row.tick,
+          type: row.type,
+          site: row.site,
+          actorSteamId64: mappedSteam(pkg, identities, row.actorIndex),
+        })),
     },
     semanticFacts: {
       playerRounds,

@@ -25,13 +25,14 @@ pnpm python:test          # 原生桥 / 凭据 / 安全更新（dev + gui extras
 
 # 分析
 pnpm analyze:sample       # CLI 分析 fixtures/input/cologne-major-2026-stage3-smoke-de_nuke.zip → fixtures/output/sample/
-# 导出使用 cs2df CLI（无需本仓库 Python 壳）：
-#   cs2df export <demo.dem>                              # 单场
-#   cs2df export-batch <dir> --out bundle.zip --descriptive  # 批量
+# 导出使用原生 cs2df v5.0.0 CLI（无需本仓库 Python 壳）：
+#   cs2df export <demo.dem> -o <out.zip>     # 单场
+#   cs2df export-batch <dir> --descriptive   # 批量
+#   cs2df validate --strict <out.zip>        # 严格校验
 
 # 导出
-cs2df export <demo.dem>          # 导出单场 .dem → v3 ZIP（cs2df CLI）
-cs2df export-batch <dir> --out bundle.zip  # 批量导出
+cs2df export <demo.dem> -o <out.zip>         # 导出单场 .dem → cs2-demo-format/3.1 ZIP
+cs2df export-batch <dir> --descriptive       # 批量导出
 
 # GUI
 bash scripts/package.sh          # 打包桌面应用（DAK Studio + PyInstaller）
@@ -109,8 +110,8 @@ docs/                  # 架构与集成文档（索引见 docs/README.md）
 
 详细架构见 `docs/architecture.md`。分发架构见 `docs/design/distribution.md`。
 
-> **已迁移**：cs2-demo-format 3.1.0 / cs2df 3.1.0（2026-06）。TS 管线全部使用 v3 合同，
-> Python exporter 切换为 PyPI `cs2df`（本仓库只留 Studio 桌面壳）。
+> **已迁移**：cs2-demo-format v5.0.0（原生 Rust `cs2df v5.0.0`）。TS 管线同时兼容读取
+> `cs2-demo-format/3.0` 与 `3.1`；桌面壳与上传器通过 `cs2df_runner` 调用原生 `cs2df` 二进制。
 > v3 迁移与 fixture 重导均已完成（归档见 `docs/archive/2026-06/v3-migration.md`）。
 > Studio 当前入口见 [`apps/dak-studio/README.md`](apps/dak-studio/README.md)，旧设计仅作历史参考。
 
@@ -183,7 +184,7 @@ docs/                  # 架构与集成文档（索引见 docs/README.md）
 
 - **WKWebView sandbox 警告**：macOS 上非 `.app` bundle 运行 GUI 时，WKWebView 会在 stderr 输出沙盒目录创建失败。无害，PyInstaller 打包后自动消失
 - **ruff 路径**：`ruff` 不在全局 PATH，用 `uv run ruff check <path>` 跑 lint
-- **cs2df 导出**：`uv run cs2df export` 直接导出 v3 ZIP（无需本仓库 Python 壳）。DAK Studio 需要 `uv sync --extra gui` 装 pywebview
+- **cs2df 导出**：直接使用原生 `cs2df v5.0.0`（`CS2DF_BIN` 或 `PATH`）导出 `cs2-demo-format/3.1` ZIP（DAK 同时兼容 `3.0` 与 `3.1`）。DAK Studio 需要 `uv sync --extra gui` 装 pywebview
 - **`.tri` 碰撞几何**：反应时间/预瞄的 LOS 口径需要 awpy `.tri`（`uvx awpy get tris`，~30MB/图，不进 git）。Node 端从 `~/.awpy/tris` 读（`AWPY_TRIS_DIR` 可覆盖）；Studio 浏览器端 fetch `tris/{map}.tri`——开发环境放/链到 `apps/dak-studio/public/tris/`，打包时 `scripts/package.sh` 自动从 `~/.awpy/tris` 拷入安装包。缺失只降级不报错
 - **cwd 敏感**：pnpm 命令只在 workspace root 有效，不要在 `python/` 子目录下跑
 - **dist 被 gitignore**：`apps/dak-studio/dist/` 与包构建产物不提交，CI 或本地需先构建

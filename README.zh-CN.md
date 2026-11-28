@@ -11,7 +11,7 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/Starfie1d1272/cs2-demo-analysis-kit/ci.yml?label=ci)](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/actions)
 [![Release](https://img.shields.io/github/v/release/Starfie1d1272/cs2-demo-analysis-kit?label=release)](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT%20%2F%20AGPL--3.0-blue)](#许可证)
-[![Format](https://img.shields.io/badge/cs2--demo--format-3.x-success)](https://pypi.org/project/cs2df/)
+[![Format](https://img.shields.io/badge/cs2--demo--format-3.x-success)](https://github.com/Starfie1d1272/cs2-demo-format)
 
 </div>
 
@@ -19,7 +19,7 @@
 
 **DAK Studio** 是一个桌面工作台，把 CS2 的 `.dem` 变成完整的分析会话：单场复盘与 2D 回放、选手和队伍分析、战术材料与训练流程。一切都在你本机运行与保存——无账号、不上传、无服务端。
 
-本仓库同时是支撑 Studio 的**产品中立管道**：一组 `@cs2dak/*` 包，把 `cs2-demo-format/3.x` ZIP 转成可复用的分析结果与 View Model，供 Studio 以及 RivalHub、CS2 Insight Agent 等产品消费。
+本仓库同时是支撑 Studio 的**产品中立管道**：一组 `@cs2dak/*` 包，把 `cs2-demo-format/3.0` 或 `3.1` ZIP 转成可复用的分析结果与 View Model，供 Studio 以及 RivalHub、CS2 Insight Agent 等产品消费。
 
 > **Query-first，拒绝黑盒。** Studio 里每一个数字都能点回具体的比赛、回合与 tick，并在 2D 回放里亲眼复核。我们透明地派生信号，绝不给出一个你无法追溯的评分。
 
@@ -91,12 +91,13 @@ pnpm analyze:sample    # CLI 分析示例 ZIP → fixtures/output/sample/
 bash scripts/package.sh  # 打包桌面应用（DMG / exe）
 ```
 
-Demo 导出直接用 `cs2df` CLI：
+Demo 导出直接使用原生 `cs2df` `v5.0.0` 二进制（[GitHub Releases](https://github.com/Starfie1d1272/cs2-demo-format/releases/tag/v5.0.0)）：
 
 ```bash
-cd python && uv sync --extra gui     # 装 pywebview（GUI/Studio 桥需要）
-uv run cs2df export <demo.dem>       # 单场 .dem → v3 ZIP
-uv run cs2df export-batch <dir> --out bundle.zip --descriptive
+cs2df export <demo.dem> -o <out.zip>       # 单场 .dem → cs2-demo-format/3.1 ZIP
+cs2df export-batch <dir> --descriptive     # 批量导出（输出到 <dir>/*.zip）
+cs2df validate --strict <out.zip>          # 严格校验 ZIP 合同
+cd python && uv sync --extra gui           # 装 pywebview（GUI/Studio 桥需要）
 ```
 
 ## 消费者与边界

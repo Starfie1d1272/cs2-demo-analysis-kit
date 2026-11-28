@@ -22,6 +22,48 @@ SRC="${3:?需要 .rar 或 .dem 路径}"
 PREFIX="${4:-}"
 COMPRESS_LEVEL="${5:-9}"  # cs2df 内部 ZIP 压缩等级，默认 9（最高）；event-export.mjs 由 spec.export.compressLevel 透传
 
+verify_cs2df_version() {
+  local ver
+  ver="$("$CS2DF_BIN" --version 2>&1 || true)"
+  case "$ver" in
+    *" 5."*|5.*) return 0 ;;
+    *)
+      echo "错误：需要 cs2df 5.x 原生二进制，当前为：${ver:-unknown} ($CS2DF_BIN)" >&2
+      exit 1
+      ;;
+  esac
+}
+
+resolve_cs2df() {
+  if [ -n "${CS2DF_BIN:-}" ]; then
+    if [ -x "$CS2DF_BIN" ] || command -v "$CS2DF_BIN" >/dev/null 2>&1; then
+      verify_cs2df_version
+      return 0
+    fi
+    echo "错误：CS2DF_BIN 不可执行：$CS2DF_BIN" >&2
+    exit 1
+  fi
+  if command -v cs2df >/dev/null 2>&1; then
+    CS2DF_BIN="$(command -v cs2df)"
+    verify_cs2df_version
+    return 0
+  fi
+  cat >&2 <<'EOF'
+错误：未找到原生 cs2df v5.0.0 二进制（已检查 CS2DF_BIN 与 PATH）。
+请从 GitHub Releases 下载对应平台产物并加入 PATH 或设置 CS2DF_BIN：
+  https://github.com/Starfie1d1272/cs2-demo-format/releases/tag/v5.0.0
+  - macOS (Apple Silicon): cs2df-v5.0.0-aarch64-apple-darwin.tar.gz
+  - Linux (x86_64):        cs2df-v5.0.0-x86_64-unknown-linux-gnu.tar.gz
+  - Windows (x86_64):      cs2df-v5.0.0-x86_64-pc-windows-msvc.zip
+示例：
+  gh release download v5.0.0 -R Starfie1d1272/cs2-demo-format -p 'cs2df-v5.0.0-*.tar.gz'
+  export CS2DF_BIN=/path/to/cs2df
+EOF
+  exit 1
+}
+
+resolve_cs2df
+
 # outRoot 相对路径按仓库根解析
 case "$OUTROOT_ARG" in
   /*) OUTDIR="$OUTROOT_ARG/$STAGE" ;;
@@ -62,7 +104,7 @@ do_export() {
   write_date "$name" "$@"
   if [ -f "$out" ]; then echo "  · 跳过（已存在）：$STAGE/$name.zip"; return; fi
   if [ "$#" -gt 1 ]; then echo "  → 合并 $# 段 → $STAGE/$name.zip"; else echo "  → 导出 → $STAGE/$name.zip"; fi
-  uv run --project "$REPO/python" cs2df export "$@" -o "$out" --research --compress-level "$COMPRESS_LEVEL"
+  "$CS2DF_BIN" export "$@" -o "$out" --research --compress-level "$COMPRESS_LEVEL"
 }
 
 case "$SRC" in
@@ -82,9 +124,25 @@ case "$SRC" in
     bases="$(echo "$dems" | while IFS= read -r d; do clean_base "$d"; done | sort -u)"
     while IFS= read -r base; do
       [ -n "$base" ] || continue
-      parts="$(echo "$dems" | while IFS= read -r d; do
-        if [ "$(clean_base "$d")" = "$base" ]; then echo "$d"; fi
+      part_rows="$(echo "$dems" | while IFS= read -r d; do
+        if [ "$(clean_base "$d")" = "$base" ]; then
+          pnum="$(basename "$d" .dem | sed -nE 's/.*-p([0-9]+)$/\1/p')"
+          printf '%s\t%s\n' "${pnum:-}" "$d"
+        fi
       done)"
+      part_count="$(printf '%s\n' "$part_rows" | wc -l | tr -d ' ')"
+      if [ "$part_count" -gt 1 ]; then
+        if printf '%s\n' "$part_rows" | grep -q $'^\t'; then
+          echo "错误：$SRC 内多个 .dem 映射到 $base 但缺少 -pN 分段后缀，拒绝合并" >&2
+          exit 1
+        fi
+        unique_pnums="$(printf '%s\n' "$part_rows" | cut -f1 | sort -n -u | wc -l | tr -d ' ')"
+        if [ "$unique_pnums" -ne "$part_count" ]; then
+          echo "错误：$SRC 内 $base 存在重复的 -pN 分段编号，拒绝合并" >&2
+          exit 1
+        fi
+      fi
+      parts="$(printf '%s\n' "$part_rows" | sort -t $'\t' -k1,1n | cut -f2-)"
       # shellcheck disable=SC2086
       do_export "${PREFIX:+$PREFIX-}$base" $parts
     done <<< "$bases"

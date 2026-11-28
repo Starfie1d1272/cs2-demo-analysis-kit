@@ -35,6 +35,7 @@ from cs2dak.diagnostics import (
     safe_metadata,
     sanitize_text,
 )
+from cs2dak.cs2df_runner import export_dem_to_zip
 from cs2dak.uploader_transport import UploaderTransport
 
 SERVICE = "com.starfie1d.rivalhub-demo-uploader"
@@ -89,6 +90,8 @@ class UploaderApi:
         self._jobs: dict[str, dict] = {}
         self._lock = threading.Lock()
         self._closed = False
+        self._cancel_event = threading.Event()
+        self._export_threads: set[threading.Thread] = set()
         self._origin = ""
         self._connection_rollback = None
 
@@ -347,15 +350,20 @@ class UploaderApi:
 
     def start_export(self, key: str) -> bool:
         with self._lock:
+            if self._closed:
+                raise RuntimeError("上传器正在关闭")
             if any(job["state"] == "running" for job in self._jobs.values()):
                 raise RuntimeError("已有 Demo 正在解析，请稍候")
             self._jobs[key] = {"state": "running", "progress": 0, "stage": "正在读取 Demo"}
-        threading.Thread(target=self._export, args=(key,), daemon=True).start()
+            thread = threading.Thread(target=self._export, args=(key,), daemon=True)
+            self._export_threads.add(thread)
+            thread.start()
         return True
 
     def _export(self, key: str):
+        temp_out = Path(self._temp.name) / f"{key}.tmp"
+        final_out = Path(self._temp.name) / key
         try:
-            from cs2df.package import export_demo
 
             def progress(stage, fraction):
                 stage = sanitize_text(stage, 80)
@@ -363,19 +371,24 @@ class UploaderApi:
                 self._jobs[key].update(stage=stage, progress=fraction)
                 log.info("demo=%s export stage=%s progress=%.3f", key, stage, fraction)
 
-            data, _ = export_demo(str(self._files[key]), progress=progress)
+            export_dem_to_zip(
+                self._files[key],
+                temp_out,
+                research=False,
+                compress_level=3,
+                progress=progress,
+                cancel_event=self._cancel_event,
+            )
+            size = temp_out.stat().st_size
             with self._lock:
                 if self._closed:
+                    temp_out.unlink(missing_ok=True)
                     return
-                (Path(self._temp.name) / key).write_bytes(data)
-                self._jobs[key].update(state="done", size=len(data), progress=1)
-            log.info("demo=%s export complete bytes=%d", key, len(data))
-        except BaseException as exc:
-            # Rust parser panics inherit BaseException; retain cancellation semantics.
-            if not isinstance(exc, Exception) and not (
-                type(exc).__module__ == "pyo3_runtime" and type(exc).__name__ == "PanicException"
-            ):
-                raise
+                temp_out.replace(final_out)
+                self._jobs[key].update(state="done", size=size, progress=1)
+            log.info("demo=%s export complete bytes=%d", key, size)
+        except Exception as exc:
+            temp_out.unlink(missing_ok=True)
             failure = log_failure(log, exc, "export:" + self._jobs[key].get("stage", "parse"))
             failure.update(code="PARSE_FAILED", fileId=key)
             self._jobs[key].update(
@@ -383,6 +396,10 @@ class UploaderApi:
                 error=f"PARSE_FAILED：{failure['message']}",
                 diagnostic=safe_metadata(failure),
             )
+        finally:
+            current = threading.current_thread()
+            with self._lock:
+                self._export_threads.discard(current)
 
     def export_status(self, key: str) -> dict:
         return dict(self._jobs[key])
@@ -439,9 +456,18 @@ class UploaderApi:
 
     def close(self):
         self._transport.close()
+        self._cancel_event.set()
         with self._lock:
             self._closed = True
-            self._temp.cleanup()
+            threads = list(self._export_threads)
+        for thread in threads:
+            if thread is not threading.current_thread():
+                thread.join(timeout=15)
+        with self._lock:
+            try:
+                self._temp.cleanup()
+            except OSError:
+                pass
 
 
 def main():

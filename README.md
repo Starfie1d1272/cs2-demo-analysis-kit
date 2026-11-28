@@ -11,7 +11,7 @@ English · [简体中文](./README.zh-CN.md)
 [![CI](https://img.shields.io/github/actions/workflow/status/Starfie1d1272/cs2-demo-analysis-kit/ci.yml?label=ci)](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/actions)
 [![Release](https://img.shields.io/github/v/release/Starfie1d1272/cs2-demo-analysis-kit?label=release)](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT%20%2F%20AGPL--3.0-blue)](#license)
-[![Format](https://img.shields.io/badge/cs2--demo--format-3.x-success)](https://pypi.org/project/cs2df/)
+[![Format](https://img.shields.io/badge/cs2--demo--format-3.x-success)](https://github.com/Starfie1d1272/cs2-demo-format)
 
 </div>
 
@@ -19,7 +19,7 @@ English · [简体中文](./README.zh-CN.md)
 
 **DAK Studio** is a desktop workbench that turns a CS2 `.dem` into a full analysis session: match review and 2D replay, player and team analysis, tactical materials, and training workflows. Everything runs and stays on your machine — no account, no upload, no server.
 
-This repository is also the product-neutral pipeline **behind** Studio: a set of `@cs2dak/*` packages that take a `cs2-demo-format/3.x` ZIP and produce reusable analysis and view models, consumed by Studio and by other products such as RivalHub and CS2 Insight Agent.
+This repository is also the product-neutral pipeline **behind** Studio: a set of `@cs2dak/*` packages that take a `cs2-demo-format/3.0` or `3.1` ZIP and produce reusable analysis and view models, consumed by Studio and by other products such as RivalHub and CS2 Insight Agent.
 
 > **Query-first, no black boxes.** Every number in Studio links back to the exact match, round, and tick — and you can watch it happen in the 2D replay. We derive signals transparently; we never ship a score you can't trace.
 
@@ -110,12 +110,13 @@ pnpm analyze:sample    # CLI analysis of the sample ZIP → fixtures/output/samp
 bash scripts/package.sh  # package the desktop app (DMG / exe)
 ```
 
-Demo export uses the `cs2df` CLI directly:
+Demo export uses the native `cs2df` `v5.0.0` CLI binary ([GitHub Releases](https://github.com/Starfie1d1272/cs2-demo-format/releases/tag/v5.0.0)):
 
 ```bash
-cd python && uv sync --extra gui     # installs pywebview for the GUI/Studio bridge
-uv run cs2df export <demo.dem>       # single .dem → v3 ZIP
-uv run cs2df export-batch <dir> --out bundle.zip --descriptive
+cs2df export <demo.dem> -o <out.zip>       # single .dem → cs2-demo-format/3.1 ZIP
+cs2df export-batch <dir> --descriptive     # batch export (.zip per match in <dir>)
+cs2df validate --strict <out.zip>          # strict schema & stream validation
+cd python && uv sync --extra gui           # installs pywebview for the GUI/Studio bridge
 ```
 
 ## Consumers & boundaries

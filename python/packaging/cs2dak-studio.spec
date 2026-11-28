@@ -1,17 +1,18 @@
-# PyInstaller spec — DAK Studio 桌面应用（pywebview 壳 + exporter）。Unsigned.
+# PyInstaller spec — DAK Studio 桌面应用（pywebview 壳 + 原生 cs2df）。Unsigned.
 #
 #   pnpm --filter @cs2dak/dak-studio build  （并把 dist/ 拷到 src/cs2dak/studio_web/）
+#   node scripts/fetch-cs2df-bin.mjs
 #   uv sync --extra gui --extra build
 #   uv run pyinstaller packaging/cs2dak-studio.spec
 #
-# 一体化封装：Python cs2df 壳层与 Studio 前端（静态 SPA）打进同一个应用，
+# 一体化封装：pywebview 桌面壳、原生 cs2df 二进制与 Studio 前端（静态 SPA）打进同一个应用，
 # 运行时不需要 Node —— 前端只是 pywebview 托管的构建产物，分析在浏览器引擎里跑。
-# 推荐入口是 scripts/package.sh（会先构建前端再打包）。
+# 推荐入口是 scripts/package.sh（会先构建前端与拉取原生 cs2df 再打包）。
 
 import sys
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs, collect_submodules
+# Native cs2df binary is staged by scripts/fetch-cs2df-bin.mjs before PyInstaller.
 
 IS_WIN = sys.platform.startswith("win")
 ROOT = Path(SPECPATH).resolve()         # python/packaging/
@@ -34,45 +35,24 @@ else:
         "cp -R apps/dak-studio/dist python/src/cs2dak/studio_web"
     )
 
-binaries = []
-hiddenimports = []
+cs2df_bin = ROOT / "bin" / ("cs2df.exe" if IS_WIN else "cs2df")
+if not cs2df_bin.is_file():
+    raise SystemExit(
+        f"Native cs2df binary not found at {cs2df_bin}. "
+        "Run: node scripts/fetch-cs2df-bin.mjs"
+    )
 
-def keep_runtime_module(name: str) -> bool:
-    blocked_parts = (
-        ".tests",
-        ".testing",
-        "._testing",
-        ".bench",
-        ".benchmarks",
-        ".conftest",
-        "._pyinstaller",
-    )
-    blocked_names = (
-        "benchmark",
-        "conftest",
-        "pytest",
-        "_pytest",
-        "_test",
-        "test_",
-        "testutils",
-    )
-    return (
-        not any(part in name for part in blocked_parts)
-        and name != "cs2df.cli"
-        and not any(segment.startswith(blocked_names) for segment in name.split("."))
-        and not any(
-            segment.endswith(("_test", "_tests", "_testing"))
-            for segment in name.split(".")
+for license_name in ("LICENSE", "THIRD-PARTY-LICENSES.txt"):
+    license_file = ROOT / "bin" / license_name
+    if not license_file.is_file():
+        raise SystemExit(
+            f"Native cs2df license file not found at {license_file}. "
+            "Run: node scripts/fetch-cs2df-bin.mjs"
         )
-    )
+    datas.append((str(license_file), "bin"))
 
-for pkg in (
-    # cs2df 及其传递依赖（动态加载，静态分析易遗漏）
-    "cs2df", "pyarrow", "polars", "pandas", "numpy",
-):
-    datas += collect_data_files(pkg, include_py_files=False)
-    binaries += collect_dynamic_libs(pkg)
-    hiddenimports += collect_submodules(pkg, filter=keep_runtime_module)
+binaries = [(str(cs2df_bin), "bin")]
+hiddenimports = []
 
 # cs2dak 自身——studio.py 是入口点，但其内部惰性导入（updater 等）
 # 不在模块顶层，PyInstaller 静态分析无法追踪，需显式声明。

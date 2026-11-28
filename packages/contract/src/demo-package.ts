@@ -15,6 +15,7 @@ import {
   shotsSchema,
   replaySchema,
   duelsSchema,
+  weaponsSchema,
 } from 'cs2-demo-format';
 
 export const demoPackageSchema = z.object({
@@ -33,6 +34,7 @@ export const demoPackageSchema = z.object({
   shots: shotsSchema.optional(),
   replay: replaySchema.optional(),
   duels: duelsSchema.optional(),
+  weapons: weaponsSchema.optional(),
 });
 
 export type DemoPackage = z.infer<typeof demoPackageSchema>;

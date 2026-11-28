@@ -11,8 +11,6 @@ requires-python = ">=3.14,<3.15"
 license = { text = "MIT" }
 authors = [{ name = "Xinyu Du" }]
 dependencies = [
-    "cs2df==4.0.0",  # v3 reference exporter (Python 3.14+, trade & safe-int updates)
-    "demoparser2==0.42.2",  # 0.42.0 读不了 2026-11 完美平台 Demo 的回合事件
     "typer>=0.27.2",   # CLI (version only)
     "urllib3>=2.6,<3",
 ]

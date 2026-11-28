@@ -1,4 +1,5 @@
 """Real HTTP boundaries protect connection reuse and non-replay of writes."""
+
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from unittest.mock import Mock
@@ -60,8 +61,11 @@ def test_reuse_redirect_and_uncertain_post_are_not_replayed(server):
         with pytest.raises(urllib3.exceptions.HTTPError):
             client.request(origin, "/evidence", "POST", {"Authorization": "Bearer secret"}, b"{}")
         assert [path for path, _ in calls] == [
-            "/api/integrations/dak/pairing/poll", "/api/integrations/dak/pairing/poll",
-            "/api/integrations/dak/pairing/start", "/api/integrations/dak/evidence"]
+            "/api/integrations/dak/pairing/poll",
+            "/api/integrations/dak/pairing/poll",
+            "/api/integrations/dak/pairing/start",
+            "/api/integrations/dak/evidence",
+        ]
         assert client.request(origin, "/pairing/poll", "POST", {}, b"{}").status == 200
         assert len(connections) == 2
     finally:
@@ -71,8 +75,14 @@ def test_reuse_redirect_and_uncertain_post_are_not_replayed(server):
 
 
 def test_proxy_bypass_origin_isolation_and_operation_budgets(monkeypatch):
-    monkeypatch.setattr(transport.urllib.request, "proxy_bypass", lambda host: host == "local.example")
-    monkeypatch.setattr(transport.urllib.request, "getproxies", lambda: {"https": "http://user:p%40ss@proxy.example:80"})
+    monkeypatch.setattr(
+        transport.urllib.request, "proxy_bypass", lambda host: host == "local.example"
+    )
+    monkeypatch.setattr(
+        transport.urllib.request,
+        "getproxies",
+        lambda: {"https": "http://user:p%40ss@proxy.example:80"},
+    )
     proxy, direct = Mock(), Mock()
     proxy_factory, direct_factory = Mock(return_value=proxy), Mock(return_value=direct)
     monkeypatch.setattr(transport.urllib3, "ProxyManager", proxy_factory)

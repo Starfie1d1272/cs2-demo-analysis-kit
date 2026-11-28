@@ -2,7 +2,7 @@
 import sys
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs, collect_submodules, copy_metadata
+from PyInstaller.utils.hooks import copy_metadata
 
 IS_WIN = sys.platform.startswith("win")
 ROOT = Path(SPECPATH).resolve()         # python/packaging/
@@ -25,46 +25,24 @@ else:
         "cp -R apps/rivalhub-uploader/dist python/src/cs2dak/rivalhub_uploader_web"
     )
 
-binaries = []
-hiddenimports = []
+cs2df_bin = ROOT / "bin" / ("cs2df.exe" if IS_WIN else "cs2df")
+if not cs2df_bin.is_file():
+    raise SystemExit(
+        f"Native cs2df binary not found at {cs2df_bin}. "
+        "Run: node scripts/fetch-cs2df-bin.mjs"
+    )
 
-def keep_runtime_module(name: str) -> bool:
-    blocked_parts = (
-        ".tests",
-        ".testing",
-        "._testing",
-        ".bench",
-        ".benchmarks",
-        ".conftest",
-        "._pyinstaller",
-    )
-    blocked_names = (
-        "benchmark",
-        "conftest",
-        "pytest",
-        "_pytest",
-        "_test",
-        "test_",
-        "testutils",
-    )
-    return (
-        not any(part in name for part in blocked_parts)
-        and name != "cs2df.cli"
-        and not any(segment.startswith(blocked_names) for segment in name.split("."))
-        and not any(
-            segment.endswith(("_test", "_tests", "_testing"))
-            for segment in name.split(".")
+for license_name in ("LICENSE", "THIRD-PARTY-LICENSES.txt"):
+    license_file = ROOT / "bin" / license_name
+    if not license_file.is_file():
+        raise SystemExit(
+            f"Native cs2df license file not found at {license_file}. "
+            "Run: node scripts/fetch-cs2df-bin.mjs"
         )
-    )
+    datas.append((str(license_file), "bin"))
 
-for pkg in (
-    # demoparser2 converts native event results through pyarrow and Polars.
-    # These optional parser dependencies are required by real Demo exports.
-    "cs2df", "pandas", "numpy", "pyarrow", "polars", "_polars_runtime_32",
-):
-    datas += collect_data_files(pkg, include_py_files=False)
-    binaries += collect_dynamic_libs(pkg)
-    hiddenimports += collect_submodules(pkg, filter=keep_runtime_module)
+binaries = [(str(cs2df_bin), "bin")]
+hiddenimports = []
 
 # Runtime version for diagnostic logs.
 for package in ("cs2dak", "pywebview") + (("pythonnet", "clr-loader") if IS_WIN else ()):

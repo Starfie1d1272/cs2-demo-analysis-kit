@@ -11,6 +11,7 @@ if [[ "$OSTYPE" == msys* || "$OSTYPE" == cygwin* ]]; then
   export UV_PYTHON
   UV_PYTHON="$(uv python find --managed-python 3.14.4)"
 fi
+node scripts/fetch-cs2df-bin.mjs
 pnpm build:uploader
 python3 - <<'PY'
 from pathlib import Path

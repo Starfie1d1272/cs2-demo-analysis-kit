@@ -54,6 +54,7 @@ from cs2dak.credentials import (
     _windows_credential_set,
 )
 from cs2dak.cs2_playback import launch_demo
+from cs2dak.cs2df_runner import export_dem_to_zip
 from cs2dak.diagnostics import (
     SafeFormatter,
     export_logs,
@@ -453,22 +454,6 @@ def _setup_logging(logs_dir: Path) -> Path | None:
     return active_path
 
 
-def _stage_export_result(data: bytes) -> Path:
-    """Stage one export result on disk for bounded bridge reads."""
-    fd, raw_path = tempfile.mkstemp(prefix="dak-studio-export-", suffix=".zip")
-    path = Path(raw_path)
-    try:
-        with os.fdopen(fd, "wb") as output:
-            output.write(data)
-    except Exception:
-        try:
-            path.unlink(missing_ok=True)
-        except OSError as cleanup_exc:
-            log_failure(log, cleanup_exc, "export.cleanup")
-        raise
-    return path
-
-
 class _ExportJob:
     """One background .dem→ZIP export. Status is polled over the JS bridge
     with tiny payloads; the resulting ZIP is staged on disk and fetched in
@@ -625,6 +610,12 @@ class StudioApi:
     def __init__(self) -> None:
         self._window = None  # set in main() after window creation
         self._jobs: dict[str, _ExportJob] = {}
+        self._export_threads: set[threading.Thread] = set()
+        self._export_threads_lock = threading.Lock()
+        self._sync_exports_done = threading.Condition(self._export_threads_lock)
+        self._active_sync_exports = 0
+        self._closed = False
+        self._cancel_event = threading.Event()
         self._update_jobs: dict[str, _UpdateJob] = {}
         self._event_sessions: dict[str, dict] = {}
         self._event_download_jobs: dict[str, _UpdateJob] = {}
@@ -636,6 +627,41 @@ class StudioApi:
         self._demo_commit_handles: dict[str, list] = {}
         self._demo_commit_guard = threading.Lock()
         self._db: sqlite3.Connection | None = None
+
+    @contextmanager
+    def _track_sync_export(self):
+        with self._export_threads_lock:
+            if self._closed:
+                raise RuntimeError("DAK Studio 正在关闭")
+            self._active_sync_exports += 1
+        try:
+            yield
+        finally:
+            with self._export_threads_lock:
+                self._active_sync_exports -= 1
+                self._sync_exports_done.notify_all()
+
+    def close(self) -> None:
+        """Stop accepting exports, cancel active exports, wait, then clean up."""
+        with self._export_threads_lock:
+            self._closed = True
+            threads = list(self._export_threads)
+        self._cancel_event.set()
+        for thread in threads:
+            if thread is not threading.current_thread():
+                thread.join(timeout=15)
+        with self._export_threads_lock:
+            self._sync_exports_done.wait_for(lambda: self._active_sync_exports == 0, timeout=15)
+        for job in list(self._jobs.values()):
+            if job.result_path is not None:
+                try:
+                    job.result_path.unlink(missing_ok=True)
+                except OSError:
+                    pass
+                job.result_path = None
+                job.result_size = 0
+        for session_id in list(self._event_maker_sessions):
+            self.event_maker_cleanup(session_id)
 
     def _assets_dir(self) -> Path:
         return _assets_dir_for(self._userdata)
@@ -1434,8 +1460,6 @@ class StudioApi:
 
     def event_resource_prepare(self, session_id: str, path: str) -> dict:
         """Prepare one source demo on disk for the maker without a JS byte round-trip."""
-        from cs2df.package import export_demo
-
         source = Path(path)
         output_dir = self._event_maker_sessions.get(session_id)
         if output_dir is None:
@@ -1445,9 +1469,17 @@ class StudioApi:
                 output = output_dir / f"{uuid.uuid4().hex}-{source.name}"
                 shutil.copy2(source, output)
             else:
-                data, match_meta = export_demo(str(source), research=True)
+                tmp_output = output_dir / f"{uuid.uuid4().hex}.zip"
+                with self._track_sync_export():
+                    match_meta = export_dem_to_zip(
+                        source,
+                        tmp_output,
+                        research=True,
+                        compress_level=3,
+                        cancel_event=self._cancel_event,
+                    )
                 output = output_dir / f"{uuid.uuid4().hex}-{_build_zip_name(source, match_meta)}"
-                output.write_bytes(data)
+                tmp_output.replace(output)
             with zipfile.ZipFile(output) as archive:
                 match = json.loads(archive.read("match.json"))
             digest = updater.sha256_file(output)
@@ -1515,20 +1547,26 @@ class StudioApi:
         job = _ExportJob(path)
         self._jobs[job.id] = job
         log.info("export job %s start: %s", job.id, path)
-        threading.Thread(target=self._run_export_job, args=(job,), daemon=True).start()
+        with self._export_threads_lock:
+            if self._closed:
+                raise RuntimeError("DAK Studio 正在关闭")
+            thread = threading.Thread(target=self._run_export_job, args=(job,), daemon=True)
+            self._export_threads.add(thread)
+            thread.start()
         return {"jobId": job.id}
 
     def _run_export_job(self, job: _ExportJob) -> None:
         try:
             dem = Path(job.path)
+            fd, raw_path = tempfile.mkstemp(prefix="dak-studio-export-", suffix=".zip")
+            os.close(fd)
+            staged_path = Path(raw_path)
+            job.result_path = staged_path
             if dem.suffix.lower() == ".zip":
                 job.stage = "读取 ZIP"
-                data = dem.read_bytes()
+                shutil.copyfile(dem, staged_path)
                 job.file_name = dem.name
             else:
-                job.stage = "export.dependencies"
-                from cs2df.package import export_demo
-
                 job.stage = "export.parse"
 
                 def on_progress(stage: str, frac: float) -> None:
@@ -1536,12 +1574,16 @@ class StudioApi:
                     job.progress = frac
                     log.info("export job %s %s %.0f%%", job.id, stage, frac * 100)
 
-                data, match_meta = export_demo(str(dem), research=True, progress=on_progress)
+                match_meta = export_dem_to_zip(
+                    dem,
+                    staged_path,
+                    research=True,
+                    compress_level=3,
+                    progress=on_progress,
+                    cancel_event=self._cancel_event,
+                )
                 job.file_name = _build_zip_name(dem, match_meta)
-            job.stage = "export.stage_result"
-            job.result_path = _stage_export_result(data)
-            job.result_size = len(data)
-            del data
+            job.result_size = staged_path.stat().st_size
             job.progress = 1.0
             job.state = "done"
             job.stage = "完成"
@@ -1552,11 +1594,7 @@ class StudioApi:
                 time.monotonic() - job.started,
                 job.result_size,
             )
-        except BaseException as exc:  # Worker boundary: only parser panics and ordinary failures.
-            if not isinstance(exc, Exception) and not (
-                type(exc).__module__ == "pyo3_runtime" and type(exc).__name__ == "PanicException"
-            ):
-                raise
+        except Exception as exc:
             job.diagnostic = safe_exception(exc, job.stage)
             job.error = job.diagnostic["message"]
             job.state = "error"
@@ -1572,6 +1610,10 @@ class StudioApi:
                 finally:
                     job.result_path = None
                     job.result_size = 0
+        finally:
+            current = threading.current_thread()
+            with self._export_threads_lock:
+                self._export_threads.discard(current)
 
     def get_export_status(self, job_id: str) -> dict:
         job = self._jobs.get(job_id)
@@ -1622,8 +1664,6 @@ class StudioApi:
         ZIP stays small (columnar replay), so the base64 bridge transfer is cheap;
         the temp dir is removed afterwards either way.
         """
-        from cs2df.package import export_demo
-
         dem = Path(path)
         # 原生对话框也允许直接选 v3 ZIP：不经 exporter，原样回传字节。
         if dem.suffix.lower() == ".zip":
@@ -1635,15 +1675,22 @@ class StudioApi:
                 }
             except OSError as exc:
                 return {"ok": False, "error": str(exc)}
+        tmp_dir = Path(tempfile.mkdtemp(prefix="cs2dak-studio-path-"))
         try:
-            data, match_meta = export_demo(str(dem), research=True)
+            out_zip = tmp_dir / "out.zip"
+            with self._track_sync_export():
+                match_meta = export_dem_to_zip(
+                    dem, out_zip, research=True, compress_level=3, cancel_event=self._cancel_event
+                )
             return {
                 "ok": True,
                 "fileName": _build_zip_name(dem, match_meta),
-                "dataBase64": base64.b64encode(data).decode("ascii"),
+                "dataBase64": base64.b64encode(out_zip.read_bytes()).decode("ascii"),
             }
         except Exception as exc:  # noqa: BLE001 - surface parse failures to the UI
             return {"ok": False, "error": str(exc)}
+        finally:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
 
     def export_dem_bytes(self, name: str, data_b64: str) -> dict:
         """Export .dem raw bytes (base64) to a v3 ZIP.
@@ -1652,17 +1699,23 @@ class StudioApi:
         (e.g. Windows pywebview). Writes the bytes to a temp file, runs the
         exporter, and returns the ZIP the same way export_dem_path does.
         """
-        from cs2df.package import export_demo
-
         tmp_dir = Path(tempfile.mkdtemp(prefix="cs2dak-studio-"))
         try:
             dem_path = tmp_dir / name
             dem_path.write_bytes(base64.b64decode(data_b64))
-            data, match_meta = export_demo(str(dem_path), research=True)
+            out_zip = tmp_dir / "out.zip"
+            with self._track_sync_export():
+                match_meta = export_dem_to_zip(
+                    dem_path,
+                    out_zip,
+                    research=True,
+                    compress_level=3,
+                    cancel_event=self._cancel_event,
+                )
             return {
                 "ok": True,
                 "fileName": _build_zip_name(dem_path, match_meta),
-                "dataBase64": base64.b64encode(data).decode("ascii"),
+                "dataBase64": base64.b64encode(out_zip.read_bytes()).decode("ascii"),
             }
         except Exception as exc:
             return {"ok": False, "error": str(exc)}
@@ -2330,11 +2383,16 @@ def _launch_studio(storage: Path) -> None:
         min_size=(1024, 700),
     )
     api._window = window
+    if hasattr(window, "events") and hasattr(window.events, "closed"):
+        window.events.closed += lambda: api.close()
     # 自建 localhost 静态服务：pywebview 内置 server 会给静态文件写
     # no-cache/no-store，导致 .tri 与雷达图在切图时反复重拉。
     # private_mode=False：Windows Edge Chromium 默认隐私模式会把
     # IndexedDB 等数据存到临时目录，重启丢失；显式关掉后落盘到持久目录。
-    webview.start(private_mode=False, storage_path=str(storage))
+    try:
+        webview.start(private_mode=False, storage_path=str(storage))
+    finally:
+        api.close()
 
 
 def main() -> None:

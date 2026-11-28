@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { loadDemoPackageFromZip } from "@cs2dak/demo-io";
 import { rivalHubEventsResponseSchema, type RivalHubEventsResponse } from "./contract";
+import { buildRivalHubDemoEvidenceV1 } from "./evidence";
 import { uploadDemo, type UploadDependencies, type UploadUpdate } from "./pipeline";
 import { createRivalHubClient, requestJson, rivalHubEvidenceIdempotencyKey } from "./client";
 
@@ -155,13 +156,66 @@ describe("standalone upload pipeline with real Demo + events contract", () => {
     s.deps.warning = vi.fn();
     await uploadDemo(s.deps);
     const diagnostics = vi.mocked(s.deps.warning).mock.calls.map(([diagnostic]) => diagnostic);
-    expect(diagnostics.filter(diagnostic => diagnostic.code === "OPTIONAL_INPUT_SKIPPED")).toHaveLength(3);
+    expect(diagnostics.filter(diagnostic => diagnostic.code === "OPTIONAL_INPUT_SKIPPED")).toHaveLength(4);
     expect(diagnostics).toEqual(expect.arrayContaining([
       expect.objectContaining({ stage: "participants.event_roster.fallback" }),
       expect.objectContaining({ stage: "participants.lineup.fallback" }),
     ]));
     expect(s.requests).toHaveLength(1);
     expect(s.updates.at(-1)?.phase).toBe("done");
+  });
+
+  it("filters cs2-demo-format/3.1 plant_abort and defuse_abort out of V1 objectives", async () => {
+    const basePkg = await loadDemoPackageFromZip(zip, { profile: "evidence" });
+    const roundNumber = basePkg.rounds[0]!.roundNumber;
+    const validBomb = {
+      roundNumber,
+      tick: basePkg.rounds[0]!.freezeEndTick + 50,
+      type: "planted" as const,
+      site: "a" as const,
+      actorIndex: 0,
+      position: { x: 0, y: 0, z: 0 },
+    };
+    const pkg31 = {
+      ...basePkg,
+      manifest: {
+        ...basePkg.manifest,
+        schemaVersion: "cs2-demo-format/3.1" as const,
+      },
+      bombs: [
+        ...basePkg.bombs,
+        { ...validBomb, tick: validBomb.tick - 20, type: "plant_abort" as const },
+        { ...validBomb, tick: validBomb.tick + 20, type: "defuse_abort" as const },
+        validBomb,
+      ],
+    };
+    const event = fixture.events[0]!;
+    const map = event.series[0]!.maps[0]!;
+    const identities = new Map(
+      basePkg.players.map((p, idx) => [
+        p.steamId64,
+        {
+          steamId64: p.steamId64,
+          nameSnapshot: p.name,
+          userId: `user-${idx}`,
+          eventRosterMemberId: `member-${idx}`,
+          entryId: p.teamKey === "teamA" ? map.target.entryAId : map.target.entryBId,
+        },
+      ]),
+    );
+    const evidence = buildRivalHubDemoEvidenceV1(
+      pkg31,
+      { ...map.target, stageRunId: map.target.stageRunId ?? undefined },
+      identities,
+    ) as {
+      source: { sourceSchemaVersion: string };
+      sourceFacts: { objectives: Array<{ type: string }> };
+    };
+    const types = evidence.sourceFacts.objectives.map((o) => o.type);
+    expect(types).not.toContain("plant_abort");
+    expect(types).not.toContain("defuse_abort");
+    expect(evidence.sourceFacts.objectives).toHaveLength(basePkg.bombs.length + 1);
+    expect(evidence.source.sourceSchemaVersion).toBe("cs2-demo-format/3.1");
   });
 
 });
