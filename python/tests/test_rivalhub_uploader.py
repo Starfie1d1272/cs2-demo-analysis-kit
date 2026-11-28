@@ -86,6 +86,30 @@ def test_file_hash_chunks_and_cleanup(api, tmp_path, monkeypatch):
     assert source.read_bytes() == b"raw demo"
 
 
+def test_close_rejects_new_exports_and_joins_concurrent_start_without_race(
+    api, tmp_path, monkeypatch
+):
+    source = tmp_path / "demo.dem"
+    source.write_bytes(b"raw demo")
+    api._files["demo"] = source
+    started = threading.Event()
+
+    def slow_export(
+        dem_path, output_zip, *, research=False, compress_level=3, progress=None, cancel_event=None
+    ):
+        started.set()
+        assert cancel_event is not None
+        cancel_event.wait(timeout=5)
+        raise RuntimeError("cs2df 导出已取消")
+
+    monkeypatch.setattr(uploader, "export_dem_to_zip", slow_export)
+    assert api.start_export("demo") is True
+    assert started.wait(timeout=2)
+    api.close()
+    with pytest.raises(RuntimeError, match="正在关闭"):
+        api.start_export("demo")
+
+
 def test_bridge_rejects_paths_and_cross_origin_browser(api):
     api.configure("https://example.com")
     with pytest.raises(ValueError):

@@ -357,7 +357,7 @@ class UploaderApi:
             self._jobs[key] = {"state": "running", "progress": 0, "stage": "正在读取 Demo"}
             thread = threading.Thread(target=self._export, args=(key,), daemon=True)
             self._export_threads.add(thread)
-        thread.start()
+            thread.start()
         return True
 
     def _export(self, key: str):
@@ -462,9 +462,12 @@ class UploaderApi:
             threads = list(self._export_threads)
         for thread in threads:
             if thread is not threading.current_thread():
-                thread.join(timeout=5)
+                thread.join(timeout=15)
         with self._lock:
-            self._temp.cleanup()
+            try:
+                self._temp.cleanup()
+            except OSError:
+                pass
 
 
 def main():

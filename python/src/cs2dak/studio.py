@@ -612,6 +612,9 @@ class StudioApi:
         self._jobs: dict[str, _ExportJob] = {}
         self._export_threads: set[threading.Thread] = set()
         self._export_threads_lock = threading.Lock()
+        self._sync_exports_done = threading.Condition(self._export_threads_lock)
+        self._active_sync_exports = 0
+        self._closed = False
         self._cancel_event = threading.Event()
         self._update_jobs: dict[str, _UpdateJob] = {}
         self._event_sessions: dict[str, dict] = {}
@@ -625,14 +628,30 @@ class StudioApi:
         self._demo_commit_guard = threading.Lock()
         self._db: sqlite3.Connection | None = None
 
-    def close(self) -> None:
-        """Cancel active native exports and clean up staged temp files on exit."""
-        self._cancel_event.set()
+    @contextmanager
+    def _track_sync_export(self):
         with self._export_threads_lock:
+            if self._closed:
+                raise RuntimeError("DAK Studio 正在关闭")
+            self._active_sync_exports += 1
+        try:
+            yield
+        finally:
+            with self._export_threads_lock:
+                self._active_sync_exports -= 1
+                self._sync_exports_done.notify_all()
+
+    def close(self) -> None:
+        """Stop accepting exports, cancel active exports, wait, then clean up."""
+        with self._export_threads_lock:
+            self._closed = True
             threads = list(self._export_threads)
+        self._cancel_event.set()
         for thread in threads:
             if thread is not threading.current_thread():
-                thread.join(timeout=5)
+                thread.join(timeout=15)
+        with self._export_threads_lock:
+            self._sync_exports_done.wait_for(lambda: self._active_sync_exports == 0, timeout=15)
         for job in list(self._jobs.values()):
             if job.result_path is not None:
                 try:
@@ -1451,13 +1470,14 @@ class StudioApi:
                 shutil.copy2(source, output)
             else:
                 tmp_output = output_dir / f"{uuid.uuid4().hex}.zip"
-                match_meta = export_dem_to_zip(
-                    source,
-                    tmp_output,
-                    research=True,
-                    compress_level=3,
-                    cancel_event=self._cancel_event,
-                )
+                with self._track_sync_export():
+                    match_meta = export_dem_to_zip(
+                        source,
+                        tmp_output,
+                        research=True,
+                        compress_level=3,
+                        cancel_event=self._cancel_event,
+                    )
                 output = output_dir / f"{uuid.uuid4().hex}-{_build_zip_name(source, match_meta)}"
                 tmp_output.replace(output)
             with zipfile.ZipFile(output) as archive:
@@ -1527,10 +1547,12 @@ class StudioApi:
         job = _ExportJob(path)
         self._jobs[job.id] = job
         log.info("export job %s start: %s", job.id, path)
-        thread = threading.Thread(target=self._run_export_job, args=(job,), daemon=True)
         with self._export_threads_lock:
+            if self._closed:
+                raise RuntimeError("DAK Studio 正在关闭")
+            thread = threading.Thread(target=self._run_export_job, args=(job,), daemon=True)
             self._export_threads.add(thread)
-        thread.start()
+            thread.start()
         return {"jobId": job.id}
 
     def _run_export_job(self, job: _ExportJob) -> None:
@@ -1656,9 +1678,10 @@ class StudioApi:
         tmp_dir = Path(tempfile.mkdtemp(prefix="cs2dak-studio-path-"))
         try:
             out_zip = tmp_dir / "out.zip"
-            match_meta = export_dem_to_zip(
-                dem, out_zip, research=True, compress_level=3, cancel_event=self._cancel_event
-            )
+            with self._track_sync_export():
+                match_meta = export_dem_to_zip(
+                    dem, out_zip, research=True, compress_level=3, cancel_event=self._cancel_event
+                )
             return {
                 "ok": True,
                 "fileName": _build_zip_name(dem, match_meta),
@@ -1681,9 +1704,14 @@ class StudioApi:
             dem_path = tmp_dir / name
             dem_path.write_bytes(base64.b64decode(data_b64))
             out_zip = tmp_dir / "out.zip"
-            match_meta = export_dem_to_zip(
-                dem_path, out_zip, research=True, compress_level=3, cancel_event=self._cancel_event
-            )
+            with self._track_sync_export():
+                match_meta = export_dem_to_zip(
+                    dem_path,
+                    out_zip,
+                    research=True,
+                    compress_level=3,
+                    cancel_event=self._cancel_event,
+                )
             return {
                 "ok": True,
                 "fileName": _build_zip_name(dem_path, match_meta),

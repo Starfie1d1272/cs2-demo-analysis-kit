@@ -11,7 +11,7 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/Starfie1d1272/cs2-demo-analysis-kit/ci.yml?label=ci)](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/actions)
 [![Release](https://img.shields.io/github/v/release/Starfie1d1272/cs2-demo-analysis-kit?label=release)](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT%20%2F%20AGPL--3.0-blue)](#许可证)
-[![Format](https://img.shields.io/badge/cs2--demo--format-3.x-success)](https://pypi.org/project/cs2df/)
+[![Format](https://img.shields.io/badge/cs2--demo--format-3.x-success)](https://github.com/Starfie1d1272/cs2-demo-format)
 
 </div>
 
