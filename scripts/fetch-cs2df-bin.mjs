@@ -18,8 +18,10 @@ import { fileURLToPath } from 'node:url';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CS2DF_VERSION = 'v5.0.0';
+const EXACT_VERSION = '5.0.0';
 const RELEASE_BASE = `https://github.com/Starfie1d1272/cs2-demo-format/releases/download/${CS2DF_VERSION}`;
 const OUT_DIR = join(REPO, 'python', 'packaging', 'bin');
+const LICENSE_FILES = ['LICENSE', 'THIRD-PARTY-LICENSES.txt'];
 
 function assetForPlatform() {
   if (process.platform === 'darwin' && process.arch === 'arm64') {
@@ -40,10 +42,10 @@ function sha256(buf) {
   return createHash('sha256').update(buf).digest('hex');
 }
 
-function verifyVersion(binPath) {
+function verifyExactVersion(binPath) {
   const out = execFileSync(binPath, ['--version'], { encoding: 'utf8' }).trim();
-  if (!/(?:^|\s)5\.\d+/.test(out)) {
-    throw new Error(`Expected cs2df 5.x binary at ${binPath}, got: ${out}`);
+  if (out !== `cs2df ${EXACT_VERSION}`) {
+    throw new Error(`Expected exact cs2df ${EXACT_VERSION} at ${binPath}, got: ${out}`);
   }
 }
 
@@ -58,15 +60,26 @@ async function fetchBuffer(url) {
 const { archive, bin } = assetForPlatform();
 mkdirSync(OUT_DIR, { recursive: true });
 const targetBin = join(OUT_DIR, bin);
+const stampPath = join(OUT_DIR, `${bin}.${CS2DF_VERSION}.sha256`);
 
-if (existsSync(targetBin)) {
+if (
+  existsSync(targetBin) &&
+  existsSync(stampPath) &&
+  LICENSE_FILES.every((f) => existsSync(join(OUT_DIR, f)))
+) {
   try {
-    verifyVersion(targetBin);
-    console.log(`Using cached cs2df binary: ${targetBin}`);
-    process.exit(0);
+    verifyExactVersion(targetBin);
+    const expectedBinHash = readFileSync(stampPath, 'utf8').trim();
+    const actualBinHash = sha256(readFileSync(targetBin));
+    if (actualBinHash === expectedBinHash) {
+      console.log(`Using verified cached cs2df ${EXACT_VERSION} binary: ${targetBin}`);
+      process.exit(0);
+    }
   } catch {
-    rmSync(targetBin, { force: true });
+    // Re-download below if cached binary or stamp fails verification.
   }
+  rmSync(targetBin, { force: true });
+  rmSync(stampPath, { force: true });
 }
 
 console.log(`Downloading ${archive} and SHA256SUMS.txt (${CS2DF_VERSION})...`);
@@ -118,8 +131,16 @@ try {
   if (process.platform !== 'win32') {
     chmodSync(targetBin, 0o755);
   }
-  verifyVersion(targetBin);
-  console.log(`Staged native cs2df binary → ${targetBin}`);
+  for (const licenseFile of LICENSE_FILES) {
+    const srcLicense = join(tmp, licenseFile);
+    if (!existsSync(srcLicense)) {
+      throw new Error(`Extracted archive missing ${licenseFile}`);
+    }
+    copyFileSync(srcLicense, join(OUT_DIR, licenseFile));
+  }
+  verifyExactVersion(targetBin);
+  writeFileSync(stampPath, `${sha256(readFileSync(targetBin))}\n`, 'utf8');
+  console.log(`Staged native cs2df ${EXACT_VERSION} binary & licenses → ${OUT_DIR}`);
 } finally {
   rmSync(tmp, { recursive: true, force: true });
 }

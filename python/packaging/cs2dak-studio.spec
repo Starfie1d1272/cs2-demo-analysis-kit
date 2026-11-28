@@ -1,12 +1,13 @@
-# PyInstaller spec — DAK Studio 桌面应用（pywebview 壳 + exporter）。Unsigned.
+# PyInstaller spec — DAK Studio 桌面应用（pywebview 壳 + 原生 cs2df）。Unsigned.
 #
 #   pnpm --filter @cs2dak/dak-studio build  （并把 dist/ 拷到 src/cs2dak/studio_web/）
+#   node scripts/fetch-cs2df-bin.mjs
 #   uv sync --extra gui --extra build
 #   uv run pyinstaller packaging/cs2dak-studio.spec
 #
-# 一体化封装：Python cs2df 壳层与 Studio 前端（静态 SPA）打进同一个应用，
+# 一体化封装：pywebview 桌面壳、原生 cs2df 二进制与 Studio 前端（静态 SPA）打进同一个应用，
 # 运行时不需要 Node —— 前端只是 pywebview 托管的构建产物，分析在浏览器引擎里跑。
-# 推荐入口是 scripts/package.sh（会先构建前端再打包）。
+# 推荐入口是 scripts/package.sh（会先构建前端与拉取原生 cs2df 再打包）。
 
 import sys
 from pathlib import Path
@@ -40,6 +41,15 @@ if not cs2df_bin.is_file():
         f"Native cs2df binary not found at {cs2df_bin}. "
         "Run: node scripts/fetch-cs2df-bin.mjs"
     )
+
+for license_name in ("LICENSE", "THIRD-PARTY-LICENSES.txt"):
+    license_file = ROOT / "bin" / license_name
+    if not license_file.is_file():
+        raise SystemExit(
+            f"Native cs2df license file not found at {license_file}. "
+            "Run: node scripts/fetch-cs2df-bin.mjs"
+        )
+    datas.append((str(license_file), "bin"))
 
 binaries = [(str(cs2df_bin), "bin")]
 hiddenimports = []

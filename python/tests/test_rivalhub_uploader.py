@@ -1,4 +1,5 @@
 """Native boundary tests without a WebView, OS credential prompts or live website."""
+
 import base64
 import hashlib
 import json
@@ -37,7 +38,10 @@ def test_connection_keeps_token_out_of_metadata(api, monkeypatch):
     other = uploader.UploaderApi(api._userdata)
     try:
         assert other.connection() == {
-            "baseUrl": "https://example.com", "pairingId": "pairing", "connected": True}
+            "baseUrl": "https://example.com",
+            "pairingId": "pairing",
+            "connected": True,
+        }
         other.configure("https://other.example")
         assert credential(other._origin) is None
     finally:
@@ -51,10 +55,19 @@ def test_file_hash_chunks_and_cleanup(api, tmp_path, monkeypatch):
     assert api.hash_demo("demo") == hashlib.sha256(b"raw demo").hexdigest()
     payload = b"zip" * 500000
 
-    def fake_export(dem_path, output_zip, *, research=False, compress_level=3, progress=None):
+    def fake_export(
+        dem_path,
+        output_zip,
+        *,
+        research=False,
+        compress_level=3,
+        progress=None,
+        cancel_event=None,
+    ):
         assert Path(dem_path) == source
         assert research is False
         assert compress_level == 3
+        assert cancel_event is api._cancel_event
         if progress is not None:
             progress("open demo", 0.05)
         Path(output_zip).write_bytes(payload)
@@ -146,7 +159,9 @@ def test_cancel_undoes_only_owned_authorization_and_restores_previous(api, monke
         return True
 
     monkeypatch.setattr(uploader, "credential", credential)
-    monkeypatch.setattr(uploader, "delete_credential", lambda origin: vault.pop(origin, None) is not None)
+    monkeypatch.setattr(
+        uploader, "delete_credential", lambda origin: vault.pop(origin, None) is not None
+    )
     api.configure("https://old.example")
     api.save_connection("original", "old-token")
     api.configure("https://new.example")
@@ -188,16 +203,23 @@ def test_runtime_install_refuses_to_overwrite_custom_data(tmp_path, monkeypatch)
 
 def test_native_apply_refuses_custom_data_outside_preserved_directories(tmp_path, monkeypatch):
     from cs2dak import studio
+
     install = tmp_path / "install"
     data = install / "custom-data"
     data.mkdir(parents=True)
     (data / "demo.zip").write_bytes(b"original-zip")
     monkeypatch.setattr(studio, "_studio_userdata", lambda: data)
     api = studio.StudioApi()
-    api._update_jobs["fixture"] = SimpleNamespace(staged_path=tmp_path / "runtime.zip", state="ready")
+    api._update_jobs["fixture"] = SimpleNamespace(
+        staged_path=tmp_path / "runtime.zip", state="ready"
+    )
     monkeypatch.setattr(studio.sys, "platform", "win32")
     monkeypatch.setattr(updater, "current_install_dir", lambda: install)
-    monkeypatch.setattr(updater, "apply_windows_update", lambda *_args: (_ for _ in ()).throw(AssertionError("must not launch relay")))
+    monkeypatch.setattr(
+        updater,
+        "apply_windows_update",
+        lambda *_args: (_ for _ in ()).throw(AssertionError("must not launch relay")),
+    )
     result = api.update_apply("fixture")
     assert not result["ok"]
     assert "自定义资料位置" in result["error"]
@@ -207,6 +229,7 @@ def test_native_apply_refuses_custom_data_outside_preserved_directories(tmp_path
 def test_real_webview_reflection_never_reads_native_window(tmp_path, monkeypatch):
     import webview
     from webview import util
+
     touched, scripts = [], []
 
     class NativeWindow:
@@ -229,6 +252,7 @@ def test_real_webview_reflection_never_reads_native_window(tmp_path, monkeypatch
 
     monkeypatch.setattr(util, "Thread", InlineThread)
     monkeypatch.setattr(util, "load_js_files", lambda *args: ("bootstrap", "%(functions)s"))
+
     class Event:
         def __init__(self):
             self.count = 0
@@ -254,7 +278,9 @@ def test_real_webview_reflection_never_reads_native_window(tmp_path, monkeypatch
 
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
     monkeypatch.setattr(webview, "create_window", create_window)
-    monkeypatch.setattr(webview, "start", lambda **kwargs: util.inject_pywebview("edgechromium", window))
+    monkeypatch.setattr(
+        webview, "start", lambda **kwargs: util.inject_pywebview("edgechromium", window)
+    )
     monkeypatch.setattr(uploader, "__file__", str(tmp_path / "rivalhub_uploader.py"))
     (tmp_path / "rivalhub_uploader_web").mkdir()
     (tmp_path / "rivalhub_uploader_web" / "index.html").write_text("<html></html>")
@@ -266,9 +292,20 @@ def test_real_webview_reflection_never_reads_native_window(tmp_path, monkeypatch
         assert touched == []
         methods = {value["func"] for value in json.loads(scripts[-1])}
         expected = {
-            "connection", "configure", "save_connection", "open_website", "request",
-            "select_demos", "hash_demo", "start_export", "export_status", "read_chunk",
-            "cleanup", "record", "export_logs", "report_ui_error",
+            "connection",
+            "configure",
+            "save_connection",
+            "open_website",
+            "request",
+            "select_demos",
+            "hash_demo",
+            "start_export",
+            "export_status",
+            "read_chunk",
+            "cleanup",
+            "record",
+            "export_logs",
+            "report_ui_error",
         }
         assert methods == expected | {"close"}
         assert window.events._pywebviewready.count == 1
@@ -282,5 +319,6 @@ def test_real_webview_reflection_never_reads_native_window(tmp_path, monkeypatch
             if handler not in handlers:
                 uploader.log.removeHandler(handler)
                 import logging
+
                 logging.getLogger("pywebview").removeHandler(handler)
                 handler.close()

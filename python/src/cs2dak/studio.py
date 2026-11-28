@@ -454,22 +454,6 @@ def _setup_logging(logs_dir: Path) -> Path | None:
     return active_path
 
 
-def _stage_export_result(data: bytes) -> Path:
-    """Stage one export result on disk for bounded bridge reads."""
-    fd, raw_path = tempfile.mkstemp(prefix="dak-studio-export-", suffix=".zip")
-    path = Path(raw_path)
-    try:
-        with os.fdopen(fd, "wb") as output:
-            output.write(data)
-    except Exception:
-        try:
-            path.unlink(missing_ok=True)
-        except OSError as cleanup_exc:
-            log_failure(log, cleanup_exc, "export.cleanup")
-        raise
-    return path
-
-
 class _ExportJob:
     """One background .dem→ZIP export. Status is polled over the JS bridge
     with tiny payloads; the resulting ZIP is staged on disk and fetched in
@@ -626,6 +610,9 @@ class StudioApi:
     def __init__(self) -> None:
         self._window = None  # set in main() after window creation
         self._jobs: dict[str, _ExportJob] = {}
+        self._export_threads: set[threading.Thread] = set()
+        self._export_threads_lock = threading.Lock()
+        self._cancel_event = threading.Event()
         self._update_jobs: dict[str, _UpdateJob] = {}
         self._event_sessions: dict[str, dict] = {}
         self._event_download_jobs: dict[str, _UpdateJob] = {}
@@ -637,6 +624,25 @@ class StudioApi:
         self._demo_commit_handles: dict[str, list] = {}
         self._demo_commit_guard = threading.Lock()
         self._db: sqlite3.Connection | None = None
+
+    def close(self) -> None:
+        """Cancel active native exports and clean up staged temp files on exit."""
+        self._cancel_event.set()
+        with self._export_threads_lock:
+            threads = list(self._export_threads)
+        for thread in threads:
+            if thread is not threading.current_thread():
+                thread.join(timeout=5)
+        for job in list(self._jobs.values()):
+            if job.result_path is not None:
+                try:
+                    job.result_path.unlink(missing_ok=True)
+                except OSError:
+                    pass
+                job.result_path = None
+                job.result_size = 0
+        for session_id in list(self._event_maker_sessions):
+            self.event_maker_cleanup(session_id)
 
     def _assets_dir(self) -> Path:
         return _assets_dir_for(self._userdata)
@@ -1445,7 +1451,13 @@ class StudioApi:
                 shutil.copy2(source, output)
             else:
                 tmp_output = output_dir / f"{uuid.uuid4().hex}.zip"
-                match_meta = export_dem_to_zip(source, tmp_output, research=True, compress_level=3)
+                match_meta = export_dem_to_zip(
+                    source,
+                    tmp_output,
+                    research=True,
+                    compress_level=3,
+                    cancel_event=self._cancel_event,
+                )
                 output = output_dir / f"{uuid.uuid4().hex}-{_build_zip_name(source, match_meta)}"
                 tmp_output.replace(output)
             with zipfile.ZipFile(output) as archive:
@@ -1515,7 +1527,10 @@ class StudioApi:
         job = _ExportJob(path)
         self._jobs[job.id] = job
         log.info("export job %s start: %s", job.id, path)
-        threading.Thread(target=self._run_export_job, args=(job,), daemon=True).start()
+        thread = threading.Thread(target=self._run_export_job, args=(job,), daemon=True)
+        with self._export_threads_lock:
+            self._export_threads.add(thread)
+        thread.start()
         return {"jobId": job.id}
 
     def _run_export_job(self, job: _ExportJob) -> None:
@@ -1538,7 +1553,12 @@ class StudioApi:
                     log.info("export job %s %s %.0f%%", job.id, stage, frac * 100)
 
                 match_meta = export_dem_to_zip(
-                    dem, staged_path, research=True, compress_level=3, progress=on_progress
+                    dem,
+                    staged_path,
+                    research=True,
+                    compress_level=3,
+                    progress=on_progress,
+                    cancel_event=self._cancel_event,
                 )
                 job.file_name = _build_zip_name(dem, match_meta)
             job.result_size = staged_path.stat().st_size
@@ -1568,6 +1588,10 @@ class StudioApi:
                 finally:
                     job.result_path = None
                     job.result_size = 0
+        finally:
+            current = threading.current_thread()
+            with self._export_threads_lock:
+                self._export_threads.discard(current)
 
     def get_export_status(self, job_id: str) -> dict:
         job = self._jobs.get(job_id)
@@ -1632,7 +1656,9 @@ class StudioApi:
         tmp_dir = Path(tempfile.mkdtemp(prefix="cs2dak-studio-path-"))
         try:
             out_zip = tmp_dir / "out.zip"
-            match_meta = export_dem_to_zip(dem, out_zip, research=True, compress_level=3)
+            match_meta = export_dem_to_zip(
+                dem, out_zip, research=True, compress_level=3, cancel_event=self._cancel_event
+            )
             return {
                 "ok": True,
                 "fileName": _build_zip_name(dem, match_meta),
@@ -1655,7 +1681,9 @@ class StudioApi:
             dem_path = tmp_dir / name
             dem_path.write_bytes(base64.b64decode(data_b64))
             out_zip = tmp_dir / "out.zip"
-            match_meta = export_dem_to_zip(dem_path, out_zip, research=True, compress_level=3)
+            match_meta = export_dem_to_zip(
+                dem_path, out_zip, research=True, compress_level=3, cancel_event=self._cancel_event
+            )
             return {
                 "ok": True,
                 "fileName": _build_zip_name(dem_path, match_meta),
@@ -2327,11 +2355,16 @@ def _launch_studio(storage: Path) -> None:
         min_size=(1024, 700),
     )
     api._window = window
+    if hasattr(window, "events") and hasattr(window.events, "closed"):
+        window.events.closed += lambda: api.close()
     # 自建 localhost 静态服务：pywebview 内置 server 会给静态文件写
     # no-cache/no-store，导致 .tri 与雷达图在切图时反复重拉。
     # private_mode=False：Windows Edge Chromium 默认隐私模式会把
     # IndexedDB 等数据存到临时目录，重启丢失；显式关掉后落盘到持久目录。
-    webview.start(private_mode=False, storage_path=str(storage))
+    try:
+        webview.start(private_mode=False, storage_path=str(storage))
+    finally:
+        api.close()
 
 
 def main() -> None:

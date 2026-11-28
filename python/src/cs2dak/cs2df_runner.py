@@ -140,15 +140,26 @@ def export_dem_to_zip(
 
     tail: deque[str] = deque(maxlen=20)
     deadline = (time.monotonic() + timeout_seconds) if timeout_seconds is not None else None
+    terminate_lock = threading.Lock()
 
     def _terminate() -> None:
-        if proc.poll() is None:
-            proc.terminate()
-            try:
-                proc.wait(timeout=3)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-                proc.wait(timeout=3)
+        with terminate_lock:
+            if proc.poll() is None:
+                try:
+                    proc.terminate()
+                except OSError:
+                    return
+                try:
+                    proc.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    try:
+                        proc.kill()
+                    except OSError:
+                        pass
+                    try:
+                        proc.wait(timeout=3)
+                    except subprocess.TimeoutExpired:
+                        pass
 
     watcher_stop = threading.Event()
     timed_out = False
@@ -156,7 +167,7 @@ def export_dem_to_zip(
 
     def _watchdog() -> None:
         nonlocal timed_out, cancelled
-        while not watcher_stop.wait(0.2):
+        while not watcher_stop.wait(0.05):
             if cancel_event is not None and cancel_event.is_set():
                 cancelled = True
                 _terminate()
@@ -168,9 +179,17 @@ def export_dem_to_zip(
 
     watchdog = threading.Thread(target=_watchdog, daemon=True)
     watchdog.start()
+    succeeded = False
     try:
+        if cancel_event is not None and cancel_event.is_set():
+            cancelled = True
+            _terminate()
         assert proc.stdout is not None
         for raw_line in proc.stdout:
+            if cancel_event is not None and cancel_event.is_set():
+                cancelled = True
+                _terminate()
+                break
             line = raw_line.strip()
             if not line:
                 continue
@@ -182,19 +201,37 @@ def export_dem_to_zip(
                     stage = match.group(2)
                     progress(stage, pct / 100.0)
         returncode = proc.wait()
+
+        if cancelled:
+            raise RuntimeError("cs2df 导出已取消")
+        if timed_out:
+            raise RuntimeError(f"cs2df 导出超时（>{timeout_seconds:.0f}s）")
+        if returncode != 0:
+            detail = "\n".join(tail) or f"exit {returncode}"
+            raise RuntimeError(f"cs2df 导出失败（exit {returncode}）：{detail}")
+
+        meta = _read_match_meta(dst)
+        succeeded = True
+        return meta
     finally:
         watcher_stop.set()
+        if proc.poll() is None:
+            _terminate()
+        if proc.stdout is not None:
+            try:
+                proc.stdout.close()
+            except OSError:
+                pass
+        if proc.stderr is not None:
+            try:
+                proc.stderr.close()
+            except OSError:
+                pass
+        if proc.poll() is None:
+            try:
+                proc.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                pass
         watchdog.join(timeout=1)
-
-    if cancelled:
-        dst.unlink(missing_ok=True)
-        raise RuntimeError("cs2df 导出已取消")
-    if timed_out:
-        dst.unlink(missing_ok=True)
-        raise RuntimeError(f"cs2df 导出超时（>{timeout_seconds:.0f}s）")
-    if returncode != 0:
-        dst.unlink(missing_ok=True)
-        detail = "\n".join(tail) or f"exit {returncode}"
-        raise RuntimeError(f"cs2df 导出失败（exit {returncode}）：{detail}")
-
-    return _read_match_meta(dst)
+        if not succeeded:
+            dst.unlink(missing_ok=True)

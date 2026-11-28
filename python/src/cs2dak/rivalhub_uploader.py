@@ -90,6 +90,8 @@ class UploaderApi:
         self._jobs: dict[str, dict] = {}
         self._lock = threading.Lock()
         self._closed = False
+        self._cancel_event = threading.Event()
+        self._export_threads: set[threading.Thread] = set()
         self._origin = ""
         self._connection_rollback = None
 
@@ -348,10 +350,14 @@ class UploaderApi:
 
     def start_export(self, key: str) -> bool:
         with self._lock:
+            if self._closed:
+                raise RuntimeError("上传器正在关闭")
             if any(job["state"] == "running" for job in self._jobs.values()):
                 raise RuntimeError("已有 Demo 正在解析，请稍候")
             self._jobs[key] = {"state": "running", "progress": 0, "stage": "正在读取 Demo"}
-        threading.Thread(target=self._export, args=(key,), daemon=True).start()
+            thread = threading.Thread(target=self._export, args=(key,), daemon=True)
+            self._export_threads.add(thread)
+        thread.start()
         return True
 
     def _export(self, key: str):
@@ -371,6 +377,7 @@ class UploaderApi:
                 research=False,
                 compress_level=3,
                 progress=progress,
+                cancel_event=self._cancel_event,
             )
             size = temp_out.stat().st_size
             with self._lock:
@@ -389,6 +396,10 @@ class UploaderApi:
                 error=f"PARSE_FAILED：{failure['message']}",
                 diagnostic=safe_metadata(failure),
             )
+        finally:
+            current = threading.current_thread()
+            with self._lock:
+                self._export_threads.discard(current)
 
     def export_status(self, key: str) -> dict:
         return dict(self._jobs[key])
@@ -445,8 +456,14 @@ class UploaderApi:
 
     def close(self):
         self._transport.close()
+        self._cancel_event.set()
         with self._lock:
             self._closed = True
+            threads = list(self._export_threads)
+        for thread in threads:
+            if thread is not threading.current_thread():
+                thread.join(timeout=5)
+        with self._lock:
             self._temp.cleanup()
 
 

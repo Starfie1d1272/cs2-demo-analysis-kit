@@ -124,12 +124,25 @@ case "$SRC" in
     bases="$(echo "$dems" | while IFS= read -r d; do clean_base "$d"; done | sort -u)"
     while IFS= read -r base; do
       [ -n "$base" ] || continue
-      parts="$(echo "$dems" | while IFS= read -r d; do
+      part_rows="$(echo "$dems" | while IFS= read -r d; do
         if [ "$(clean_base "$d")" = "$base" ]; then
           pnum="$(basename "$d" .dem | sed -nE 's/.*-p([0-9]+)$/\1/p')"
-          printf '%09d\t%s\n' "${pnum:-0}" "$d"
+          printf '%s\t%s\n' "${pnum:-}" "$d"
         fi
-      done | sort -t $'\t' -k1,1n | cut -f2-)"
+      done)"
+      part_count="$(printf '%s\n' "$part_rows" | wc -l | tr -d ' ')"
+      if [ "$part_count" -gt 1 ]; then
+        if printf '%s\n' "$part_rows" | grep -q $'^\t'; then
+          echo "错误：$SRC 内多个 .dem 映射到 $base 但缺少 -pN 分段后缀，拒绝合并" >&2
+          exit 1
+        fi
+        unique_pnums="$(printf '%s\n' "$part_rows" | cut -f1 | sort -n -u | wc -l | tr -d ' ')"
+        if [ "$unique_pnums" -ne "$part_count" ]; then
+          echo "错误：$SRC 内 $base 存在重复的 -pN 分段编号，拒绝合并" >&2
+          exit 1
+        fi
+      fi
+      parts="$(printf '%s\n' "$part_rows" | sort -t $'\t' -k1,1n | cut -f2-)"
       # shellcheck disable=SC2086
       do_export "${PREFIX:+$PREFIX-}$base" $parts
     done <<< "$bases"

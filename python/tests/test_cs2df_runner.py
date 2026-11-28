@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import os
 import sys
+import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -127,3 +130,112 @@ def test_export_dem_to_zip_cleans_up_on_failure(
     with pytest.raises(RuntimeError, match="corrupt demo header"):
         cs2df_runner.export_dem_to_zip(dem, out_zip)
     assert not out_zip.exists()
+
+
+def _write_slow_cs2df(
+    directory: Path, pid_file: Path, *, emit_progress_first: bool = False
+) -> Path:
+    directory.mkdir(parents=True, exist_ok=True)
+    progress_line = '    print("  [ 12.5%] open demo", flush=True)\n' if emit_progress_first else ""
+    body = f"""import sys
+import time
+import os
+from pathlib import Path
+
+args = sys.argv[1:]
+if args == ["--version"]:
+    print("cs2df 5.0.0")
+    sys.exit(0)
+if args and args[0] == "export":
+    Path({str(pid_file)!r}).write_text(str(os.getpid()), encoding="utf-8")
+{progress_line}    time.sleep(30)
+    sys.exit(0)
+sys.exit(2)
+"""
+    if sys.platform == "win32":
+        py_path = directory / "slow_cs2df.py"
+        py_path.write_text(body, encoding="utf-8")
+        cmd_path = directory / "cs2df.cmd"
+        cmd_path.write_text(f'@echo off\r\n"{sys.executable}" "{py_path}" %*\r\n', encoding="utf-8")
+        return cmd_path
+    sh_path = directory / "cs2df"
+    sh_path.write_text(f"#!{sys.executable}\n{body}", encoding="utf-8")
+    sh_path.chmod(0o755)
+    return sh_path
+
+
+def _is_pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
+
+
+def test_export_dem_to_zip_cancels_and_reaps_subprocess(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pid_file = tmp_path / "child.pid"
+    fake = _write_slow_cs2df(tmp_path, pid_file)
+    monkeypatch.setenv("CS2DF_BIN", str(fake))
+    dem = tmp_path / "match.dem"
+    dem.write_bytes(b"HL2DEMO")
+    out_zip = tmp_path / "out.zip"
+    cancel_event = threading.Event()
+
+    def _trigger_cancel() -> None:
+        deadline = time.monotonic() + 5
+        while not pid_file.exists() and time.monotonic() < deadline:
+            time.sleep(0.05)
+        cancel_event.set()
+
+    threading.Thread(target=_trigger_cancel, daemon=True).start()
+    with pytest.raises(RuntimeError, match="已取消"):
+        cs2df_runner.export_dem_to_zip(dem, out_zip, cancel_event=cancel_event)
+
+    assert not out_zip.exists()
+    pid = int(pid_file.read_text(encoding="utf-8"))
+    time.sleep(0.1)
+    assert not _is_pid_alive(pid)
+
+
+def test_export_dem_to_zip_times_out_and_reaps_subprocess(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pid_file = tmp_path / "child.pid"
+    fake = _write_slow_cs2df(tmp_path, pid_file)
+    monkeypatch.setenv("CS2DF_BIN", str(fake))
+    dem = tmp_path / "match.dem"
+    dem.write_bytes(b"HL2DEMO")
+    out_zip = tmp_path / "out.zip"
+
+    with pytest.raises(RuntimeError, match="超时"):
+        cs2df_runner.export_dem_to_zip(dem, out_zip, timeout_seconds=0.3)
+
+    assert not out_zip.exists()
+    if pid_file.exists():
+        pid = int(pid_file.read_text(encoding="utf-8"))
+        time.sleep(0.1)
+        assert not _is_pid_alive(pid)
+
+
+def test_export_dem_to_zip_progress_exception_terminates_subprocess(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pid_file = tmp_path / "child.pid"
+    fake = _write_slow_cs2df(tmp_path, pid_file, emit_progress_first=True)
+    monkeypatch.setenv("CS2DF_BIN", str(fake))
+    dem = tmp_path / "match.dem"
+    dem.write_bytes(b"HL2DEMO")
+    out_zip = tmp_path / "out.zip"
+
+    def _boom(_stage: str, _frac: float) -> None:
+        raise ValueError("ui closed")
+
+    with pytest.raises(ValueError, match="ui closed"):
+        cs2df_runner.export_dem_to_zip(dem, out_zip, progress=_boom)
+
+    assert not out_zip.exists()
+    pid = int(pid_file.read_text(encoding="utf-8"))
+    time.sleep(0.1)
+    assert not _is_pid_alive(pid)

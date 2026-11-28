@@ -317,8 +317,7 @@ for (const stageDef of exp.stages) {
       const m = basename(demPath, '.dem').match(/-p(\d+)$/i);
       return m ? Number(m[1]) : null;
     };
-    const seenTargets = new Map();
-    const groups = new Map();
+    const candidatesByTarget = new Map();
     for (const { source, dems } of sourceDems) {
       const localGroups = new Map();
       for (const demPath of dems) {
@@ -327,32 +326,57 @@ for (const stageDef of exp.stages) {
         localGroups.get(targetName).push(demPath);
       }
       for (const [targetName, parts] of localGroups.entries()) {
-        if (seenTargets.has(targetName)) {
+        if (!candidatesByTarget.has(targetName)) candidatesByTarget.set(targetName, []);
+        candidatesByTarget.get(targetName).push({ source, parts });
+      }
+    }
+
+    const groups = new Map();
+    for (const [targetName, entries] of candidatesByTarget.entries()) {
+      if (entries.length > 1) {
+        const conflictSources = entries
+          .map((e) => e.source)
+          .sort()
+          .join(', ');
+        console.error(
+          `!! 跨源命名冲突：${stageDef.stage}/${targetName} 同时出现在多个源（${conflictSources}），拒绝整组导出`,
+        );
+        totalFail += entries.length;
+        continue;
+      }
+      const { source, parts } = entries[0];
+      if (parts.length > 1) {
+        const withPartNum = parts.map((p) => ({ path: p, num: partNumberOf(p) }));
+        if (withPartNum.some((x) => x.num === null)) {
           console.error(
-            `!! 跨源命名冲突：${stageDef.stage}/${targetName} 同时出现在 ${seenTargets.get(targetName)} 与 ${source}，拒绝合并`,
+            `!! 同源命名冲突：${source} 内多个 .dem 映射到 ${targetName} 但缺少 -pN 分段后缀，拒绝合并`,
           );
           totalFail += 1;
           continue;
         }
-        if (parts.length > 1) {
-          const withPartNum = parts.map((p) => ({ path: p, num: partNumberOf(p) }));
-          if (withPartNum.some((x) => x.num === null)) {
-            console.error(
-              `!! 同源命名冲突：${source} 内多个 .dem 映射到 ${targetName} 但缺少 -pN 分段后缀，拒绝合并`,
-            );
-            totalFail += 1;
-            continue;
+        const seenNums = new Set();
+        let duplicateNum = null;
+        for (const item of withPartNum) {
+          if (seenNums.has(item.num)) {
+            duplicateNum = item.num;
+            break;
           }
-          withPartNum.sort((a, b) => a.num - b.num);
-          seenTargets.set(targetName, source);
-          groups.set(
-            targetName,
-            withPartNum.map((x) => x.path),
-          );
-        } else {
-          seenTargets.set(targetName, source);
-          groups.set(targetName, parts);
+          seenNums.add(item.num);
         }
+        if (duplicateNum !== null) {
+          console.error(
+            `!! 同源分段编号重复：${source} 内 ${targetName} 存在重复的 -p${duplicateNum} 分段，拒绝合并`,
+          );
+          totalFail += 1;
+          continue;
+        }
+        withPartNum.sort((a, b) => a.num - b.num);
+        groups.set(
+          targetName,
+          withPartNum.map((x) => x.path),
+        );
+      } else {
+        groups.set(targetName, parts);
       }
     }
 

@@ -7,8 +7,8 @@
 ## English
 
 `cs2dak` no longer contains a `.dem` parser or exporter. Raw demo export is owned by
-[`cs2df`](https://pypi.org/project/cs2df/), the reference exporter for
-`cs2-demo-format` v3.
+the native Rust [`cs2df` v5.0.0](https://github.com/Starfie1d1272/cs2-demo-format/releases/tag/v5.0.0)
+binary (`cs2-demo-format/3.0` & `3.1`).
 
 This package is now a thin desktop shell:
 
@@ -16,7 +16,7 @@ This package is now a thin desktop shell:
 - `cs2dak version`: print the package version (also available without a subcommand)
 
 ```text
-.dem -> cs2df -> cs2-demo-format/3.x ZIP -> @cs2dak/* TypeScript analysis
+.dem -> cs2df (v5.0.0) -> cs2-demo-format/3.0 & 3.1 ZIP -> @cs2dak/* TypeScript analysis
 ```
 
 ### Development
@@ -40,16 +40,17 @@ uv sync --locked --extra gui
 
 ### Exporting demos
 
-Use `cs2df` directly:
+Use the native `cs2df` v5.0.0 CLI directly:
 
 ```bash
-uv run cs2df export demos/example.dem -o exports/example.zip
-uv run cs2df export-batch demos/ --out exports/bundle.zip --descriptive
-uv run cs2df validate exports/example.zip
+cs2df export demos/example.dem -o exports/example.zip
+cs2df export-batch demos/ --descriptive
+cs2df validate --strict exports/example.zip
 ```
 
-DAK Studio calls the same `cs2df` package internally. The
-exported ZIP is the only Python/TypeScript seam.
+DAK Studio and the RivalHub uploader invoke the native `cs2df` binary via `cs2dak.cs2df_runner`
+(bundled in packaged releases; set `CS2DF_BIN` or add `cs2df` to `PATH` in dev). The exported
+ZIP is the only Python/TypeScript seam.
 
 ### Packaging
 
@@ -64,8 +65,9 @@ The PyInstaller spec bundles the Python shell plus DAK Studio frontend assets.
 
 ## 中文
 
-`cs2dak` 不再包含 `.dem` parser 或 exporter。原始 demo 导出由
-[`cs2df`](https://pypi.org/project/cs2df/) 负责，它是 `cs2-demo-format` v3 的参考导出器。
+`cs2dak` 不再包含 `.dem` parser 或 exporter。原始 demo 导出由原生 Rust 二进制
+[`cs2df` v5.0.0](https://github.com/Starfie1d1272/cs2-demo-format/releases/tag/v5.0.0)
+负责（产出 `cs2-demo-format/3.1`，DAK 同时兼容读取 `3.0` 与 `3.1`）。
 
 本包现在只是桌面壳层：
 
@@ -73,7 +75,7 @@ The PyInstaller spec bundles the Python shell plus DAK Studio frontend assets.
 - `cs2dak version`：打印包版本（也可不带子命令调用）
 
 ```text
-.dem -> cs2df -> cs2-demo-format/3.x ZIP -> @cs2dak/* TypeScript 分析
+.dem -> cs2df (v5.0.0) -> cs2-demo-format/3.0 & 3.1 ZIP -> @cs2dak/* TypeScript 分析
 ```
 
 ### 开发
@@ -96,15 +98,15 @@ uv sync --locked --extra gui
 
 ### 导出 demo
 
-直接使用 `cs2df`：
+直接使用原生 `cs2df` v5.0.0 CLI：
 
 ```bash
-uv run cs2df export demos/example.dem -o exports/example.zip
-uv run cs2df export-batch demos/ --out exports/bundle.zip --descriptive
-uv run cs2df validate exports/example.zip
+cs2df export demos/example.dem -o exports/example.zip
+cs2df export-batch demos/ --descriptive
+cs2df validate --strict exports/example.zip
 ```
 
-DAK Studio 内部也调用同一个 `cs2df` 包。导出的 ZIP 是 Python/TypeScript 的唯一 seam。
+DAK Studio 与 RivalHub 上传器通过 `cs2dak.cs2df_runner` 调用原生 `cs2df` 二进制（桌面安装包已内置；开发环境可通过 `CS2DF_BIN` 或 `PATH` 指定）。导出的 ZIP 是 Python/TypeScript 的唯一 seam。
 
 ### 打包
 

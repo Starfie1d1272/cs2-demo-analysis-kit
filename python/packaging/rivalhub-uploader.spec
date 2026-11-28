@@ -32,6 +32,15 @@ if not cs2df_bin.is_file():
         "Run: node scripts/fetch-cs2df-bin.mjs"
     )
 
+for license_name in ("LICENSE", "THIRD-PARTY-LICENSES.txt"):
+    license_file = ROOT / "bin" / license_name
+    if not license_file.is_file():
+        raise SystemExit(
+            f"Native cs2df license file not found at {license_file}. "
+            "Run: node scripts/fetch-cs2df-bin.mjs"
+        )
+    datas.append((str(license_file), "bin"))
+
 binaries = [(str(cs2df_bin), "bin")]
 hiddenimports = []
 
