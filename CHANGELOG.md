@@ -4,6 +4,18 @@ DAK Studio、RivalHub Demo Uploader 及 `@cs2dak/*` 分析管道面向用户的�
 
 > 0.1.3 起面向 Studio 用户维护。`@cs2dak/*` npm 包版本由 changesets 独立管理（见各包的 CHANGELOG.md）；本文件聚焦 DAK Studio 桌面应用变更。
 
+## [0.8.13] — 2026-11-28
+
+### 变更
+
+- **原生 Rust `cs2df v5.0.0` 与 `cs2-demo-format/3.1`**：将 DAK Studio、RivalHub Demo Uploader 及赛事导出脚本切换至原生 Rust `cs2df v5.0.0` 二进制随包发行，移除 Python 侧 `cs2df` / `demoparser2` 与科学计算栈依赖；TS 分析与导入管道同步支持无损读取 `cs2-demo-format/3.0` 与 `3.1` ZIP（含可选 `weapons.json` 与新增状态标记）。
+
+### 修复
+
+- **RivalHub 上传器 3.1 兼容性**：`buildRivalHubDemoEvidenceV1` 按 V1 合法事件白名单过滤炸弹目标事件，自动剔除 `3.1` 新增的 `plant_abort` / `defuse_abort`，避免上传时被服务端枚举校验拒绝。
+- **导出子进程与窗口关闭生命周期**：接通原生 `cs2df` 的取消、超时与退出清理，修复导出线程启动/关闭竞态，避免应用退出后残留子进程或临时文件。
+- **赛事批处理冲突保护**：`event-export` 脚本强制校验 `cs2df 5.x`、按分段数字顺序合并同源 `-pN` 归档，并在跨源同名冲突或部分失败时拒绝冲突组并返回非零退出码。
+
 ## [0.8.12] — 2026-11-28
 
 ### 变更
