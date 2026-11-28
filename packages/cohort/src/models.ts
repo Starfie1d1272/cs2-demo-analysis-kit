@@ -79,7 +79,7 @@ export const seasonCohortBundleSchema = z.object({
   weightsVersion: z.string(),
   provenance: z.object({
     cohortVersion: z.literal('cs2-demo-analysis-kit/cohort-1.0'),
-    sourceSchemaVersion: z.literal('cs2-demo-format/3.0'),
+    sourceSchemaVersion: z.enum(['cs2-demo-format/3.0', 'cs2-demo-format/3.1']),
     matches: z.array(
       z.object({
         matchId: z.string(),

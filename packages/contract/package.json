@@ -31,6 +31,6 @@
     "build": "node ../../scripts/build-public-package.mjs"
   },
   "devDependencies": {
-    "cs2-demo-format": "4.0.0"
+    "cs2-demo-format": "5.0.0"
   }
 }
