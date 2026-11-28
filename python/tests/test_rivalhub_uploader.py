@@ -45,13 +45,22 @@ def test_connection_keeps_token_out_of_metadata(api, monkeypatch):
 
 
 def test_file_hash_chunks_and_cleanup(api, tmp_path, monkeypatch):
-    import cs2df.package
     source = tmp_path / "demo.dem"
     source.write_bytes(b"raw demo")
     api._files["demo"] = source
     assert api.hash_demo("demo") == hashlib.sha256(b"raw demo").hexdigest()
     payload = b"zip" * 500000
-    monkeypatch.setattr(cs2df.package, "export_demo", lambda *a, **k: (payload, {}))
+
+    def fake_export(dem_path, output_zip, *, research=False, compress_level=3, progress=None):
+        assert Path(dem_path) == source
+        assert research is False
+        assert compress_level == 3
+        if progress is not None:
+            progress("open demo", 0.05)
+        Path(output_zip).write_bytes(payload)
+        return {"mapName": "de_inferno"}
+
+    monkeypatch.setattr(uploader, "export_dem_to_zip", fake_export)
     api._jobs["demo"] = {"state": "running"}
     api._export("demo")
     assert api.export_status("demo")["state"] == "done"

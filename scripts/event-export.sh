@@ -22,9 +22,22 @@ SRC="${3:?需要 .rar 或 .dem 路径}"
 PREFIX="${4:-}"
 COMPRESS_LEVEL="${5:-9}"  # cs2df 内部 ZIP 压缩等级，默认 9（最高）；event-export.mjs 由 spec.export.compressLevel 透传
 
+verify_cs2df_version() {
+  local ver
+  ver="$("$CS2DF_BIN" --version 2>&1 || true)"
+  case "$ver" in
+    *" 5."*|5.*) return 0 ;;
+    *)
+      echo "错误：需要 cs2df 5.x 原生二进制，当前为：${ver:-unknown} ($CS2DF_BIN)" >&2
+      exit 1
+      ;;
+  esac
+}
+
 resolve_cs2df() {
   if [ -n "${CS2DF_BIN:-}" ]; then
     if [ -x "$CS2DF_BIN" ] || command -v "$CS2DF_BIN" >/dev/null 2>&1; then
+      verify_cs2df_version
       return 0
     fi
     echo "错误：CS2DF_BIN 不可执行：$CS2DF_BIN" >&2
@@ -32,6 +45,7 @@ resolve_cs2df() {
   fi
   if command -v cs2df >/dev/null 2>&1; then
     CS2DF_BIN="$(command -v cs2df)"
+    verify_cs2df_version
     return 0
   fi
   cat >&2 <<'EOF'
@@ -111,8 +125,11 @@ case "$SRC" in
     while IFS= read -r base; do
       [ -n "$base" ] || continue
       parts="$(echo "$dems" | while IFS= read -r d; do
-        if [ "$(clean_base "$d")" = "$base" ]; then echo "$d"; fi
-      done)"
+        if [ "$(clean_base "$d")" = "$base" ]; then
+          pnum="$(basename "$d" .dem | sed -nE 's/.*-p([0-9]+)$/\1/p')"
+          printf '%09d\t%s\n' "${pnum:-0}" "$d"
+        fi
+      done | sort -t $'\t' -k1,1n | cut -f2-)"
       # shellcheck disable=SC2086
       do_export "${PREFIX:+$PREFIX-}$base" $parts
     done <<< "$bases"

@@ -38,19 +38,34 @@ function fail(message) {
   process.exit(2);
 }
 
+function verifyCs2dfVersion(binPath) {
+  let ver = '';
+  try {
+    ver = execFileSync(binPath, ['--version'], { encoding: 'utf8' }).trim();
+  } catch (err) {
+    fail(`错误：无法执行 cs2df --version（${binPath}）：${err?.message ?? err}`);
+  }
+  if (!/(?:^|\s)5\.\d+/.test(ver)) {
+    fail(`错误：需要 cs2df 5.x 原生二进制，当前为：${ver || 'unknown'}（${binPath}）`);
+  }
+  return binPath;
+}
+
 function resolveCs2dfBin() {
   const envBin = process.env.CS2DF_BIN?.trim();
   if (envBin) {
-    if (existsSync(envBin)) return envBin;
+    if (existsSync(envBin)) return verifyCs2dfVersion(envBin);
     try {
-      return execFileSync('which', [envBin], { encoding: 'utf8' }).trim();
+      const resolved = execFileSync('which', [envBin], { encoding: 'utf8' }).trim();
+      if (resolved) return verifyCs2dfVersion(resolved);
     } catch {
-      fail(`错误：CS2DF_BIN 不可用：${envBin}`);
+      // handled below
     }
+    fail(`错误：CS2DF_BIN 不可用：${envBin}`);
   }
   try {
     const found = execFileSync('which', ['cs2df'], { encoding: 'utf8' }).trim();
-    if (found) return found;
+    if (found) return verifyCs2dfVersion(found);
   } catch {
     // fall through to download instructions
   }
@@ -277,7 +292,7 @@ for (const stageDef of exp.stages) {
       else archives.push(src);
     }
 
-    const extractedDems = [...directDems];
+    const sourceDems = directDems.map((demPath) => ({ source: demPath, dems: [demPath] }));
     await runBounded(archives, EXTRACT_CONCURRENCY, async (src, idx) => {
       console.log(`[解压 ${idx + 1}/${archives.length}] ${basename(src)}`);
       const subDir = join(extractRoot, `src-${idx}`);
@@ -290,7 +305,7 @@ for (const stageDef of exp.stages) {
           totalFail += 1;
           return;
         }
-        extractedDems.push(...dems);
+        sourceDems.push({ source: src, dems });
       } catch (err) {
         console.error(`!! 解压失败：${src} (${err?.message ?? err})`);
         totalFail += 1;
@@ -298,16 +313,51 @@ for (const stageDef of exp.stages) {
     });
 
     const prefix = stageDef.prefix ? `${stageDef.prefix}-` : '';
+    const partNumberOf = (demPath) => {
+      const m = basename(demPath, '.dem').match(/-p(\d+)$/i);
+      return m ? Number(m[1]) : null;
+    };
+    const seenTargets = new Map();
     const groups = new Map();
-    for (const demPath of extractedDems) {
-      const targetName = `${prefix}${cleanBase(demPath)}`;
-      if (!groups.has(targetName)) groups.set(targetName, []);
-      groups.get(targetName).push(demPath);
+    for (const { source, dems } of sourceDems) {
+      const localGroups = new Map();
+      for (const demPath of dems) {
+        const targetName = `${prefix}${cleanBase(demPath)}`;
+        if (!localGroups.has(targetName)) localGroups.set(targetName, []);
+        localGroups.get(targetName).push(demPath);
+      }
+      for (const [targetName, parts] of localGroups.entries()) {
+        if (seenTargets.has(targetName)) {
+          console.error(
+            `!! 跨源命名冲突：${stageDef.stage}/${targetName} 同时出现在 ${seenTargets.get(targetName)} 与 ${source}，拒绝合并`,
+          );
+          totalFail += 1;
+          continue;
+        }
+        if (parts.length > 1) {
+          const withPartNum = parts.map((p) => ({ path: p, num: partNumberOf(p) }));
+          if (withPartNum.some((x) => x.num === null)) {
+            console.error(
+              `!! 同源命名冲突：${source} 内多个 .dem 映射到 ${targetName} 但缺少 -pN 分段后缀，拒绝合并`,
+            );
+            totalFail += 1;
+            continue;
+          }
+          withPartNum.sort((a, b) => a.num - b.num);
+          seenTargets.set(targetName, source);
+          groups.set(
+            targetName,
+            withPartNum.map((x) => x.path),
+          );
+        } else {
+          seenTargets.set(targetName, source);
+          groups.set(targetName, parts);
+        }
+      }
     }
 
     const pendingTargets = [];
     for (const [targetName, parts] of groups.entries()) {
-      parts.sort();
       writeDateSidecar(stageDir, targetName, parts);
       const outZip = join(stageDir, `${targetName}.zip`);
       if (existsSync(outZip)) {
@@ -399,4 +449,8 @@ for (const stageDef of exp.stages) {
     .map(([v, c]) => `${c}×${v}`)
     .join(' ');
   console.log(`  ${stageDef.stage}: ${zips.length} zip${dist ? ` (${dist})` : ''}`);
+}
+
+if (totalFail > 0) {
+  process.exit(1);
 }

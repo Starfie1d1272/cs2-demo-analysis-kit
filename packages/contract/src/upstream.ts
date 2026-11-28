@@ -26,6 +26,8 @@ import {
   duelWindowSchema,
   duelPlayerTrackSchema,
   duelAnchorSchema,
+  weaponSpanRowSchema,
+  weaponsSchema,
 } from 'cs2-demo-format';
 
 export {
@@ -49,6 +51,12 @@ export {
   FLAG_ALIVE,
   FLAG_HAS_BOMB,
   FLAG_HAS_DEFUSE_KIT,
+  FLAG_HAS_HELMET,
+  FLAG_IS_SCOPED,
+  FLAG_IS_WALKING,
+  FLAG_IS_AIRBORNE,
+  FLAG_IS_DUCKING,
+  FLAG_IS_IN_RELOAD,
   grenadeRowSchema,
   grenadeTypeSchema,
   grenadesSchema,
@@ -79,6 +87,8 @@ export {
   teamKeySchema,
   teamSummarySchema,
   vec3Schema,
+  weaponSpanRowSchema,
+  weaponsSchema,
 } from 'cs2-demo-format';
 
 export type Side = z.infer<typeof sideSchema>;
@@ -108,3 +118,5 @@ export type Duels = z.infer<typeof duelsSchema>;
 export type DuelWindow = z.infer<typeof duelWindowSchema>;
 export type DuelPlayerTrack = z.infer<typeof duelPlayerTrackSchema>;
 export type DuelAnchor = z.infer<typeof duelAnchorSchema>;
+export type PackageWeaponSpan = z.infer<typeof weaponSpanRowSchema>;
+export type PackageWeapons = z.infer<typeof weaponsSchema>;

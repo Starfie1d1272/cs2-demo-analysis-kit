@@ -11,7 +11,7 @@
 import sys
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs, collect_submodules
+# Native cs2df binary is staged by scripts/fetch-cs2df-bin.mjs before PyInstaller.
 
 IS_WIN = sys.platform.startswith("win")
 ROOT = Path(SPECPATH).resolve()         # python/packaging/
@@ -34,45 +34,15 @@ else:
         "cp -R apps/dak-studio/dist python/src/cs2dak/studio_web"
     )
 
-binaries = []
+cs2df_bin = ROOT / "bin" / ("cs2df.exe" if IS_WIN else "cs2df")
+if not cs2df_bin.is_file():
+    raise SystemExit(
+        f"Native cs2df binary not found at {cs2df_bin}. "
+        "Run: node scripts/fetch-cs2df-bin.mjs"
+    )
+
+binaries = [(str(cs2df_bin), "bin")]
 hiddenimports = []
-
-def keep_runtime_module(name: str) -> bool:
-    blocked_parts = (
-        ".tests",
-        ".testing",
-        "._testing",
-        ".bench",
-        ".benchmarks",
-        ".conftest",
-        "._pyinstaller",
-    )
-    blocked_names = (
-        "benchmark",
-        "conftest",
-        "pytest",
-        "_pytest",
-        "_test",
-        "test_",
-        "testutils",
-    )
-    return (
-        not any(part in name for part in blocked_parts)
-        and name != "cs2df.cli"
-        and not any(segment.startswith(blocked_names) for segment in name.split("."))
-        and not any(
-            segment.endswith(("_test", "_tests", "_testing"))
-            for segment in name.split(".")
-        )
-    )
-
-for pkg in (
-    # cs2df 及其传递依赖（动态加载，静态分析易遗漏）
-    "cs2df", "pyarrow", "polars", "pandas", "numpy",
-):
-    datas += collect_data_files(pkg, include_py_files=False)
-    binaries += collect_dynamic_libs(pkg)
-    hiddenimports += collect_submodules(pkg, filter=keep_runtime_module)
 
 # cs2dak 自身——studio.py 是入口点，但其内部惰性导入（updater 等）
 # 不在模块顶层，PyInstaller 静态分析无法追踪，需显式声明。

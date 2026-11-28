@@ -67,7 +67,7 @@ export async function loadDemoPackageFromZip(
   const files = manifest.files;
 
   const optional = async (
-    slot: 'shots' | 'replay' | 'duels',
+    slot: 'shots' | 'replay' | 'duels' | 'weapons',
     name: string | undefined,
     enabled = true,
   ): Promise<unknown> => {
@@ -137,6 +137,7 @@ export async function loadDemoPackageFromZip(
   const shots = await optional('shots', files.shots, !evidenceProfile);
   const replay = await optional('replay', files.replay, !evidenceProfile);
   const duels = await optional('duels', files.duels, !evidenceProfile);
+  const weapons = await optional('weapons', files.weapons, !evidenceProfile);
 
   return normalizeDemoPackage({
     manifest,
@@ -154,5 +155,6 @@ export async function loadDemoPackageFromZip(
     shots,
     replay,
     duels,
+    weapons,
   });
 }

@@ -66,6 +66,7 @@ rm -rf "$STUDIO_WEB/tris"
 # .tri 自 0.6.4 起不再打进安装包；内置赛事自 0.7.0 起也不再打进 Vite bundle。
 
 echo "==> [3/5] PyInstaller build (studio)"
+node scripts/fetch-cs2df-bin.mjs
 cd python
 uv sync --extra gui --extra build
 uv run pyinstaller packaging/cs2dak-studio.spec --noconfirm --distpath "$DIST_PATH"
